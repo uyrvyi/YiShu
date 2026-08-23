@@ -1,0 +1,42 @@
+{
+  "name": "yishu",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "驿书 V1 (MVP) — 现代世界 + 古代通信方式的点对点通信 App",
+  "engines": {
+    "node": ">=24.3.0 <25",
+    "pnpm": ">=11.0.0 <12"
+  },
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "postinstall": "prisma generate --schema prisma/schema.prisma",
+    "build:packages": "pnpm --if-present -r --filter \"./packages/*\" run build",
+    "dev": "pnpm build:packages && pnpm --parallel -r run dev",
+    "build": "pnpm --if-present -r run build",
+    "typecheck": "pnpm build:packages && pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm build:packages && pnpm -r run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prisma:validate": "prisma validate --schema prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:studio": "prisma studio --schema prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/pg": "^8.23.1",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.0",
+    "prisma": "7.9.1",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
+    "dotenv": "^16.6.1",
+    "pg": "^8.23.0"
+  }
+}

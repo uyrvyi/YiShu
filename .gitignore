@@ -1,0 +1,40 @@
+# ---- Dependencies ----
+node_modules
+
+# ---- Build / TypeScript output ----
+dist
+build
+*.tsbuildinfo
+
+# ---- Test / coverage ----
+coverage
+
+# ---- Expo ----
+.expo
+.expo-shared
+dist-export
+apps/mobile/.expo
+
+# ---- Prisma generated client ----
+generated
+
+# ---- Env files (ignore all .env*, keep example) ----
+.env
+.env.*
+!.env.example
+
+# ---- Logs ----
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ---- OS / editor ----
+.DS_Store
+*.pem
+
+# ---- Local ----
+.local
+
+# ---- Local agent / tool data ----
+.codebuddy

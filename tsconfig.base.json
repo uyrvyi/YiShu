@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    // 全局开启 strict，禁止 any / @ts-ignore 绕过。
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    // skipLibCheck：Node 端与 Expo 的依赖类型（如 RN）存在相互不兼容的 d.ts，
+    // 是实际工程兼容需要，故开启。业务代码本身仍接受完整类型检查。
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmitOnError": true
+  }
+}

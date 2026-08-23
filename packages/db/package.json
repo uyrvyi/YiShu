@@ -1,0 +1,25 @@
+{
+  "name": "@yishu/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/packages/db/src/index.js",
+  "types": "dist/packages/db/src/index.d.ts",
+  "scripts": {
+    "dev": "tsc -w -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "@types/node": "^24.0.0"
+  }
+}

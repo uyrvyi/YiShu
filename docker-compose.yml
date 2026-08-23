@@ -1,0 +1,41 @@
+# 驿书 V1 本地开发基础设施
+# PostgreSQL 17 + Redis
+#
+# 端口仅绑定本机 localhost（127.0.0.1），不对局域网暴露。
+# 连接串默认值：DATABASE_URL 需与下方 POSTGRES_* 保持一致。
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yishu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yishu}
+      POSTGRES_DB: ${POSTGRES_DB:-yishu}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-yishu} -d ${POSTGRES_DB:-yishu}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

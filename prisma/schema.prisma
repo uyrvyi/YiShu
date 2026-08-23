@@ -1,0 +1,69 @@
+// 驿书 V1 Prisma Schema
+// Phase 2：账号与身份系统。
+// 业务模型：User / Block / RefreshToken。
+// Letter / Journey / TransportLeg 等在后续 Phase 引入。
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../generated/prisma"
+  engineType             = "client"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 用户（对应开发规范 §52，Phase 2 阶段仅含账号身份字段）
+model User {
+  id           BigInt   @id @default(autoincrement())
+  uid          String   @unique
+  account      String   @unique
+  passwordHash String
+  nickname     String
+
+  province String
+  city     String
+  district String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 我拉黑的用户（对应规范 §10）
+  blocks Block[] @relation("Blocker")
+  // 拉黑我的用户
+  blockedBy Block[] @relation("Blocked")
+
+  refreshTokens RefreshToken[]
+}
+
+// 拉黑关系（对应规范 §10）
+model Block {
+  id        BigInt   @id @default(autoincrement())
+  blockerId BigInt
+  blockedId BigInt
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id])
+  blocked User @relation("Blocked", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+// Refresh Token（对应规范 §5：数据库只保存 Token Hash）
+model RefreshToken {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
