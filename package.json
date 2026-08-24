@@ -21,7 +21,8 @@
     "format:check": "prettier --check .",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
-    "prisma:studio": "prisma studio --schema prisma/schema.prisma"
+    "prisma:studio": "prisma studio --schema prisma/schema.prisma",
+    "graph:validate": "node data/validate_graph.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

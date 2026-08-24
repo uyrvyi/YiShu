@@ -1,11 +1,9 @@
-# 规范文档 / 评审历史（非 Prettier 管理）
+# 规范文档（冻结基线，非 Prettier 管理）
 驿书_V1_Coding_Agent_开发规范.md
 驿书_V1_Coding_Agent_协作开发流程.md
-Phase1_全仓库技术评审报告.md
 
 # 自动生成 / 锁文件
 pnpm-lock.yaml
-pnpm-workspace.yaml
 
 # 构建产物
 node_modules

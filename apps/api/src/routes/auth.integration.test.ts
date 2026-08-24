@@ -19,6 +19,9 @@ describe("auth integration", () => {
     const config = loadConfig({ NODE_ENV: "test" });
     prisma = createPrismaClient(testDbUrl);
     // 清理测试数据（仅发生在确认安全的 *_test 库）
+    await prisma.recipientState.deleteMany();
+    await prisma.senderState.deleteMany();
+    await prisma.letter.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.block.deleteMany();
     await prisma.user.deleteMany();
@@ -92,6 +95,41 @@ describe("auth integration", () => {
     expect(payload.sub).toMatch(/^[1-9][0-9]{7}$/);
     // payload 不得包含 internal BIGINT id
     expect(payload.id).toBeUndefined();
+  });
+
+  it("禁止注册 8 位数字 account（避免与 UID 歧义）", async () => {
+    const res = await register({
+      account: "59093690",
+      password: "numeric-pass-1",
+      nickname: "数字账号",
+      province: "上海市",
+      city: "上海市",
+      district: "徐汇区",
+    });
+    expect(res.statusCode).toBe(400); // validation_error
+  });
+
+  it("nickname 按 Unicode code point 限制 20 个字符", async () => {
+    const allowed = await register({
+      account: "emoji_nick_ok",
+      password: "emoji-nick-pass",
+      nickname: "😀".repeat(20),
+      province: "上海市",
+      city: "上海市",
+      district: "徐汇区",
+    });
+    expect(allowed.statusCode).toBe(201);
+
+    const rejected = await register({
+      account: "emoji_nick_over",
+      password: "emoji-nick-pass",
+      nickname: "😀".repeat(21),
+      province: "上海市",
+      city: "上海市",
+      district: "徐汇区",
+    });
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.json().error).toBe("validation_error");
   });
 
   it("密码以非明文哈希保存", async () => {

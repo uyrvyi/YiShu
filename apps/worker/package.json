@@ -13,9 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@yishu/config": "workspace:*",
-    "@yishu/db": "workspace:*",
-    "@yishu/shared": "workspace:*"
+    "@yishu/config": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

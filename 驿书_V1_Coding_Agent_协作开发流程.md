@@ -2,7 +2,7 @@
 
 > 本文档定义 **驿书 V1 的开发协作方式**。  
 > Coding Agent 必须遵守本文档执行任务。  
-> 本文档不替代 `docs/YISHU_V1_SPEC.md`，产品与技术需求仍以 `YISHU_V1_SPEC.md` 为唯一业务规范。
+> 本文档只定义 **协作、执行、评审与 Gate 流程**。产品与技术规则以根目录 `驿书_V1_Coding_Agent_开发规范.md` 为准；Phase 编号与功能归属以 `驿书_V1_Coding_Agent_阶段规划.md` 为唯一来源；`README.md` 只描述仓库当前真实状态。
 
 ---
 
@@ -82,13 +82,20 @@ Coding Agent 不是最终需求决策者。
 
 ## 技术评审 LLM
 
-当前参与评审的模型包括：
+角色可由不同模型承担，当前推荐分工：
 
 ```text
-ChatGPT
-Luna
-DeepSeek V4 Flash
+HY3 / DeepSeek
+→ Coding Agent：实操实现、修改仓库、运行命令
+
+GPT-5.6 Sol / Codex
+→ 技术评审 LLM：默认只读 Gate Review
+
+ChatGPT / 项目负责人
+→ 汇总评审、决定修复范围与是否进入下一 Phase
 ```
+
+具体模型可以更换，但“实操”和“独立评审”职责不得混淆。
 
 主要职责：
 
@@ -109,11 +116,13 @@ Coding Agent 不得假定自己已经通过评审。
 当信息冲突时，按以下优先级执行：
 
 ```text
-1. 项目负责人最新明确指令
-2. docs/YISHU_V1_SPEC.md
-3. 本协作流程文档
-4. 当前 Phase Prompt
-5. Coding Agent 自己的实现偏好
+1. 项目负责人最新明确指令 / 已冻结最新决策
+2. 驿书_V1_Coding_Agent_开发规范.md      （产品与技术规则）
+3. 驿书_V1_Coding_Agent_阶段规划.md      （Phase 编号与功能归属）
+4. 驿书_V1_Coding_Agent_协作开发流程.md  （执行与 Gate 流程）
+5. 当前 Phase Prompt                     （本轮具体任务）
+6. README.md                             （当前真实实现状态）
+7. Coding Agent 自己的实现偏好
 ```
 
 Coding Agent 不得自行改变已经冻结的业务规则。
@@ -124,11 +133,13 @@ Coding Agent 不得自行改变已经冻结的业务规则。
 
 收到新的 Phase 指令后，Coding Agent 必须先：
 
-1. 阅读 `docs/YISHU_V1_SPEC.md`
-2. 阅读本协作流程文档
-3. 明确当前 Phase 的边界
-4. 检查当前 Git / 项目状态
-5. 只修改本 Phase 必需内容
+1. 阅读 `驿书_V1_Coding_Agent_开发规范.md`
+2. 阅读 `驿书_V1_Coding_Agent_协作开发流程.md`
+3. 阅读 `驿书_V1_Coding_Agent_阶段规划.md`
+4. 阅读 `README.md`
+5. 从《阶段规划》明确当前 Phase 的边界
+6. 检查当前 Git / 项目状态
+7. 只修改本 Phase 必需内容
 
 如果发现：
 
@@ -499,7 +510,8 @@ Agent 输出完成报告后：
 
 ### A. 需求一致性
 
-- 是否符合 `YISHU_V1_SPEC.md`
+- 是否符合 `驿书_V1_Coding_Agent_开发规范.md`
+- 是否符合 `驿书_V1_Coding_Agent_阶段规划.md` 的当前 Phase 边界
 - 是否擅自增加功能
 - 是否删除必要功能
 - 是否误解冻结规则
@@ -777,47 +789,21 @@ Coding Agent 只能报告：
 
 # 21. 开发阶段顺序
 
-当前 V1 默认顺序：
+Phase 编号、阶段名称和功能归属不在本文件重复维护。
+
+唯一来源：
 
 ```text
-Phase 1
-项目骨架
-
-Phase 2
-账号与身份系统
-
-Phase 3
-Letter 核心 + Mobile 基础信件流程
-
-Phase 4
-本地 Graph + Dijkstra
-
-Phase 5
-Simulation Core + Journey + Random Events
-
-Phase 6
-BullMQ Simulation Worker
-
-Phase 7
-地图与 Timeline
-
-Phase 8
-DEV Simulation Debug Panel
-
-Phase 9
-Polling + Push
-
-Phase 10
-V1 Final Audit
+驿书_V1_Coding_Agent_阶段规划.md
 ```
 
-实际细分可以由项目负责人决定。
+原因：协作流程长期稳定，而 Phase 可能按真实工程情况细分；如果在多个文件维护阶段表，会产生编号漂移。
 
-但：
+因此 Coding Agent / Review Agent 不得根据旧 Prompt、旧报告或本文件历史文字推断下一 Phase。
 
-```text
-不得跳过评审机制
-```
+必须读取《阶段规划》确认。
+
+不得跳过评审机制。
 
 ---
 
@@ -830,125 +816,90 @@ V1 Final Audit
 
 1. 实际运行所有适用测试。
 2. 实际运行 TypeScript 检查。
-3. 如果出现错误，自行定位并修复。
-4. 不允许通过删除测试或关闭检查绕过问题。
-5. 给出完整 Phase 完成报告。
-6. 完成后停止。
-7. 不要进入下一 Phase。
-8. 等待项目负责人评审。
+3. 实际运行 lint / format / build。
+4. 涉及 Prisma 时实际执行 validate / generate / migration 检查。
+5. 如果出现错误，自行定位并修复。
+6. 不允许通过删除测试或关闭检查绕过问题。
+7. 给出完整 Phase 完成报告。
+8. 完成后停止。
+9. 不要进入下一 Phase。
+10. 等待项目负责人和独立技术评审结果。
 ```
 
 Coding Agent 必须遵守。
 
 ---
 
-# 23. 项目当前状态
+# 23. 项目当前状态来源
 
-当前阶段：
+本协作流程文档不硬编码“当前 Phase”，防止随着开发推进而过期。
 
-```text
-Phase 1：项目骨架
-```
-
-当前目标：
+每次工作时按以下顺序确认：
 
 ```text
-只建立可运行、可测试、可继续扩展的基础工程。
+驿书_V1_Coding_Agent_阶段规划.md
+→ 确认 Phase 编号、阶段边界和历史 Gate 状态
+
+README.md
+→ 确认仓库当前真实实现、启动方式、测试状态和下一阶段
+
+项目负责人最新指令
+→ 确认本轮实际要执行/评审的 Phase
 ```
 
-当前禁止提前开发：
-
-- 用户业务
-- Letter
-- Journey
-- Simulation
-- 地图
-- Push
+如果三者存在明显冲突，不得自行猜测跨阶段开发；应遵循项目负责人最新明确决定，并在报告中指出文档需要同步。
 
 ---
 
-# 24. Phase 1 当前执行要求
+# 24. 当前 Phase 执行要求
 
-Phase 1 应完成：
-
-```text
-pnpm workspace
-
-apps/mobile
-apps/api
-apps/worker
-
-packages/shared
-packages/simulation
-packages/routing
-packages/config
-
-Prisma
-PostgreSQL
-Redis
-Docker Compose
-
-TypeScript strict
-ESLint
-Prettier
-Vitest
-
-.env.example
-
-pnpm dev
-
-API health check
-```
-
-完成后必须：
+无论当前处于哪个 Phase，都必须：
 
 ```text
-运行
+读取三份根目录规范 + README
 ↓
-检查
+确认当前 Phase 边界
 ↓
-修复
+检查现有代码/迁移/Git 状态
 ↓
-汇报
+只实现当前 Phase
 ↓
-停止
+实际运行适用验证
+↓
+修复当前 Phase 问题
+↓
+输出完成报告
+↓
+立即停止
+↓
+等待 Gate Review
 ```
 
-不得开始 Phase 2。
+具体“该 Phase 要做什么 / 不得做什么 / Gate 看什么”，只从 `驿书_V1_Coding_Agent_阶段规划.md` 获取。
 
 ---
 
-# 25. Coding Agent 当前指令
-
-如果当前还未开始 Phase 1，请执行：
+# 25. Coding Agent 通用启动指令模板
 
 ```text
-完整阅读：
-1. docs/YISHU_V1_SPEC.md
-2. 本开发协作流程文档
+完整阅读项目根目录：
 
-现在只执行 Phase 1：项目骨架。
+1. 驿书_V1_Coding_Agent_开发规范.md
+2. 驿书_V1_Coding_Agent_协作开发流程.md
+3. 驿书_V1_Coding_Agent_阶段规划.md
+4. README.md
 
-严格控制范围，不实现任何业务逻辑。
-
-完成后必须：
-- 实际安装依赖
-- 实际执行 TypeScript Check
-- 实际执行 ESLint
-- 实际执行 Vitest
-- 实际验证 API Health Check
-- 修复所有本阶段可修复错误
-
-然后按照本文件定义的《Phase 完成报告模板》汇报。
-
-完成后立即停止。
-
-不要进入 Phase 2。
-等待项目负责人和技术评审 LLM 的评审结果。
+根据项目负责人指定的 Phase：
+- 只实现《阶段规划》中属于该 Phase 的内容
+- 不进入下一 Phase
+- 不提前实现后续功能
+- 不自动 Commit
+- 实际运行所有适用检查
+- 输出 Phase 完成报告后立即停止
+- 等待独立 Gate Review
 ```
 
 ---
-
 # 26. 最终原则
 
 整个项目始终遵守：

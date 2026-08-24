@@ -57,6 +57,9 @@ importers:
       '@yishu/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@yishu/routing':
+        specifier: workspace:*
+        version: link:../../packages/routing
       '@yishu/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -140,12 +143,6 @@ importers:
       '@yishu/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@yishu/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@yishu/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -202,6 +199,10 @@ importers:
         version: 2.1.9(@types/node@24.13.3)(lightningcss@1.33.0)(supports-color@8.1.1)(terser@5.50.0)
 
   packages/routing:
+    dependencies:
+      '@yishu/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.0

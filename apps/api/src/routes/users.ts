@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { searchQuerySchema, blockUidParamSchema } from "../schemas/user.js";
 import { toUserPublicView } from "../lib/user-view.js";
+import { acquireBlockLetterPairLock } from "../lib/blockLock.js";
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
   // 当前用户（规范 §72）：Access Token sub 为对外 UID，用 UID 查询，不依赖 internal id。
@@ -53,13 +54,16 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "cannot_block_self" });
       }
 
-      // 幂等：已存在则返回成功（重复 block 行为正确）
-      await req.server.prisma.block.upsert({
-        where: {
-          blockerId_blockedId: { blockerId: blocker.id, blockedId: target.id },
-        },
-        update: {},
-        create: { blockerId: blocker.id, blockedId: target.id },
+      // 幂等：已存在则返回成功；使用 advisory lock 与 Letter 创建协调并发（规范 §10）
+      await req.server.prisma.$transaction(async (tx) => {
+        await acquireBlockLetterPairLock(tx, blocker.id, target.id);
+        await tx.block.upsert({
+          where: {
+            blockerId_blockedId: { blockerId: blocker.id, blockedId: target.id },
+          },
+          update: {},
+          create: { blockerId: blocker.id, blockedId: target.id },
+        });
       });
       return reply.send({ blocked: toUserPublicView(target) });
     }

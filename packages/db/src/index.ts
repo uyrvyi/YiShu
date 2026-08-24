@@ -11,7 +11,19 @@ import { Prisma, PrismaClient } from "../../../generated/prisma/client.js";
  */
 
 export { Prisma, PrismaClient };
-export type { User, Block, RefreshToken } from "../../../generated/prisma/client.js";
+export type {
+  User,
+  Block,
+  RefreshToken,
+  Letter,
+  RecipientState,
+  SenderState,
+  Journey,
+  JourneyStatus,
+  TransportLeg,
+  TransportLegStatus,
+  TransportType,
+} from "../../../generated/prisma/client.js";
 
 /**
  * 创建 PostgreSQL Prisma Client 实例。
@@ -30,7 +42,7 @@ export function createPrismaClient(databaseUrl: string): PrismaClient {
 export async function pingDatabase(databaseUrl: string): Promise<boolean> {
   const prisma = createPrismaClient(databaseUrl);
   try {
-    // 无业务表，执行 `SELECT 1` 验证连接。
+    // 不依赖业务表，执行 `SELECT 1` 验证连接。
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } finally {

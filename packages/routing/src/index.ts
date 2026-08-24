@@ -1,9 +1,13 @@
 /**
- * 驿书 V1 Routing 包。
+ * 驿书 V1 Routing 包（Phase 4：本地 Graph + Dijkstra + PIGEON 直连）。
  *
- * Phase 1 仅建立包骨架，导出最小占位能力以验证可编译、可测试。
- * 本地 Graph / Dijkstra / StationNode / RouteEdge 将在 Phase 4 实现。
+ * - 不依赖外部地图服务（开发规范 §14/§15）。
+ * - 权重仅 distanceKm（开发规范 §24）。
+ * - PIGEON 走 Haversine 直线，绕过 road graph（开发规范 §26）。
  */
 
-/** 包版本标识（骨架占位，供 smoke 测试使用）。 */
-export const ROUTING_PACKAGE_NAME = "@yishu/routing";
+export * from "./types.js";
+export { buildGraph, validateGraph, type GraphValidationResult } from "./loader.js";
+export { findShortestPath } from "./dijkstra.js";
+export { planPigeonRoute, getNode } from "./pigeon.js";
+export { haversineKm } from "./geo.js";

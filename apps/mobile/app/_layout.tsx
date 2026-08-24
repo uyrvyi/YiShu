@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 
 /**
  * 驿书 V1 Mobile 根布局。
- * Phase 1 仅建立 Expo Router 骨架，不包含任何业务路由。
+ * 当前承载 Phase 2 认证入口与 Phase 3 基础信件路由。
  */
 export default function RootLayout(): React.JSX.Element {
   return (

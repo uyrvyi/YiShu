@@ -5,12 +5,12 @@ import dotenv from "dotenv";
 import { z } from "zod";
 
 /**
- * 驿书 V1 基础设施环境配置加载（Phase 1）。
+ * 驿书 V1 统一环境配置加载（Phase 1–3）。
  *
  * - 由仓库根目录的 `.env` 加载环境变量。
  * - 使用 Zod 统一校验并导出类型安全的配置对象。
  * - API / Worker 通过本包读取配置，禁止各自散落读取 `process.env`。
- * - 业务 / Simulation 相关配置在后续 Phase 引入，不在本阶段冻结。
+ * - 当前覆盖基础设施、认证与 Letter 正文加密配置；Simulation 配置在后续 Phase 引入。
  */
 
 /** 开发环境默认数据库连接串（仅限 development/test 使用）。 */
@@ -25,6 +25,10 @@ export const DEFAULT_JWT_SECRET = "yishu-dev-jwt-secret-change-me";
 /** 测试专用数据库连接串（默认 yishu_test，仅用于集成测试）。 */
 export const DEFAULT_TEST_DATABASE_URL =
   "postgresql://yishu:yishu@localhost:5432/yishu_test?schema=public";
+
+/** 开发环境默认正文加密密钥（32 字节 hex；仅限 development/test）。 */
+export const DEFAULT_CONTENT_ENCRYPTION_KEY =
+  "0000000000000000000000000000000000000000000000000000000000000001";
 
 const EnvSchema = z
   .object({
@@ -45,6 +49,11 @@ const EnvSchema = z
       .default(15 * 60),
     // Refresh Token 有效期（天），默认 30 天。
     REFRESH_TOKEN_DAYS: z.coerce.number().int().positive().default(30),
+    // 正文加密密钥（AES-256-GCM，32 字节 hex）；production 必须显式提供。
+    CONTENT_ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/, "CONTENT_ENCRYPTION_KEY must be 32 bytes hex")
+      .default(DEFAULT_CONTENT_ENCRYPTION_KEY),
   })
   .superRefine((val, ctx) => {
     if (val.NODE_ENV === "production") {
@@ -68,6 +77,13 @@ const EnvSchema = z
           code: z.ZodIssueCode.custom,
           path: ["JWT_SECRET"],
           message: "JWT_SECRET must be explicitly provided when NODE_ENV=production",
+        });
+      }
+      if (val.CONTENT_ENCRYPTION_KEY === DEFAULT_CONTENT_ENCRYPTION_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["CONTENT_ENCRYPTION_KEY"],
+          message: "CONTENT_ENCRYPTION_KEY must be explicitly provided when NODE_ENV=production",
         });
       }
     }

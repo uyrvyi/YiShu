@@ -16,6 +16,7 @@
     "@fastify/jwt": "^10.2.2",
     "@yishu/config": "workspace:*",
     "@yishu/db": "workspace:*",
+    "@yishu/routing": "workspace:*",
     "@yishu/shared": "workspace:*",
     "argon2": "^0.45.1",
     "fastify": "^5.0.0",

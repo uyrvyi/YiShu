@@ -4,7 +4,7 @@ import { WORKER_NAME } from "./constants.js";
 /**
  * 驿书 V1 Simulation Worker。
  *
- * Phase 1 仅提供可启动骨架。BullMQ / Redis 消费者将在 Phase 6 实现。
+ * Phase 1 仅提供可启动骨架。BullMQ / Redis 消费者将在 Phase 9（Worker Scheduling + Push + Refresh）实现。
  *
  * 日志安全：不得输出任何含用户名/密码/token 的完整连接串（如 REDIS_URL / DATABASE_URL）。
  */

@@ -2,9 +2,11 @@
 
 「现代世界 + 古代通信方式」的点对点通信 App。
 
-> 当前阶段：**Phase 2：账号与身份系统**
-> 当前状态：Phase 2 implementation complete · Final Gate pending re-review
-> 已完成账号/身份能力，尚未实现 Letter / Journey / Simulation / 地图 / Push 等后续业务。
+> 当前基线：**Phase 4 实现完成 · Final Gate 三次评审修复完毕（第一次 FAIL 与第二、三次 PASS WITH FIXES 的全部 BLOCKER/HIGH/MEDIUM/LOW 均已修复，等待最终封板复核）**
+> 下一阶段：**Phase 5（Simulation Core + Transport Progression，尚未开始）**
+> 已完成项目骨架、账号/身份、Letter 核心，以及 Phase 4：本地静态 Graph + Dijkstra 路线规划（Journey / TransportLeg，版本化图与规则冻结）。Simulation / 地图 / Push 等后续业务仍未实现。
+
+当前进度、验收结果与已知限制见 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
 
 ## 技术栈（规划）
 
@@ -23,18 +25,18 @@
 ```
 yishu/
 ├─ apps/
-│  ├─ mobile/          # Expo Router App（Phase 1 占位首页）
-│  ├─ api/             # Fastify API（含 /api/v1/health）
+│  ├─ mobile/          # Expo Router App（认证入口 + Letter 列表/写信/详情）
+│  ├─ api/             # Fastify API（含 /api/v1/health、认证、用户、Letter）
 │  └─ worker/          # Simulation Worker 骨架
 ├─ packages/
-│  ├─ shared/          # 共享基础设施（API_PREFIX）
-│  ├─ db/              # Prisma PostgreSQL Runtime（API/Worker 共用，正式接受）
+│  ├─ shared/          # 共享基础设施 + 业务常量/类型（TransportType/LetterStatus/RecipientReadState）
+│  ├─ db/              # Prisma PostgreSQL Runtime（当前由 API 使用，Worker 后续复用）
 │  ├─ simulation/      # 骨架（Phase 5 实现）
-│  ├─ routing/         # 骨架（Phase 4 实现）
+│  ├─ routing/         # 本地静态 Graph + Dijkstra + PIGEON 直连（Phase 4 实现）
 │  └─ config/          # Zod 环境配置加载 + 根 .env
-├─ data/               # 本地静态数据（占位）
+├─ data/               # 本地静态数据（station_nodes/route_edges/region_station_map 等）
 ├─ prisma/
-│  ├─ schema.prisma    # Phase 2 业务模型：User / Block / RefreshToken（后续 Letter/Journey 等待引入）
+│  ├─ schema.prisma    # 模型：User/Block/RefreshToken/Letter/RecipientState/SenderState/Journey/TransportLeg（含 enum）
 │  └─ migrations/
 ├─ prisma.config.ts    # Prisma 7 配置文件
 ├─ docker-compose.yml  # PostgreSQL 17 + Redis
@@ -88,7 +90,11 @@ REDIS_URL=redis://localhost:6379
 JWT_SECRET=change-me-to-a-long-random-secret
 JWT_EXPIRES_IN_SECONDS=900
 REFRESH_TOKEN_DAYS=30
+CONTENT_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000001
+EXPO_PUBLIC_API_BASE_URL=http://192.168.x.x:4000
 ```
+
+> **真机 API 地址**：`EXPO_PUBLIC_API_BASE_URL` 在真机上必须设为开发机的**局域网地址**（如 `http://192.168.x.x:4000`）。`localhost` 在真机上指向手机自身，不可用；未配置时 Mobile 层 **fail-fast 抛错**，不会默默 fallback 到 localhost。
 
 - API / Worker 统一通过 `@yishu/config` 的 `loadConfig()` 读取，不散落读取 `process.env`。
 - 根 `.env` 由 `@yishu/config` 自动加载。
@@ -145,6 +151,7 @@ pnpm format:check      # Prettier 检查
 pnpm prisma:validate   # Prisma schema 校验
 pnpm prisma:generate   # 生成 Prisma Client 到 generated/prisma
 pnpm prisma:studio     # Prisma Studio
+pnpm graph:validate    # 校验 data/graphs/<version>/ 并写出 GRAPH_VALIDATION_REPORT.json
 ```
 
 ### Build 语义说明
@@ -203,17 +210,17 @@ pnpm prisma:validate    # Prisma schema 校验
 pnpm prisma:generate    # 生成 Prisma Client 到 generated/prisma（install 时自动执行）
 ```
 
-Phase 2 schema 包含业务模型：**User**、**Block**、**RefreshToken**。以下模型属于后续 Phase，尚未实现：Letter、Journey、TransportLeg、WorldEvent、TimelineEvent、RecipientState、SenderState。
+Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Letter**、**RecipientState**、**SenderState**、**Journey**、**TransportLeg**（含 `LetterStatus` / `TransportType` / `RecipientReadState` / `JourneyStatus` / `TransportLegStatus` enum）。以下模型属于后续 Phase，尚未实现：WorldEvent、TimelineEvent、Routing 等领域模型。
 
-## packages/db（已正式接受为 API/Worker 共用数据库基础设施）
+## packages/db（已正式接受的数据库基础设施）
 
-`packages/db` 由项目负责人正式接受，作为 API / Worker 共用的数据库基础设施 package。
+`packages/db` 由项目负责人正式接受，作为可供 API / Worker 复用的数据库基础设施 package；当前生产消费方是 API，Worker 在 Phase 9（Worker Scheduling + Push + Refresh）接入数据库与队列时再声明依赖。
 
 **职责**：
 
 - 封装 Prisma 7 PostgreSQL driver adapter（`@prisma/adapter-pg` + `pg`）。
 - 提供可复用的 Prisma Client 工厂与连接健康检查。
-- 生成真正的 JS `dist`，API / Worker 生产 `node dist/*.js` 可直接导入，**不依赖 tsx**。
+- 生成真正的 JS `dist`，Node 生产进程可直接导入，**不依赖 tsx**。
 
 **关键实现**：
 
@@ -221,7 +228,7 @@ Phase 2 schema 包含业务模型：**User**、**Block**、**RefreshToken**。�
 - `packages/db` 的 `build`（tsc）把 `generated/prisma` 编译进自身 `dist`，`main`/`types` 指向 `dist/packages/db/src/index.js`。
 - 导出 `createPrismaClient(databaseUrl)` 与 `pingDatabase(databaseUrl)`（`SELECT 1` 连接健康检查）。
 
-**API 真实消费**：`apps/api/src/server.ts` 在生产代码路径 `import { createPrismaClient } from "@yishu/db"`，构造 PostgreSQL adapter + PrismaClient（惰性连接），并在 shutdown 时 `$disconnect`。Worker 同样通过 workspace 依赖 `@yishu/db` 复用。
+**API 真实消费**：`apps/api/src/server.ts` 在生产代码路径 `import { createPrismaClient } from "@yishu/db"`，构造 PostgreSQL adapter + PrismaClient（惰性连接），并在 shutdown 时 `$disconnect`。Worker 当前仍是可启动骨架，数据库依赖将在 Phase 9 按实际消费路径接入。
 
 **运行时测试**：`packages/db` 提供可重复的构造测试（无需 PostgreSQL 在线即可构造 adapter + PrismaClient 并 disconnect）；当 Docker 可用时，`pingDatabase` 可执行真实 `SELECT 1` 连接验证（已在当前机器验证 PASS）。
 
@@ -239,15 +246,50 @@ Phase 2 schema 包含业务模型：**User**、**Block**、**RefreshToken**。�
 - **Mobile SecureStore**：`expo-secure-store` 封装（tokenStorage.ts）
 - **Mobile AuthService**：`authService.ts`，register/login 保存 Refresh Token、refresh 读取更新、logout try/finally 删除
 - **PostgreSQL / Prisma**：User/Block/RefreshToken 模型 + migration + validate/generate
-- **Phase 2 测试**：全 workspace 66+ tests（含认证/用户集成测试、JWT sub、malformed JSON、UID 碰撞重试、SecureStore/AuthService）
+- **Phase 2 测试覆盖**：认证/用户集成、JWT sub、malformed JSON、UID 碰撞重试、Unicode 昵称边界、SecureStore/AuthService
+
+### 已完成（Phase 3：Letter 核心）
+
+- **Letter 模型**：BIGINT 内部 id、trackingNo（对外唯一）、senderId/recipientId、身份快照、区域快照、status（enum）、initialTransport/currentTransport（enum）、AES-256-GCM 加密正文（ciphertext/iv/authTag）、clientRequestId、requestFingerprint、rulesVersion/graphVersion/simulationSeed（密码学随机）、sentAt/deliveredAt
+- **Prisma enum + Shared Types**：`LetterStatus`（15 值）、`TransportType`（4 值）、`RecipientReadState`（2 值）；`@yishu/shared` 提供同一份类型来源，API schema/响应/Mobile 共用
+- **Tracking Number**：`YS-YYYYMMDD-XXXXX` 格式，全局唯一，碰撞自动重试（最大 10 次）
+- **正文加密**：AES-256-GCM 应用层加密（密钥来自 `CONTENT_ENCRYPTION_KEY`），数据库不存明文；Sender 始终可见，Recipient 未 DELIVERED 前 content=null；完整性错误抛入统一 500（不静默置 null）
+- **创建信件** `POST /letters`：recipient（account/8 位 UID 精准解析；禁止注册 8 位数字 account 避免歧义）、block 发送拦截（**advisory lock** `pg_advisory_xact_lock` 与 Block 共用同一把锁防并发竞态）、身份/区域快照、正文加密、幂等（senderId+clientRequestId + requestFingerprint）
+- **幂等指纹**：requestFingerprint = SHA-256(recipient UID + content + transportType)；同 key 同 body → 原 Letter(200)；同 key 不同 body → 409 `idempotency_conflict`（顺序/并发均适用）
+- **simulationSeed**：每封 Letter 用 `crypto.randomBytes(32)` 生成，非空、两封不同、API 不返回
+- **信件查询** `GET /letters`（寄出/收到/全部，过滤当前用户已隐藏信）、`GET /letters/:trackingNo`（详情）
+- **RecipientState / SenderState**：open/hide 独立；Sender 永远看不到 readState
+- **Open** `POST /letters/:trackingNo/open`：仅 Recipient 且 DELIVERED（幂等，重复 open 不重写 openedAt）
+- **Hide** `POST /letters/:trackingNo/hide`：仅终态，Sender/Recipient 独立软隐藏（列表过滤，detail 仍可直达）
+- **TransportType**：HAND_CARRY / HORSE_RELAY / EXPRESS_RELAY / PIGEON（仅保存选择）
+- **Mobile 基础信件流程**：列表页、写信页（稳定幂等键、发已确认 UID、code-point 计数正文、搜索/确认/运输方式/寄出）、详情页（DELIVERED 前锁定正文）
+- **Mobile 真实 Auth Session**：`loginSession`/`registerSession`/`restoreSession`/`logoutSession` 调用真实后端；access token 仅内存、refresh token 存 SecureStore；API Base URL 统一 `EXPO_PUBLIC_API_BASE_URL`（真机需配置局域网地址，未配置 fail-fast）
+- **Mobile 最小认证入口**：首页启动 restoreSession，未认证显示 Login/Register 最小表单，认证后进入信件
+- **Phase 3 测试**：全 workspace 130 tests（含 Letter 集成、advisory lock 确定性并发、fingerprint 幂等、simulationSeed、hide/open/snapshot 边界、加密/追踪号/视图单元测试、Mobile Letter API + 共享 Session + restoreSession）
+
+### 已完成（Phase 4：本地 Graph + Dijkstra 路线规划）
+
+- **Prisma 模型**：`Journey`（Letter 1:1，`letterId` UNIQUE；继承 `rulesVersion`/`graphVersion`/`simulationSeed`，自身不生成）、`TransportLeg`（Journey 1:N，`(journeyId, sequence)` UNIQUE；`distanceKm>0`；最小状态集，不含事件/掉落/疲劳等 Phase 5+ 字段）
+- **Shared Types**：`@yishu/shared` 新增 `JourneyStatus`/`TransportLegStatus` enum 与 `TRANSPORT_SPEEDS_KM_PER_DAY`（HAND_CARRY 35 / HORSE_RELAY 120 / EXPRESS_RELAY 300 / PIGEON 480 km/day，冻结常量）；版本化速度：`TRANSPORT_SPEEDS_BY_RULES_VERSION` / `speedKmPerDay(rulesVersion, transportType)` / `plannedDurationSeconds(rulesVersion, transportType, distanceKm)`（`distanceKm/speed → 秒`，仅内部 Simulation 输入，用户 API 严禁暴露）；未知 `rulesVersion` 抛 `UnknownRulesVersionError`（路由 → 422），不静默 fallback
+- **本地静态路网（按版本索引）**：`data/graphs/china-v1/station_nodes.json`（294 节点）、`route_edges.json`（1949 无向边，全连通）、`region_station_map.json`（市→站点 / 省→省会兜底，确定性、无 GPS/geocoder）；`data/graphs/registry.json` 登记已知版本，未知版本明确拒绝；`pnpm graph:validate` 可重复生成 `data/GRAPH_VALIDATION_REPORT.json`
+- **Graph Loader + 校验**：节点 id 唯一、边端点存在、无自环、`distanceKm>0`、transport 合法、重复边检测、连通分量统计（`validateGraph` 返回 node/edge/component/isolated 计数）
+- **Dijkstra**：二叉最小堆；唯一权重 `distanceKm`；遍历前过滤 `enabled && allowedTransport includes`；确定性 tie-break（node id 字典序）；`origin==destination` 返回空；无连通抛 `NoRouteError`（不 fallback 外部地图/不改 transport）
+- **PIGEON 特殊路由**：绕过 road graph，Haversine 大圆直线距离，单 leg，无 Dijkstra/在线地图
+- **Region→Station 映射**：本地确定性（市精确 → 省会兜底），失败显式抛错，不依赖外部 geocoder
+- **Journey 初始化服务**：原子事务创建 Journey + TransportLeg[]；`completedPath=[]` / `remainingPath=full route`（动态计算，completedPath 不可重写）；并发幂等（UNIQUE `letterId` + 事务 + P2002 冲突重读现有 Journey）；成功初始化后 Letter 进入 `DISPATCHED`（规范 §25）
+- **API**：`POST /letters/:trackingNo/journey`（仅 Sender，幂等 201/200，第三方 404，无站点映射 422）、`GET /letters/:trackingNo/journey`（Sender/Recipient 同视图，第三方 404）；安全视图不含 internal id / `simulationSeed` / `plannedDuration` / ETA
+- **Mobile**：Letter 详情基础路线文本（起点→终点、总距离、legs 列表；无地图、无 ETA）
+- **Phase 4 测试**：routing 单元测试（loader 校验 / graphVersion 传播 / Dijkstra 最短·禁用·运输限制·不连通·origin==dest·未知节点·距离累加·确定性 tie-break / PIGEON 直连）19 项；journey 集成测试（ground 继承字段+原子 legs、PIGEON 单直连、Sender 专属/Recipient 404、并发严格 [200,201]、幂等 200、Sender/Recipient 同视图、未知版本 422、非 CREATED 409、同站点 PIGEON、行锁竞态 409）11 项
+- **门禁**：typecheck / lint / format:check / test / build / prisma:validate / prisma:generate 全 PASS；dev 与 test 两库 migration 均 up to date（5 个）；Docker 双容器 healthy；dev 库 0 残留；构建产物 server 启动 `/health` 返回 200
+- **明确未实现（Phase 5+ 范围）**：Simulation 推进、地图可视化、Push 通知、WorldEvent / TimelineEvent、TransportLeg 事件/掉落/疲劳字段、reroute/ETA 倒计时等
 
 ### 未完成（后续 Phase）
 
-以下业务**尚未实现**：Letter、Journey、TransportLeg、Routing 正式业务、Simulation、地图、Push、BullMQ Worker、TransportType / LetterStatus 等领域类型。
+以下业务**尚未实现**：Simulation Core + Journey/Leg 运行期状态推进（Phase 5，由 SimulationClock / DeterministicRandom 驱动，属 Simulation Core；其后台调度化消费归 Phase 9）、地图可视化（Phase 8）、Push 与 BullMQ Worker 正式接入（Phase 9，Worker Scheduling + Push + Refresh）、WorldEvent / TimelineEvent（Phase 6–7）、Routing 业务领域类型（ETA 倒计时、reroute，Phase 6）等。Phase 4 内的 Journey/TransportLeg 模型已落地，但其运行期状态推进（IN_PROGRESS / COMPLETED / TRANSPORT_CHANGED 等）属 Phase 5+。
 
-## 当前已知问题
+## 已知限制与维护事项
 
-- **评审报告**: 根目录 `Phase1_全仓库技术评审报告.md` 为 Phase 1「首次评审」结论，已标记为**已过期 / STALE**，不作为当前验收依据。
-- `generated/`（Prisma 生成产物）已加入 `.gitignore`。
-- Mobile 业务 UI 未实现，首页仅为占位。
-- Docker 容器（PostgreSQL/Redis）由 `docker compose up -d` 启动，运行验证已通过；停止可执行 `docker compose down`。
+- `generated/`、`dist/`、`.expo/` 均为可再生成产物并已忽略；`.env` 与本地 Agent 数据不进入 Git。
+- Mobile 已有最小登录/注册认证入口与 Letter 列表/写信/详情页面；正式产品级 UI 打磨属后续。
+- `pnpm audit --prod` 当前报告来自 Expo/Metro 与 Prisma 工具链的传递依赖公告；上游尚无兼容的完整修复组合，详见项目状态文档，升级时需重新审计。
+- Docker 容器（PostgreSQL/Redis）由 `docker compose up -d` 启动；停止可执行 `docker compose down`。

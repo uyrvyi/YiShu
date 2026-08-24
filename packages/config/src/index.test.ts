@@ -19,6 +19,7 @@ describe("loadConfig", () => {
       DATABASE_URL: "postgresql://u:p@db:5432/app?schema=public",
       REDIS_URL: "redis://redis:6379",
       JWT_SECRET: "a-very-long-production-jwt-secret-123456",
+      CONTENT_ENCRYPTION_KEY: "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
     });
     expect(cfg.API_PORT).toBe(8080);
     expect(cfg.API_HOST).toBe("127.0.0.1");
@@ -44,6 +45,18 @@ describe("loadConfig", () => {
         NODE_ENV: "production",
         DATABASE_URL: "postgresql://u:p@db:5432/app?schema=public",
         REDIS_URL: "redis://redis:6379",
+        CONTENT_ENCRYPTION_KEY: "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      })
+    ).toThrow();
+  });
+
+  it("production 未显式提供 CONTENT_ENCRYPTION_KEY 抛错", () => {
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://u:p@db:5432/app?schema=public",
+        REDIS_URL: "redis://redis:6379",
+        JWT_SECRET: "a-very-long-production-jwt-secret-123456",
       })
     ).toThrow();
   });

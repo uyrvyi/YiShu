@@ -1,7 +1,7 @@
 # 驿书 V1（MVP）Coding Agent 开发规范
 
-> 本文档是 **驿书 V1 的唯一开发基线**。  
-> Coding Agent 必须严格按本文档实现，不自行增加未定义功能，不自行替换技术栈。
+> 本文档是 **驿书 V1 产品规则与技术规则的开发基线**。  
+> Coding Agent 必须严格按本文档实现，不自行增加未定义功能，不自行替换技术栈。Phase 编号、阶段边界和功能归属统一以根目录 `驿书_V1_Coding_Agent_阶段规划.md` 为准。
 
 ---
 
@@ -208,6 +208,14 @@ _
 
 保存前统一转小写。
 
+为避免与 8 位 UID 命名空间产生歧义：
+
+```text
+禁止 account 恰好为 8 位纯数字
+```
+
+例如 `52739184` 只能被解释为 UID，不能注册为 account。
+
 必须全局唯一。
 
 ## 4.4 Nickname
@@ -395,8 +403,10 @@ V1 仅支持纯文字。
 最大正文：
 
 ```text
-2000 Unicode 字符
+2000 Unicode code points
 ```
+
+服务端与 Mobile 必须按 Unicode code point 计数，例如使用 `Array.from(content).length` 或等价迭代方式；不得仅使用 JavaScript `String.length` / 原生 `maxLength=2000` 作为唯一校验。
 
 发信流程：
 
@@ -415,11 +425,11 @@ V1 仅支持纯文字。
 ↓
 确认寄出
 ↓
-创建 Letter
+创建 Letter（Letter Core 阶段）
 ↓
-创建 Journey
+创建 Journey（Routing / Journey 阶段）
 ↓
-通知 Recipient
+通知 Recipient（通知阶段）
 ```
 
 发送后：
@@ -1393,7 +1403,8 @@ yishu/
 │  ├─ shared/
 │  ├─ simulation/
 │  ├─ routing/
-│  └─ config/
+│  ├─ config/
+│  └─ db/
 ├─ data/
 │  ├─ maps/
 │  │  ├─ china-map.svg
@@ -1402,8 +1413,10 @@ yishu/
 │  └─ route_edges.json
 ├─ prisma/
 │  └─ schema.prisma
-├─ docs/
-│  └─ YISHU_V1_SPEC.md
+├─ 驿书_V1_Coding_Agent_开发规范.md
+├─ 驿书_V1_Coding_Agent_协作开发流程.md
+├─ 驿书_V1_Coding_Agent_阶段规划.md
+├─ README.md
 ├─ docker-compose.yml
 ├─ pnpm-workspace.yaml
 └─ package.json
@@ -1470,6 +1483,9 @@ status
 initialTransport
 currentTransport
 
+clientRequestId
+requestFingerprint
+
 rulesVersion
 graphVersion
 simulationSeed
@@ -1484,11 +1500,16 @@ updatedAt
 
 # 54. Journey
 
+Journey 与 Letter 为 1:1，`letterId` 必须唯一。
+
+至少需要表达：
+
 ```text
 id
 letterId
+originNodeId
+destinationNodeId
 totalDistanceKm
-progress
 currentNodeId
 lastKnownNodeId
 currentApproximateMapX
@@ -1497,7 +1518,16 @@ uncertaintyRadiusKm
 currentLegIndex
 graphVersion
 rulesVersion
+simulationSeed
+createdAt
+updatedAt
 ```
+
+规则：
+
+- `graphVersion`、`rulesVersion`、`simulationSeed` 必须继承 Letter 已冻结值，Journey 不得重新生成。
+- 初始化时 `completedPath = empty`，`remainingPath = full route`；可以用显式字段或由 Leg 状态确定性派生，但语义必须一致。
+- 以后重新寻路只能改变 `remainingPath`，不得改写已经完成的路径。
 
 ---
 
@@ -1506,15 +1536,27 @@ rulesVersion
 ```text
 id
 journeyId
+sequence
 fromNodeId
 toNodeId
 distanceKm
 transportType
+plannedDuration
 status
 startedAt
 expectedEndAt
 endedAt
+createdAt
+updatedAt
 ```
+
+规则：
+
+- `(journeyId, sequence)` 必须唯一。
+- `distanceKm > 0`。
+- `fromNodeId != toNodeId`。
+- `transportType` 使用共享冻结类型，不得退化为任意 String。
+- planned duration 仅作为内部模拟输入，不得作为 ETA / countdown 暴露给用户。
 
 ---
 
@@ -1662,6 +1704,20 @@ DELIVERED
 
 # 62. 确定性随机数
 
+每封 Letter 创建时必须生成独立的 `simulationSeed`：
+
+```text
+crypto.randomBytes(32).toString("hex")
+```
+
+要求：
+
+- 64 位 hex
+- 非空
+- 每封信独立
+- 不向普通用户 API 返回
+- Journey 直接继承该值，不重新生成
+
 禁止：
 
 ```ts
@@ -1692,11 +1748,13 @@ simulationSeed + eventIndex
 simulation_rules_v1.json
 ```
 
-Journey 保存：
+Letter 创建时冻结：
 
 ```text
 rulesVersion = "1.0"
 ```
+
+Journey 初始化时必须继承 Letter 的 `rulesVersion`，不得重新读取当前默认版本。
 
 以后规则更新时：
 
@@ -1714,9 +1772,9 @@ rulesVersion = "1.0"
 graphVersion = "china-v1"
 ```
 
-Journey 创建时锁定。
+Letter 创建时冻结 `graphVersion`；Journey 初始化时继承 Letter 已冻结值。
 
-后续 Graph 更新不改变旧 Journey 的历史。
+后续 Graph 更新不改变旧 Letter / Journey 的历史。
 
 ---
 
@@ -1758,7 +1816,7 @@ letterId:leg:legIndex
 
 # 67. 创建信件幂等
 
-客户端生成：
+客户端为一个逻辑草稿生成稳定：
 
 ```text
 clientRequestId
@@ -1770,13 +1828,34 @@ clientRequestId
 senderId + clientRequestId
 ```
 
-重复请求：
+服务端同时保存：
 
 ```text
-返回原 Letter
+requestFingerprint
 ```
 
-不得创建重复信。
+Fingerprint 基于规范化后的：
+
+- resolved recipient UID
+- content
+- transportType
+
+同一 Sender 重复使用同一 `clientRequestId`：
+
+- fingerprint 相同 → 返回原 Letter
+- fingerprint 不同 → `409 idempotency_conflict`
+
+并发重复请求也必须最终只创建一封 Letter，不得因为唯一约束竞态返回 500。
+
+## 67.1 Block 与发信并发
+
+Recipient 对 Sender 的 Block 与 Sender→Recipient 创建 Letter 必须竞争同一 PostgreSQL transaction-scoped advisory lock。
+
+规则：
+
+- Block 先提交 → 后续新 Letter 必须被拒绝
+- Letter 先提交 → 该旧 Letter 保留，随后 Block 只影响未来新 Letter
+- 不能仅依赖普通 `$transaction` 内“先查 Block 再创建 Letter”来解决并发竞态
 
 ---
 
@@ -2288,80 +2367,26 @@ App Store
 
 # 88. Coding Agent 开发顺序
 
-## Phase 1：项目骨架
+具体 Phase 编号、阶段名称、功能归属、允许范围、禁止范围与 Gate 条件，**唯一以根目录：**
 
-1. pnpm workspace
-2. mobile
-3. api
-4. worker
-5. shared packages
-6. Prisma
-7. Docker Compose
-8. Env
-9. ESLint / Prettier / TS strict
+```text
+驿书_V1_Coding_Agent_阶段规划.md
+```
 
-## Phase 2：账号
+为准。
 
-1. 注册
-2. 登录
-3. UID
-4. Token
-5. 默认区域
-6. 用户搜索
-7. 拉黑
+本《开发规范》负责定义产品与技术规则，不再维护第二套 Phase 列表，避免阶段编号漂移。
 
-## Phase 3：信件
+Coding Agent 每次开始工作前必须同时阅读：
 
-1. Letter
-2. 身份快照
-3. 发信
-4. 列表
-5. 详情
-6. Recipient 正文权限
-7. Hide
+1. `驿书_V1_Coding_Agent_开发规范.md`
+2. `驿书_V1_Coding_Agent_协作开发流程.md`
+3. `驿书_V1_Coding_Agent_阶段规划.md`
+4. `README.md`
 
-## Phase 4：路线
-
-1. station_nodes
-2. route_edges
-3. Dijkstra
-4. Journey
-5. TransportLeg
-
-## Phase 5：模拟
-
-1. SimulationClock
-2. DeterministicRandom
-3. Probability Config
-4. WorldEvent
-5. TimelineEvent
-6. Worker
-7. BullMQ
-8. 事件分支
-9. 自动改运输方式
-
-## Phase 6：地图
-
-1. 中国 SVG
-2. 起终点
-3. Completed 实线
-4. Remaining 虚线
-5. Approximate Position
-6. Drop Area
-7. Last Known
-8. Fact Nodes
-9. Timeline
-
-## Phase 7：通知与调试
-
-1. Push
-2. Polling
-3. DEV Panel
-4. Demo Seed
-5. Time Acceleration
+当前阶段不得仅依据本文件某个技术章节的位置自行判断；例如某项技术规则可以提前写在本规范中，但只有《阶段规划》指定的 Phase 才允许实现。
 
 ---
-
 # 89. Coding Agent 禁止自行添加
 
 ```text
@@ -2429,39 +2454,27 @@ V1 完成必须满足：
 
 ---
 
-# 91. Coding Agent 第一条 Prompt
+# 91. Coding Agent 阶段启动规则
+
+每次收到新的 Phase 开发任务，Coding Agent 必须先执行：
 
 ```text
-请完整阅读 docs/YISHU_V1_SPEC.md，并将它视为项目唯一需求来源。
-
-首先只完成 Phase 1：项目骨架。
-
-技术栈必须严格使用：
-- React Native + Expo SDK 57
-- TypeScript strict
-- Expo Router
-- Node.js 24 LTS
-- Fastify 5
-- PostgreSQL 17
-- Prisma 7
-- Redis + BullMQ
-- pnpm workspace
-
-要求：
-1. 初始化 monorepo
-2. 创建 apps/mobile、apps/api、apps/worker
-3. 创建 packages/shared、simulation、routing、config
-4. 配置 Prisma
-5. 配置 Docker Compose，包含 PostgreSQL 和 Redis
-6. 配置统一 TypeScript、ESLint、Prettier
-7. 提供 .env.example
-8. 提供 pnpm dev
-9. 添加 health check
-10. 添加最基础 Vitest
-11. README 写明启动方式
-12. 不开始实现后续业务
-13. 不允许自行替换技术栈
-14. 不允许添加本文档未定义功能
-
-完成后运行测试和 TypeScript 检查，并汇报实际结果。
+完整阅读：
+1. 驿书_V1_Coding_Agent_开发规范.md
+2. 驿书_V1_Coding_Agent_协作开发流程.md
+3. 驿书_V1_Coding_Agent_阶段规划.md
+4. README.md
 ```
+
+然后：
+
+1. 从《阶段规划》确认当前 Phase 的目标、允许范围、禁止范围与 Gate 条件。
+2. 从 README 确认仓库当前真实状态和已经完成的 Phase。
+3. 只执行项目负责人明确指定的当前 Phase。
+4. 不允许自行进入下一 Phase。
+5. 不允许自行替换冻结技术栈或产品规则。
+6. 实际运行本阶段适用的 typecheck、lint、format、test、build、Prisma / migration / API / Mobile 验证。
+7. 按《协作开发流程》输出 Phase 完成报告后立即停止，等待独立 Gate Review。
+
+若 Prompt、README 或旧代码注释中的 Phase 编号与《阶段规划》冲突，先遵循项目负责人最新明确决定；没有新决定时，以《阶段规划》的阶段归属为准。
+

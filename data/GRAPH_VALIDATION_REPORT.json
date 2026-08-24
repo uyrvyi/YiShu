@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-08-24T14:58:56.190Z",
+  "defaultVersion": "china-v1",
+  "graphs": {
+    "china-v1": {
+      "version": "china-v1",
+      "nodeCount": 294,
+      "duplicateNodeIds": 0,
+      "edgeCount": 1949,
+      "invalidEdgeCount": 0,
+      "duplicateEdgeCount": 0,
+      "selfLoopCount": 0,
+      "invalidDistanceCount": 0,
+      "disabledEdgeCount": 0,
+      "connectedComponentCount": 1,
+      "isolatedNodeCount": 0,
+      "fullyConnected": true,
+      "duplicateCities": [],
+      "badMappings": [],
+      "missingProvince": []
+    }
+  },
+  "ok": true
+}

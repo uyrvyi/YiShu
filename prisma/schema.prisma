@@ -1,7 +1,7 @@
 // 驿书 V1 Prisma Schema
-// Phase 2：账号与身份系统。
-// 业务模型：User / Block / RefreshToken。
-// Letter / Journey / TransportLeg 等在后续 Phase 引入。
+// Phase 4：Journey + TransportLeg 本地路线规划（对应开发规范 §54/§55）。
+// 业务模型：User / Block / RefreshToken / Letter / RecipientState / SenderState / Journey / TransportLeg。
+// WorldEvent / TimelineEvent 等在后续 Phase 引入。
 
 generator client {
   provider               = "prisma-client"
@@ -17,7 +17,55 @@ datasource db {
   provider = "postgresql"
 }
 
-// 用户（对应开发规范 §52，Phase 2 阶段仅含账号身份字段）
+// 运输方式（对应开发规范 §13）
+enum TransportType {
+  HAND_CARRY
+  HORSE_RELAY
+  EXPRESS_RELAY
+  PIGEON
+}
+
+// Letter 状态（对应开发规范 §37）
+enum LetterStatus {
+  CREATED
+  DISPATCHED
+  IN_TRANSIT
+  AT_STATION
+  TRANSFER
+  DELAYED
+  COURIER_MISSING
+  LETTER_DROPPED
+  LETTER_MISSING
+  RECOVERED
+  TRANSPORT_CHANGED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  PERMANENTLY_LOST
+  DESTROYED
+}
+
+// 收件人阅读状态（对应开发规范 §42）
+enum RecipientReadState {
+  UNOPENED
+  OPENED
+}
+
+// Journey 状态（Phase 4：本地 Graph 路线规划；最小状态集，后续 Phase 扩展）
+enum JourneyStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// TransportLeg 状态（Phase 4：仅规划结果；最小状态集）
+enum TransportLegStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+// 用户（对应开发规范 §52）
 model User {
   id           BigInt   @id @default(autoincrement())
   uid          String   @unique
@@ -38,6 +86,12 @@ model User {
   blockedBy Block[] @relation("Blocked")
 
   refreshTokens RefreshToken[]
+
+  sentLetters     Letter[] @relation("SentLetters")
+  receivedLetters Letter[] @relation("ReceivedLetters")
+
+  recipientStates RecipientState[]
+  senderStates    SenderState[]
 }
 
 // 拉黑关系（对应规范 §10）
@@ -66,4 +120,144 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+// 信件（对应开发规范 §53）
+model Letter {
+  id         BigInt  @id @default(autoincrement())
+  trackingNo String  @unique
+  senderId   BigInt
+  recipientId BigInt
+
+  // 身份快照（规范 §11）
+  senderAccountSnapshot    String
+  senderUidSnapshot        String
+  senderNicknameSnapshot   String
+  recipientAccountSnapshot String
+  recipientUidSnapshot     String
+  recipientNicknameSnapshot String
+
+  // 正文加密（规范 §48：AES-256-GCM）
+  encryptedContent String
+  contentIv        String
+  contentAuthTag   String
+
+  // 区域快照（规范 §53）
+  originProvince  String
+  originCity      String
+  originDistrict  String
+  targetProvince  String
+  targetCity      String
+  targetDistrict  String
+
+  status           LetterStatus
+  initialTransport TransportType
+  currentTransport TransportType
+
+  // 幂等（规范 §67）
+  clientRequestId   String
+  // 请求指纹（规范化 recipient UID + content + transportType 的 SHA-256）
+  requestFingerprint String
+
+  // 版本与 Seed（规范 §53/§63/§64）
+  rulesVersion   String @default("1.0")
+  graphVersion   String @default("china-v1")
+  simulationSeed String
+
+  sentAt     DateTime?
+  deliveredAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender    User @relation("SentLetters", fields: [senderId], references: [id])
+  recipient User @relation("ReceivedLetters", fields: [recipientId], references: [id])
+
+  recipientState RecipientState?
+  senderState    SenderState?
+
+  // Letter : Journey = 1 : 1（对应开发规范 §54 + Phase 4 Prompt §9）
+  journey Journey?
+
+  @@unique([senderId, clientRequestId])
+  @@index([recipientId])
+}
+
+// 收件人状态（对应规范 §58）
+model RecipientState {
+  id          BigInt             @id @default(autoincrement())
+  letterId    BigInt             @unique
+  recipientId BigInt
+  readState   RecipientReadState
+  openedAt    DateTime?
+  hiddenAt    DateTime?
+
+  letter Letter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  recipient User @relation(fields: [recipientId], references: [id])
+
+  @@index([recipientId])
+}
+
+// 发件人状态（对应规范 §59）
+model SenderState {
+  id       BigInt   @id @default(autoincrement())
+  letterId BigInt   @unique
+  senderId BigInt
+  hiddenAt DateTime?
+
+  letter Letter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id])
+
+  @@index([senderId])
+}
+
+// Journey（Phase 4：本地 Graph 路线规划结果；对应开发规范 §54 + Phase 4 Prompt）
+// Letter : Journey = 1 : 1，letterId 唯一约束作为并发竞态最终保障。
+model Journey {
+  id         BigInt @id @default(autoincrement())
+  letterId   BigInt @unique
+  originNodeId      String
+  destinationNodeId String
+
+  status JourneyStatus @default(PLANNED)
+
+  // 继承 Letter 冻结值，Journey 不得自行生成（规范 §63/§64）
+  rulesVersion   String
+  graphVersion   String
+  simulationSeed String
+
+  totalDistanceKm Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  letter Letter         @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  legs   TransportLeg[]
+
+  @@index([letterId])
+}
+
+// TransportLeg（Phase 4：路线分段；对应开发规范 §55 + Phase 4 Prompt）
+// 仅表达规划结果，不含事件/掉落/疲劳等后续业务字段。
+model TransportLeg {
+  id         BigInt @id @default(autoincrement())
+  journeyId  BigInt
+  sequence   Int
+  fromNodeId String
+  toNodeId   String
+
+  transportType TransportType
+  distanceKm    Float
+
+  // Simulation 内部输入（秒），用户 API 严禁暴露（规范 §18/§45）
+  plannedDurationSeconds Int
+
+  status TransportLegStatus @default(PLANNED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  journey Journey @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@unique([journeyId, sequence])
+  @@index([journeyId])
 }

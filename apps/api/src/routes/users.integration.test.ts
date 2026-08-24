@@ -34,6 +34,9 @@ describe("users integration", () => {
     const testDbUrl = requireTestDatabaseUrl(process.env);
     const config = loadConfig({ NODE_ENV: "test" });
     prisma = createPrismaClient(testDbUrl);
+    await prisma.recipientState.deleteMany();
+    await prisma.senderState.deleteMany();
+    await prisma.letter.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.block.deleteMany();
     await prisma.user.deleteMany();

@@ -7,6 +7,8 @@ import type { PrismaClient } from "@yishu/db";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
+import { letterRoutes } from "./routes/letters.js";
+import { journeyRoutes } from "./routes/journeys.js";
 
 /**
  * buildApp 所需依赖（便于测试注入）。
@@ -91,6 +93,8 @@ export function buildApp(
   void app.register(healthRoutes, { prefix: API_PREFIX });
   void app.register(authRoutes, { prefix: API_PREFIX });
   void app.register(userRoutes, { prefix: API_PREFIX });
+  void app.register(letterRoutes, { prefix: API_PREFIX });
+  void app.register(journeyRoutes, { prefix: API_PREFIX });
 
   return app;
 }

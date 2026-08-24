@@ -6,7 +6,7 @@ import { defineConfig } from "prisma/config";
  *
  * - schema 指向根目录 prisma/schema.prisma
  * - 数据库连接由 DATABASE_URL 提供
- * - Phase 1 不包含业务模型；后续 Phase 按规范补充
+ * - 当前包含 Phase 2–3 的 User / Block / RefreshToken / Letter 等业务模型
  * - datasource.url 使用带默认回退的 process.env，保证 `prisma generate` 不依赖
  *   真实私密 `.env`（干净 clone / CI 下也能生成 client）。
  */
