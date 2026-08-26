@@ -111,3 +111,209 @@ export function plannedDurationSeconds(
   if (speed <= 0) return 0;
   return Math.round((distanceKm / speed) * SECONDS_PER_DAY);
 }
+
+// ============================================================================
+// Phase 6：随机事件基础设施（World Truth）
+// 概率全部冻结在此（开发规范 §27–§36），禁止业务代码散落魔法数字。
+// 事件判定统一：simulationSeed + eventIndex（Phase 5 DeterministicRandom）。
+// ============================================================================
+
+/** 一级运输事件类型（按开发规范 §28–§31 概率项；多个近义项可映射同一处理动作）。 */
+export const TRANSPORT_EVENT_TYPES = [
+  "NORMAL",
+  "DELAY", // 延误
+  "REROUTE", // 改变路线 / 临时改道
+  "LOST_PATH", // 迷路（HAND_CARRY）
+  "ROBBERY", // 遭遇抢劫
+  "COURIER_MISSING", // 信使失联 / 飞鸽失联
+  "LETTER_DROPPED", // 信件掉落
+  "SERIOUS_ACCIDENT", // 严重事故
+  "OTHER", // 其他普通异常（HORSE/EXPRESS）
+  "DEVIATION", // 偏航（PIGEON）
+  "TEMPORARY_STOP", // 临时停留（PIGEON）
+  "LOST", // 迷路（PIGEON）
+] as const;
+export type TransportEventType = (typeof TRANSPORT_EVENT_TYPES)[number];
+
+/** 带权结果（用于确定性抽样）。 */
+export interface WeightedOutcome<T extends string> {
+  outcome: T;
+  weight: number;
+}
+
+/** 托人捎信事件概率（开发规范 §28）。 */
+export const HAND_CARRY_EVENT_TABLE: readonly WeightedOutcome<TransportEventType>[] = [
+  { outcome: "NORMAL", weight: 0.84 },
+  { outcome: "DELAY", weight: 0.05 },
+  { outcome: "REROUTE", weight: 0.04 },
+  { outcome: "LOST_PATH", weight: 0.02 },
+  { outcome: "ROBBERY", weight: 0.02 },
+  { outcome: "COURIER_MISSING", weight: 0.015 },
+  { outcome: "LETTER_DROPPED", weight: 0.01 },
+  { outcome: "SERIOUS_ACCIDENT", weight: 0.005 },
+] as const;
+
+/** 驿马事件概率（开发规范 §29）。 */
+export const HORSE_RELAY_EVENT_TABLE: readonly WeightedOutcome<TransportEventType>[] = [
+  { outcome: "NORMAL", weight: 0.94 },
+  { outcome: "DELAY", weight: 0.02 },
+  { outcome: "REROUTE", weight: 0.01 },
+  { outcome: "COURIER_MISSING", weight: 0.008 },
+  { outcome: "ROBBERY", weight: 0.008 },
+  { outcome: "LETTER_DROPPED", weight: 0.003 },
+  { outcome: "SERIOUS_ACCIDENT", weight: 0.001 },
+  { outcome: "OTHER", weight: 0.01 },
+] as const;
+
+/** 加急驿递事件概率（开发规范 §30）。 */
+export const EXPRESS_RELAY_EVENT_TABLE: readonly WeightedOutcome<TransportEventType>[] = [
+  { outcome: "NORMAL", weight: 0.96 },
+  { outcome: "DELAY", weight: 0.015 },
+  { outcome: "REROUTE", weight: 0.008 },
+  { outcome: "COURIER_MISSING", weight: 0.005 },
+  { outcome: "ROBBERY", weight: 0.005 },
+  { outcome: "LETTER_DROPPED", weight: 0.002 },
+  { outcome: "SERIOUS_ACCIDENT", weight: 0.001 },
+  { outcome: "OTHER", weight: 0.004 },
+] as const;
+
+/** 飞鸽事件概率（开发规范 §31）。 */
+export const PIGEON_EVENT_TABLE: readonly WeightedOutcome<TransportEventType>[] = [
+  { outcome: "NORMAL", weight: 0.92 },
+  { outcome: "DEVIATION", weight: 0.03 },
+  { outcome: "TEMPORARY_STOP", weight: 0.02 },
+  { outcome: "LOST", weight: 0.015 },
+  { outcome: "LETTER_DROPPED", weight: 0.005 },
+  { outcome: "COURIER_MISSING", weight: 0.007 },
+  { outcome: "SERIOUS_ACCIDENT", weight: 0.003 },
+] as const;
+
+/** 一级事件概率表：按 rulesVersion + transportType（单一来源，新增版本必须显式登记）。 */
+export const TRANSPORT_EVENTS_BY_RULES_VERSION: Record<
+  RulesVersion,
+  Record<TransportType, readonly WeightedOutcome<TransportEventType>[]>
+> = {
+  "1.0": {
+    HAND_CARRY: HAND_CARRY_EVENT_TABLE,
+    HORSE_RELAY: HORSE_RELAY_EVENT_TABLE,
+    EXPRESS_RELAY: EXPRESS_RELAY_EVENT_TABLE,
+    PIGEON: PIGEON_EVENT_TABLE,
+  },
+};
+
+/** 取一级事件概率表；未知规则版本明确抛错（不 fallback latest）。 */
+export function transportEventTable(
+  rulesVersion: string,
+  transportType: TransportType
+): readonly WeightedOutcome<TransportEventType>[] {
+  const byRules = TRANSPORT_EVENTS_BY_RULES_VERSION[rulesVersion as RulesVersion];
+  if (!byRules) throw new UnknownRulesVersionError(rulesVersion);
+  return byRules[transportType];
+}
+
+/** 抢劫二级分支（开发规范 §32）。 */
+export const ROBBERY_BRANCHES: readonly WeightedOutcome<RobberyBranch>[] = [
+  { outcome: "ESCAPE_DELAY", weight: 0.55 },
+  { outcome: "INJURED_CONTINUE", weight: 0.25 },
+  { outcome: "MISSING_DROPPED", weight: 0.15 },
+  { outcome: "DEAD_DROPPED", weight: 0.05 },
+] as const;
+
+export const ROBBERY_BRANCH_NAMES = [
+  "ESCAPE_DELAY",
+  "INJURED_CONTINUE",
+  "MISSING_DROPPED",
+  "DEAD_DROPPED",
+] as const;
+export type RobberyBranch = (typeof ROBBERY_BRANCH_NAMES)[number];
+
+/** 掉落 / 失联恢复窗口（开发规范 §33）。 */
+export const DROP_RECOVERY_WINDOWS: readonly WeightedOutcome<DropRecoveryWindow>[] = [
+  { outcome: "WITHIN_24H", weight: 0.5 },
+  { outcome: "ONE_TO_THREE_DAYS", weight: 0.25 },
+  { outcome: "THREE_TO_SEVEN_DAYS", weight: 0.15 },
+  { outcome: "NEVER", weight: 0.1 },
+] as const;
+
+export const DROP_RECOVERY_WINDOW_NAMES = [
+  "WITHIN_24H",
+  "ONE_TO_THREE_DAYS",
+  "THREE_TO_SEVEN_DAYS",
+  "NEVER",
+] as const;
+export type DropRecoveryWindow = (typeof DROP_RECOVERY_WINDOW_NAMES)[number];
+
+/** 各恢复窗口的持续时间范围（秒，min ≤ 实际 < max；NEVER = 7 模拟日未恢复 → PERMANENTLY_LOST）。 */
+export const DROP_RECOVERY_WINDOW_SECONDS: Record<
+  DropRecoveryWindow,
+  { min: number; max: number } | null
+> = {
+  WITHIN_24H: { min: 6 * 3600, max: 24 * 3600 },
+  ONE_TO_THREE_DAYS: { min: 24 * 3600, max: 72 * 3600 },
+  THREE_TO_SEVEN_DAYS: { min: 72 * 3600, max: 168 * 3600 },
+  NEVER: null,
+};
+
+/** 拾获后处理（开发规范 §34）。 */
+export const RECOVERY_HANDLINGS: readonly WeightedOutcome<RecoveryHandling>[] = [
+  { outcome: "NEAREST_STATION", weight: 0.7 },
+  { outcome: "FINDER_CARRIES", weight: 0.2 },
+  { outcome: "SET_ASIDE", weight: 0.1 },
+] as const;
+
+export const RECOVERY_HANDLING_NAMES = ["NEAREST_STATION", "FINDER_CARRIES", "SET_ASIDE"] as const;
+export type RecoveryHandling = (typeof RECOVERY_HANDLING_NAMES)[number];
+
+/** 恢复后自动运输方式变更倾向（Phase 6 Prompt §7；用户不能控制）。 */
+export const RECOVERY_TRANSPORT_CHANGE: Record<
+  TransportType,
+  readonly WeightedOutcome<TransportType>[]
+> = {
+  HAND_CARRY: [
+    { outcome: "HORSE_RELAY", weight: 0.6 },
+    { outcome: "PIGEON", weight: 0.25 },
+    { outcome: "HAND_CARRY", weight: 0.15 },
+  ],
+  HORSE_RELAY: [
+    { outcome: "HORSE_RELAY", weight: 0.8 },
+    { outcome: "HAND_CARRY", weight: 0.15 },
+    { outcome: "PIGEON", weight: 0.05 },
+  ],
+  EXPRESS_RELAY: [
+    { outcome: "EXPRESS_RELAY", weight: 0.8 },
+    { outcome: "HAND_CARRY", weight: 0.15 },
+    { outcome: "PIGEON", weight: 0.05 },
+  ],
+  PIGEON: [
+    { outcome: "HORSE_RELAY", weight: 0.7 },
+    { outcome: "HAND_CARRY", weight: 0.3 },
+  ],
+};
+
+/** 7 个模拟日未恢复 → PERMANENTLY_LOST（开发规范 §20/§33）。 */
+export const PERMANENT_LOSS_SECONDS = 7 * SECONDS_PER_DAY;
+
+/** 延误最大时长（秒，冻结常量；DELAY 时长由确定性 draw 在 [0, max] 内插值）。 */
+export const DELAY_MAX_SECONDS = 12 * 3600;
+
+/** 拾获后"暂时搁置"额外延迟（秒，冻结常量）。 */
+export const SET_ASIDE_DELAY_SECONDS = 24 * 3600;
+
+/**
+ * 确定性抽样：按累计权重选择 outcome（与 DeterministicRandom.draw 配合）。
+ * @param draw [0,1) 确定性随机数
+ * @param table 冻结权重表（总和应为 1）
+ */
+export function selectWeightedOutcome<T extends string>(
+  draw: number,
+  table: readonly WeightedOutcome<T>[]
+): T {
+  let acc = 0;
+  for (const item of table) {
+    acc += item.weight;
+    if (draw < acc) return item.outcome;
+  }
+  const last = table[table.length - 1];
+  if (!last) throw new Error("selectWeightedOutcome: empty table");
+  return last.outcome; // 浮点累计误差兜底：取最后一项
+}

@@ -192,3 +192,57 @@ export function getStationNode(nodeId: string, graphVersion: string): StationNod
   }
   return node;
 }
+
+/** 读取原始图数据（nodes/edges 数组，用于排除边重建图）。 */
+function loadRawGraph(graphVersion: string): { nodes: StationNode[]; edges: RouteEdge[] } {
+  assertKnownGraphVersion(graphVersion);
+  const dir = graphDir(graphVersion);
+  const nodes = JSON.parse(
+    readFileSync(path.join(dir, "station_nodes.json"), "utf8")
+  ) as StationNode[];
+  const edges = JSON.parse(readFileSync(path.join(dir, "route_edges.json"), "utf8")) as RouteEdge[];
+  return { nodes, edges };
+}
+
+/**
+ * 规划路线并排除指定边（Phase 6 reroute）。
+ * 事件导致当前 Edge 不可用时，从当前节点重新 Dijkstra；排除边在重建图中置 enabled=false，
+ * 保持与 Phase 4 相同权重（distanceKm）与确定性 tie-break。
+ * PIGEON 不走 road graph，忽略 excludedEdge（不按 road graph reroute）。
+ * @throws UnknownGraphVersionError / UnknownNodeError / NoRouteError
+ */
+export function planRouteExcluding(params: {
+  graphVersion: string;
+  originNodeId: string;
+  destinationNodeId: string;
+  transportType: TransportType;
+  /** 需排除的无向边（from/to 两端任一匹配即排除）。 */
+  excludedEdge?: { from: string; to: string };
+}): PathResult {
+  const graph = loadGraph(params.graphVersion);
+  if (params.transportType === "PIGEON") {
+    return planPigeonRoute(graph, params.originNodeId, params.destinationNodeId);
+  }
+  if (!params.excludedEdge) {
+    return findShortestPath(
+      graph,
+      params.originNodeId,
+      params.destinationNodeId,
+      params.transportType
+    );
+  }
+  const { from, to } = params.excludedEdge;
+  const raw = loadRawGraph(params.graphVersion);
+  const filteredEdges = raw.edges.map((edge) => {
+    const blocked =
+      (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from);
+    return blocked ? { ...edge, enabled: false } : edge;
+  });
+  const rebuilt = buildGraph({ nodes: raw.nodes, edges: filteredEdges }, params.graphVersion);
+  return findShortestPath(
+    rebuilt,
+    params.originNodeId,
+    params.destinationNodeId,
+    params.transportType
+  );
+}

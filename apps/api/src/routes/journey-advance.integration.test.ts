@@ -1,8 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig, requireTestDatabaseUrl } from "@yishu/config";
 import { createPrismaClient, type PrismaClient } from "@yishu/db";
-import { TestSimulationClock } from "@yishu/simulation";
-import { LAST_MILE_DURATION_SECONDS, UnknownRulesVersionError } from "@yishu/shared";
+import { deterministicDraw, TestSimulationClock } from "@yishu/simulation";
+import {
+  LAST_MILE_DURATION_SECONDS,
+  UnknownRulesVersionError,
+  type TransportType,
+} from "@yishu/shared";
 import { buildApp } from "../app.js";
 import type { FastifyInstance } from "fastify";
 import { resetStationGraphCache } from "../lib/stationGraph.js";
@@ -12,9 +16,35 @@ import {
   LetterNotFoundError,
 } from "../lib/journey-advance.js";
 
+/** 一级事件 NORMAL 区间上界（Phase 6 概率表；用于构造纯正常推进的确定性 seed）。 */
+const NORMAL_THRESHOLDS: Record<TransportType, number> = {
+  HAND_CARRY: 0.84,
+  HORSE_RELAY: 0.94,
+  EXPRESS_RELAY: 0.96,
+  PIGEON: 0.92,
+};
+
+/** 搜索一个 seed：其前 draws 个事件判定全部为 NORMAL（确定性，Phase 6 事件不干扰 Phase 5 断言）。 */
+function findNormalSeed(transportType: TransportType, tag: string, draws = 40): string {
+  const threshold = NORMAL_THRESHOLDS[transportType];
+  for (let i = 0; i < 20000; i += 1) {
+    const seed = `${tag}-${i}`;
+    let ok = true;
+    for (let k = 0; k < draws; k += 1) {
+      if (deterministicDraw(seed, k) >= threshold) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return seed;
+  }
+  throw new Error(`no normal seed found for ${transportType}`);
+}
+
 /**
  * Phase 5 Simulation Core + Transport Progression 集成测试。
  * 仅 *_test 库。测试通过 TestSimulationClock advanceBy/advanceTo 推时间，不允许真实 sleep。
+ * 推进型测试固定 NORMAL seed（Phase 6 随机事件不参与，保持 Phase 5 纯确定性断言）。
  */
 describe("journey advance integration", () => {
   let app: FastifyInstance;
@@ -95,6 +125,18 @@ describe("journey advance integration", () => {
     return { trackingNo, letterId: await letterIdOf(trackingNo) };
   }
 
+  /** 固定 NORMAL seed：Phase 6 随机事件不参与，保持 Phase 5 纯推进断言确定。 */
+  async function setNormalSeed(
+    letterId: bigint,
+    transportType: TransportType,
+    tag: string
+  ): Promise<void> {
+    await prisma.journey.update({
+      where: { letterId },
+      data: { simulationSeed: findNormalSeed(transportType, tag) },
+    });
+  }
+
   beforeAll(async () => {
     resetStationGraphCache();
     const testDbUrl = requireTestDatabaseUrl(process.env);
@@ -158,6 +200,7 @@ describe("journey advance integration", () => {
 
   it("所有 Leg 完成 → OUT_FOR_DELIVERY（到达目标站，理论完成时间正确）", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-complete");
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-complete");
     const clock = new TestSimulationClock(T0);
     await advanceJourneyToNow(prisma, letterId, clock); // 激活
 
@@ -195,6 +238,7 @@ describe("journey advance integration", () => {
 
   it("last-mile：DELIVERED + deliveredAt 设置一次，终态 no-op 不重写", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-delivered");
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-delivered");
     const clock = new TestSimulationClock(T0);
     await advanceJourneyToNow(prisma, letterId, clock); // 激活
 
@@ -222,6 +266,7 @@ describe("journey advance integration", () => {
 
   it("多 Leg 大时间跳跃：一次跨多个 Leg，时间结余精确传递（不写成 now）", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-multileg");
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-multileg");
     const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
     const legs = await prisma.transportLeg.findMany({
       where: { journeyId: journey.id },
@@ -271,6 +316,7 @@ describe("journey advance integration", () => {
       "HORSE_RELAY",
       "adv-path"
     );
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-path");
     const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
     const legs = await prisma.transportLeg.findMany({
       where: { journeyId: journey.id },
@@ -320,6 +366,7 @@ describe("journey advance integration", () => {
 
   it("PIGEON 正常推进：单直连 leg → OUT_FOR_DELIVERY → DELIVERED", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "PIGEON", "adv-pigeon");
+    await setNormalSeed(letterId, "PIGEON", "adv-pigeon");
     const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
     const legs = await prisma.transportLeg.findMany({ where: { journeyId: journey.id } });
     expect(legs).toHaveLength(1);
@@ -340,6 +387,7 @@ describe("journey advance integration", () => {
 
   it("同 now 重复 advance：第二次 no-op（幂等）", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-idem");
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-idem");
     const clock = new TestSimulationClock(T0);
     clock.advanceTo(T0 + 25 * HOUR_MS);
     const first = await advanceJourneyToNow(prisma, letterId, clock);
@@ -356,6 +404,7 @@ describe("journey advance integration", () => {
 
   it("并发 advance：恰一个 changed，无重复完成 / 双 ACTIVE / 500", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-concurrent");
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-concurrent");
     const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
     const legs = await prisma.transportLeg.findMany({
       where: { journeyId: journey.id },
@@ -393,6 +442,7 @@ describe("journey advance integration", () => {
 
   it("时间倒退 advance：no-op（不重放、不倒退）", async () => {
     const { letterId } = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-regression");
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-regression");
     const clock = new TestSimulationClock(T0);
     await advanceJourneyToNow(prisma, letterId, clock);
     clock.advanceTo(T0 + 25 * HOUR_MS);
@@ -492,6 +542,7 @@ describe("journey advance integration", () => {
       "HORSE_RELAY",
       "adv-unlock"
     );
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-unlock");
     const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
     const legs = await prisma.transportLeg.findMany({
       where: { journeyId: journey.id },
@@ -516,6 +567,7 @@ describe("journey advance integration", () => {
       "HORSE_RELAY",
       "adv-readstate"
     );
+    await setNormalSeed(letterId, "HORSE_RELAY", "adv-readstate");
     const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
     const legs = await prisma.transportLeg.findMany({
       where: { journeyId: journey.id },
@@ -566,7 +618,9 @@ describe("journey advance integration", () => {
   it("later-sent 可先到：多 Letter 独立推进", async () => {
     // HAND_CARRY 慢信先发；HORSE_RELAY 快信后发，同一模拟 now 下快信先 DELIVERED
     const slow = await createDispatchedLetter("bob5", "HAND_CARRY", "adv-slow");
+    await setNormalSeed(slow.letterId, "HAND_CARRY", "adv-slow");
     const fast = await createDispatchedLetter("bob5", "HORSE_RELAY", "adv-fast");
+    await setNormalSeed(fast.letterId, "HORSE_RELAY", "adv-fast");
 
     const clock = new TestSimulationClock(T0);
     await advanceJourneyToNow(prisma, slow.letterId, clock);

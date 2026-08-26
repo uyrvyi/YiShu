@@ -1,7 +1,8 @@
 // 驿书 V1 Prisma Schema
 // Phase 4：Journey + TransportLeg 本地路线规划（对应开发规范 §54/§55）。
-// 业务模型：User / Block / RefreshToken / Letter / RecipientState / SenderState / Journey / TransportLeg。
-// WorldEvent / TimelineEvent 等在后续 Phase 引入。
+// Phase 6：WorldEvent（服务器世界真相）已实现（对应规范 §56）。
+// 业务模型：User / Block / RefreshToken / Letter / RecipientState / SenderState / Journey / TransportLeg / WorldEvent。
+// TimelineEvent 等在 Phase 7 引入。
 
 generator client {
   provider               = "prisma-client"
@@ -64,6 +65,27 @@ enum TransportLegStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+// Journey 异常类型（Phase 6：World Truth；异常期间运输暂停，恢复窗口后继续或永久丢失）
+enum JourneyAnomalyType {
+  COURIER_MISSING
+  LETTER_DROPPED
+}
+
+// WorldEvent 类型（Phase 6：服务器真实发生的世界事实；不等于用户 Timeline，不直接暴露给用户）
+enum WorldEventType {
+  DELAYED
+  REROUTED
+  ROBBERY
+  COURIER_MISSING
+  LOST_PATH
+  LETTER_DROPPED
+  SERIOUS_ACCIDENT
+  RECOVERED
+  TRANSPORT_CHANGED
+  PERMANENTLY_LOST
+  DESTROYED
 }
 
 // 用户（对应开发规范 §52）
@@ -235,13 +257,51 @@ model Journey {
   lastAdvancedAtSim  DateTime? // 最近一次推进到的模拟时刻（幂等 / 倒退判定基准）
   currentLegSequence Int?      // 当前 ACTIVE Leg 的 sequence；无 ACTIVE（未开始或已全部完成）为 null
 
+  // 随机事件 cursor（Phase 6：单调递增，事务内消耗，replay 可重现；retry/rollback 不重复消费）
+  nextEventIndex Int @default(0)
+
+  // 异常状态（Phase 6：World Truth；运输暂停，恢复窗口后继续或 7 模拟日未恢复 → PERMANENTLY_LOST）
+  anomalyType          JourneyAnomalyType?
+  anomalyStartedAtSim  DateTime?
+  anomalyResolvedAtSim DateTime? // 恢复计划时刻；null = 恢复窗口为 NEVER（7 日未恢复 → PERMANENTLY_LOST）
+  // 续运 not-before 边界（Phase 6 Gate：SET_ASIDE 等恢复后，now < resumeAtSim 时保持 PLANNED 不激活；
+  // 跨过 resumeAtSim 后从该时刻续运并清空）
+  resumeAtSim DateTime?
+  // last-mile 起点（Phase 6 Gate：目的站异常恢复后送达基准 = max(完成时刻, resumeAt)；持久化避免
+  // OUT_FOR_DELIVERY 等待期推进退化；DELIVERED 后保持历史值）
+  lastMileReadyAtSim DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  letter Letter         @relation(fields: [letterId], references: [id], onDelete: Cascade)
-  legs   TransportLeg[]
+  letter      Letter       @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  legs        TransportLeg[]
+  worldEvents WorldEvent[]
 
   @@index([letterId])
+}
+
+// WorldEvent（Phase 6：服务器真实发生的世界事实；开发规范 §56）。
+// (journeyId, eventIndex) 唯一 → 事件顺序可 replay；retry 幂等。
+// nodeId / transportLegSequence：事件发生的稳定位置（Phase 7 Timeline / Phase 8 Map 直接可用，
+// 不依赖按时间反推；reroute 会替换 remaining legs，故必须冻结位置字段）。
+model WorldEvent {
+  id                   BigInt        @id @default(autoincrement())
+  journeyId            BigInt
+  eventIndex           Int
+  eventType            WorldEventType
+  occurredAtSim        DateTime
+  // 稳定位置（Phase 6 Gate 修复）：事件发生节点与 Leg 序号；生产写入路径均提供，NOT NULL 强制完整
+  nodeId               String
+  transportLegSequence Int?
+  // 事件详情（分支/新旧运输方式/禁用边等；仅服务器内部，绝不直接暴露给用户）
+  payload              Json?
+  createdAt            DateTime      @default(now())
+
+  journey Journey @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@unique([journeyId, eventIndex])
+  @@index([journeyId])
 }
 
 // TransportLeg（Phase 4：路线分段；对应开发规范 §55 + Phase 4 Prompt）
@@ -264,6 +324,11 @@ model TransportLeg {
   // 模拟时间语义（Phase 5：由 SimulationClock 驱动；completed 不可回退）。
   startedAtSim   DateTime? // Leg 开始运输的模拟时刻（ACTIVE 时设置）
   completedAtSim DateTime? // Leg 完成运输的模拟时刻（COMPLETED 时设置）
+
+  // 一级事件判定持久化（Phase 6 Gate 修复：每个 Leg 最多判定一次 primary event，DELAY 只生效一次）。
+  primaryEventIndex    Int?   // 该 Leg 的 primary WorldEvent eventIndex；null = 尚未判定
+  primaryEventOutcome  String? // 冻结 outcome（NORMAL/DELAY/REROUTE/ROBBERY/...；推进循环读取，不再重抽）
+  delaySeconds         Int    @default(0) // DELAY 类延误（冻结；effectiveDuration = plannedDuration + delay）
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

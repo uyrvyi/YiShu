@@ -2,9 +2,9 @@
 
 「现代世界 + 古代通信方式」的点对点通信 App。
 
-> 当前基线：**Phase 5 实现完成 · Final Gate 待复审（Simulation Core + Transport Progression）**
-> 下一阶段：**Phase 6（Random Events + Recovery + World Truth）**
-> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划，以及 Phase 5：SimulationClock / DeterministicRandom 基础设施与 Journey/Leg 确定性时间推进（正常运输 DISPATCHED → DELIVERED）。地图 / Push / 随机事件等后续业务仍未实现。
+> 当前基线：**Phase 6 实现完成 · Final Gate 待复审（Random Events + Recovery + World Truth）**
+> 下一阶段：**Phase 7（Timeline + 用户可见运输事实）**
+> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进，以及 Phase 6：WorldEvent 世界真相 + 固定概率随机事件（delay/reroute/robbery/missing/drop/accident）+ Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED。地图 / Timeline / Push 等后续业务仍未实现。
 
 当前进度、验收结果与已知限制见 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
 
@@ -210,7 +210,7 @@ pnpm prisma:validate    # Prisma schema 校验
 pnpm prisma:generate    # 生成 Prisma Client 到 generated/prisma（install 时自动执行）
 ```
 
-Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Letter**、**RecipientState**、**SenderState**、**Journey**、**TransportLeg**（含 `LetterStatus` / `TransportType` / `RecipientReadState` / `JourneyStatus` / `TransportLegStatus` enum）。以下模型属于后续 Phase，尚未实现：WorldEvent、TimelineEvent、Routing 等领域模型。
+Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Letter**、**RecipientState**、**SenderState**、**Journey**、**TransportLeg**、**WorldEvent**（含 `LetterStatus` / `TransportType` / `RecipientReadState` / `JourneyStatus` / `TransportLegStatus` / `JourneyAnomalyType` / `WorldEventType` enum）。以下模型属于后续 Phase，尚未实现：TimelineEvent 等领域模型。
 
 ## packages/db（已正式接受的数据库基础设施）
 
@@ -294,9 +294,22 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 - **Phase 5 测试**：simulation 单元测试（TestSimulationClock advanceBy/advanceTo、SystemSimulationClock speed=1/加速/非法速度、DeterministicRandom 同 seed/index 复现·replay·序列唯一·跨 seed 不同·范围）11 项；journey-advance 集成测试（单 Leg 激活、全 Leg 完成 OUT_FOR_DELIVERY、last-mile DELIVERED + deliveredAt 一次、多 Leg 大跳跃时间结余精确传递、completedPath 只增/remainingPath 只减、PIGEON 正常推进、同 now 幂等、并发 advance 恰一 changed、时间倒退 no-op、unknown Journey.rulesVersion 明确失败且无状态写入、Letter unknown/Journey valid 反向保护、缺失 Letter/Journey 错误、Recipient 正文解锁、Sender 无 readState、无 ETA/seed/id 泄漏、later-sent 可先到、零 Leg 同站点）17 项
 - **门禁**：全 workspace 193 tests（shared 4 / config 19 / db 2 / simulation 11 / routing 19 / worker 1 / mobile 26 / api 111）0 failed；typecheck / lint / format:check / build / prisma:validate / prisma:generate 全 PASS；两库 6 个 migration applied + checksum 一致；Docker 双容器 healthy；API production smoke `/health` = 200；Expo Android bundle PASS
 
+### 已完成（Phase 6：Random Events + Recovery + World Truth）
+
+- **WorldEvent 模型**（Prisma `WorldEvent` + `WorldEventType` enum）：`(journeyId, eventIndex)` UNIQUE，事件顺序可 replay；字段 `journeyId/eventIndex/eventType/occurredAtSim/nodeId（NOT NULL）/transportLegSequence/payload/createdAt`（nodeId 为事件稳定位置，Phase 7 Timeline / Phase 8 Map 直接可用，不依赖按时间反推）；仅服务器世界真相，API 绝不直接暴露（Phase 7 才做 TimelineEvent/visibility）
+- **确定性随机消费**：每完成一个 Leg 做一次一级事件判定，`deterministicDraw(simulationSeed, eventIndex)`；`Journey.nextEventIndex` 持久化（事务内单调递增，retry/rollback 不重复消费随机数，replay 一致）；全程无 `Math.random`
+- **冻结概率（shared，禁止魔法数字）**：HAND_CARRY（§28 8 项）/ HORSE_RELAY（§29）/ EXPRESS_RELAY（§30）/ PIGEON（§31）一级事件表 + 总和/分段自动测试；ROBBERY 二级分支 55/25/15/5（§32）；掉落恢复窗口 50/25/15/10（§33）；拾获处理 70/20/10（§34）；恢复后自动运输变更倾向（HAND 60/25/15、HORSE 80/15/5、PIGEON 70/30）；`selectWeightedOutcome` 确定性抽样；未知 `rulesVersion` 明确失败
+- **事件应用**（`advanceJourneyToNow` 内联，保留 Phase 5 全部契约）：DELAY/OTHER/DEVIATION/TEMPORARY_STOP → 理论完成时刻延后；REROUTE → 排除原计划下一条边重新 Dijkstra（`planRouteExcluding`，PIGEON 不走 road graph），只重建 remaining、completed 永久保留；LOST_PATH/LOST/COURIER_MISSING → `COURIER_MISSING` 异常；LETTER_DROPPED/ROBBERY(MISSING/DEAD 分支)/ground 严重事故 → `LETTER_DROPPED` 异常；PIGEON 严重事故 → `DESTROYED`（唯一 DESTROYED 分支）
+- **Recovery**：异常运输暂停；恢复窗口（确定性抽取）到期自动恢复（`RECOVERED`），可自动变更运输方式（`TRANSPORT_CHANGED`，剩余 legs 切换字段与时长），7 模拟日未恢复 → `PERMANENTLY_LOST`（terminal，Recipient 正文仍锁定）
+- **状态机**：Letter 异常状态 `COURIER_MISSING`/`LETTER_DROPPED` → 恢复回 `IN_TRANSIT`；终态仅 `DELIVERED`/`PERMANENTLY_LOST`/`DESTROYED`，之后 advance 一律 no-op；completedPath 不变量由 `toPathViews` 派生保持
+- **并发/幂等**：事务内 `SELECT ... FOR UPDATE` 锁 Journey + 锁后重读，并发 advance 恰一套 WorldEvent；同 now 重复/时间倒退/终态 no-op；unknown rulesVersion 抛错在任何写库前 → 事务整体回滚无半个事件历史
+- **API / Mobile**：不新增任何 `POST /advance` 生产接口；用户视图不暴露 `WorldEvent/payload/eventIndex/recoveryWindow/anomaly*/simulationSeed/internal id`；Recipient 未 DELIVERED 前 `content=null`；Sender 永无 readState
+- **Phase 6 测试**：shared 概率表（总和 1.0 / 分段 / 未知版本拒绝 / 分支 / 窗口）7 项；world-events 集成（调用频率无关 replay（含**终态后**、**连续两次 reroute**、**目的站 drop 恢复**）、每 Leg 一次 primary event、DELAY 冻结延长、事件时间不倒序、reroute 剩余时间消费 + 同 now no-op、reroute completedPath 不变、robbery 分支、courier missing、drop、recovery、SET_ASIDE resume not-before、**目的站异常恢复 deliveredAt=resumeAt+6h（普通/SET_ASIDE，不因果倒置）**、recovery transport change 重建（ground↔PIGEON）、7 日 permanent loss、destroyed、WorldEvent.nodeId（全非空）、totalDistanceKm===sum(legs)、未知 graphVersion rollback、并发恰一套事件、rollback 无半个 WorldEvent、无泄漏、NORMAL 无事件）28 项（固定 seed，无 flaky）
+- **门禁**：全 workspace 228 tests 0 failed；typecheck / lint / format:check / build / prisma:validate / prisma:generate 全 PASS；两库 10 个 migration applied + checksum 一致；Docker healthy；API production smoke `/health`=200；Expo Android bundle PASS
+
 ### 未完成（后续 Phase）
 
-以下业务**尚未实现**：地图可视化（Phase 8）、Push 与 BullMQ Worker 正式接入（Phase 9，Worker Scheduling + Push + Refresh）、WorldEvent / TimelineEvent（Phase 6–7）、随机事件 / Recovery / Reroute（Phase 6）、TransportLeg 事件/掉落/疲劳字段（Phase 6）。Phase 5 已提供确定性推进 service（`advanceJourneyToNow`）与 SimulationClock / DeterministicRandom 基础设施；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
+以下业务**尚未实现**：TimelineEvent 与用户可见运输事实 / visibility（Phase 7）、地图可视化（Phase 8）、Push 与 BullMQ Worker 正式接入（Phase 9）、WorldEvent→Timeline 的可见性转换（Phase 7）。Phase 5/6 已提供确定性推进与事件内核（`advanceJourneyToNow` + WorldEvent）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
 
 ## 已知限制与维护事项
 

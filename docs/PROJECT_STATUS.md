@@ -1,33 +1,34 @@
 # 驿书 V1 项目状态
 
 > 更新时间：2026-08-26  
-> 当前基线：Phase 5 实现完成 · Final Gate 待复审（Simulation Core + Transport Progression）  
-> 下一阶段：Phase 6（Random Events + Recovery + World Truth），尚未开始
+> 当前基线：Phase 6 实现完成 · Final Gate 待复审（Random Events + Recovery + World Truth）  
+> 下一阶段：Phase 7（Timeline + 用户可见运输事实），尚未开始
 
 ## Phase 完成情况
 
-| Phase                | 状态        | 已完成范围                                                                                                                                                                                         |
-| -------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 1：项目骨架    | COMPLETE    | pnpm workspace、Mobile/API/Worker、共享包、Prisma、PostgreSQL、Redis、Docker、严格 TypeScript、ESLint、Prettier、Vitest、构建与健康检查                                                            |
-| Phase 2：账号与身份  | COMPLETE    | User/Block/RefreshToken、注册登录、8 位 UID、Argon2id、JWT、Refresh Token Hash、TEST_DATABASE_URL 隔离、用户搜索、SecureStore 与 Mobile Auth Session                                               |
-| Phase 3：Letter 核心 | COMPLETE    | Letter/RecipientState/SenderState、Tracking Number、AES-256-GCM、创建幂等、Block 并发拦截、列表/详情/open/hide、Mobile 基础信件流程                                                                |
-| Phase 4：Routing     | COMPLETE    | 版本化静态路网（data/graphs/china-v1）、Graph 加载与校验、Dijkstra、PIGEON 直连、Journey/TransportLeg、Journey 初始化服务、安全 API、Mobile 路线文本                                               |
-| Phase 5：Simulation  | IMPLEMENTED | SimulationClock（System/Test）、DeterministicRandom 基础设施、advanceJourneyToNow 确定性推进（多 Leg 结余传递、OUT_FOR_DELIVERY→DELIVERED、并发/幂等/时间倒退契约）、Prisma 模拟时间字段、集成测试 |
+| Phase                | 状态        | 已完成范围                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Phase 1：项目骨架    | COMPLETE    | pnpm workspace、Mobile/API/Worker、共享包、Prisma、PostgreSQL、Redis、Docker、严格 TypeScript、ESLint、Prettier、Vitest、构建与健康检查                                                                                                                                                                                                                                                                                                                                                                      |
+| Phase 2：账号与身份  | COMPLETE    | User/Block/RefreshToken、注册登录、8 位 UID、Argon2id、JWT、Refresh Token Hash、TEST_DATABASE_URL 隔离、用户搜索、SecureStore 与 Mobile Auth Session                                                                                                                                                                                                                                                                                                                                                         |
+| Phase 3：Letter 核心 | COMPLETE    | Letter/RecipientState/SenderState、Tracking Number、AES-256-GCM、创建幂等、Block 并发拦截、列表/详情/open/hide、Mobile 基础信件流程                                                                                                                                                                                                                                                                                                                                                                          |
+| Phase 4：Routing     | COMPLETE    | 版本化静态路网（data/graphs/china-v1）、Graph 加载与校验、Dijkstra、PIGEON 直连、Journey/TransportLeg、Journey 初始化服务、安全 API、Mobile 路线文本                                                                                                                                                                                                                                                                                                                                                         |
+| Phase 5：Simulation  | COMPLETE    | SimulationClock（System/Test）、DeterministicRandom 基础设施、advanceJourneyToNow 确定性推进（多 Leg 结余传递、OUT_FOR_DELIVERY→DELIVERED、并发/幂等/时间倒退契约）、Prisma 模拟时间字段、集成测试                                                                                                                                                                                                                                                                                                           |
+| Phase 6：World Truth | IMPLEMENTED | WorldEvent 模型、(journeyId,eventIndex) 唯一、冻结概率表（§28–§36）、每 Leg 一次 primary event 持久化（primaryEventIndex/outcome/delaySeconds，DELAY 冻结延长）、可重复 progression loop（一次大跳跃与分段推进完全一致）、reroute 后继续消费剩余模拟时间、Recovery + 自动运输变更（按新 transport 重建路线，PIGEON↔ground 语义）、WorldEvent 稳定位置（nodeId/transportLegSequence）、7 日 PERMANENTLY_LOST、PIGEON 严重事故 DESTROYED、completedPath 不变量、totalDistanceKm 同步、并发/幂等/回滚无半个事件 |
 
 ## 当前质量基线
 
 - TypeScript strict：PASS
 - ESLint：PASS
 - Prettier：PASS
-- Vitest：193 passed / 0 failed（shared 4 / config 19 / db 2 / simulation 11 / routing 19 / worker 1 / mobile 26 / api 111）
+- Vitest：228 passed / 0 failed（shared 11 / config 19 / db 2 / simulation 11 / routing 19 / worker 1 / mobile 26 / api 139）
 - Graph validation：`pnpm graph:validate` PASS（294 节点 / 1949 边 / 全连通 / 0 重复 city / 0 失效映射 / 0 孤立）
 - Production build：PASS（含 Mobile Android Expo export）
 - Prisma validate / generate：PASS
-- 开发库与测试库 migration：6 个 migration 均 applied，checksum 与文件一致（`20260826120000_phase5_simulation_progression` 为 Phase 5 新增）
+- 开发库与测试库 migration：10 个 migration 均 applied，checksum 与文件一致（Phase 6 新增 `20260826130000_phase6_world_truth` / `20260826140000_phase6_gate_fixes` / `20260826150000_phase6_terminal_resume` / `20260826160000_phase6_lastmile_ready`：WorldEvent 表 + JourneyAnomalyType + Journey 事件/异常字段 + TransportLeg primary event 持久化 + WorldEvent 位置字段（nodeId NOT NULL）+ Journey.resumeAtSim + Journey.lastMileReadyAtSim）
 - Docker：PostgreSQL 17 / Redis 7.4 healthy
 - Production API：可启动，`GET /api/v1/health` 返回 HTTP 200
-- 测试隔离：破坏性集成测试只允许 `*_test` 数据库，开发库不被清理（Phase 5 Gate 探针：test 库 0 悬挂事务 / 0 未授权锁，dev 库 8 表 0 残留）
-- Git 工程闭环：Phase 1–4 已提交至 baseline commit `bcba2e5`（feat: complete phase 4 journey and routing）；Phase 5 源码与 migration 尚未提交，待 Phase 5 Final Gate PASS 后由项目负责人确认再建立可回滚 Commit
+- 测试隔离：破坏性集成测试只允许 `*_test` 数据库，开发库不被清理（Phase 6 Gate 探针：test 库 0 悬挂事务 / 0 未授权锁，dev 库 9 表 0 残留）
+- Git 工程闭环：Phase 1–5 已提交至 baseline commit `e755cb2`（feat: complete phase 5 simulation progression）；Phase 6 源码与 migration 尚未提交，待 Phase 6 Final Gate PASS 后由项目负责人确认再建立可回滚 Commit
 
 ## 安全基线
 
@@ -44,9 +45,8 @@
 
 以下能力尚未实现，不能把当前骨架或字段误认为正式业务：
 
-- **随机事件**（Robbery / Missing / Drop / Recovery / Reroute）与 WorldEvent（Phase 6）
-- TimelineEvent 与用户可见运输事实（Phase 7）
-- BullMQ Simulation Worker（Phase 9；Phase 5 已提供确定性推进 service `advanceJourneyToNow`，生产环境由 worker 按模拟时钟调度消费）
+- TimelineEvent 与用户可见运输事实 / visibility（Phase 7；WorldEvent 已建立为服务器世界真相，不直接暴露给用户）
+- BullMQ Simulation Worker（Phase 9；Phase 5/6 已提供确定性推进 service `advanceJourneyToNow` 与 WorldEvent 事件内核，生产环境由 worker 按模拟时钟调度消费）
 - 离线地图、轨迹、掉落范围与最后确报（Phase 8）
 - Polling、Push 与开发调试面板（Phase 9）
 
@@ -63,12 +63,12 @@
 
 ## 进入下一阶段规则
 
-Phase 6（Random Events + Recovery + World Truth）只有在满足以下全部条件后才允许开始：
+Phase 7（Timeline + 用户可见运输事实）只有在满足以下全部条件后才允许开始：
 
 ```text
 FINAL GATE: PASS
-PHASE 5 COMPLETE: YES
-MAY START PHASE 6: YES
+PHASE 6 COMPLETE: YES
+MAY START PHASE 7: YES
 ```
 
-并在项目负责人确认后完成 Phase 5 baseline Commit。进入后仍遵循：单 Phase 开发、完整自测、完成报告、停止并等待评审。阶段编号与功能归属唯一以根目录 `驿书_V1_Coding_Agent_阶段规划.md` 为准。
+并在项目负责人确认后完成 Phase 6 baseline Commit。进入后仍遵循：单 Phase 开发、完整自测、完成报告、停止并等待评审。阶段编号与功能归属唯一以根目录 `驿书_V1_Coding_Agent_阶段规划.md` 为准。

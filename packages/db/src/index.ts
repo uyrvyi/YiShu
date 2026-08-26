@@ -20,9 +20,12 @@ export type {
   SenderState,
   Journey,
   JourneyStatus,
+  JourneyAnomalyType,
   TransportLeg,
   TransportLegStatus,
   TransportType,
+  WorldEvent,
+  WorldEventType,
 } from "../../../generated/prisma/client.js";
 
 /**
