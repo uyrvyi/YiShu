@@ -18,6 +18,7 @@
     "@yishu/db": "workspace:*",
     "@yishu/routing": "workspace:*",
     "@yishu/shared": "workspace:*",
+    "@yishu/simulation": "workspace:*",
     "argon2": "^0.45.1",
     "fastify": "^5.0.0",
     "pino": "^9.0.0",

@@ -58,9 +58,10 @@ enum JourneyStatus {
   CANCELLED
 }
 
-// TransportLeg 状态（Phase 4：仅规划结果；最小状态集）
+// TransportLeg 状态（Phase 4：仅规划；Phase 5：正常推进 PLANNED → ACTIVE → COMPLETED）
 enum TransportLegStatus {
   PLANNED
+  ACTIVE
   COMPLETED
   CANCELLED
 }
@@ -227,6 +228,13 @@ model Journey {
 
   totalDistanceKm Float
 
+  // 模拟时间语义（Phase 5：SimulationClock.now() 写入，与 createdAt/updatedAt 真实审计时间区分）。
+  // 时间倒退 / 重复推进契约：now <= lastAdvancedAtSim → no-op。
+  startedAtSim       DateTime? // 运输开始（首个 Leg ACTIVE 的模拟时刻）
+  completedAtSim     DateTime? // 运输完成（最后一个 Leg COMPLETED 的模拟时刻，到达目标站）
+  lastAdvancedAtSim  DateTime? // 最近一次推进到的模拟时刻（幂等 / 倒退判定基准）
+  currentLegSequence Int?      // 当前 ACTIVE Leg 的 sequence；无 ACTIVE（未开始或已全部完成）为 null
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -252,6 +260,10 @@ model TransportLeg {
   plannedDurationSeconds Int
 
   status TransportLegStatus @default(PLANNED)
+
+  // 模拟时间语义（Phase 5：由 SimulationClock 驱动；completed 不可回退）。
+  startedAtSim   DateTime? // Leg 开始运输的模拟时刻（ACTIVE 时设置）
+  completedAtSim DateTime? // Leg 完成运输的模拟时刻（COMPLETED 时设置）
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

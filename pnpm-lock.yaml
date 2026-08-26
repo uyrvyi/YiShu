@@ -63,6 +63,9 @@ importers:
       '@yishu/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@yishu/simulation':
+        specifier: workspace:*
+        version: link:../../packages/simulation
       argon2:
         specifier: ^0.45.1
         version: 0.45.1

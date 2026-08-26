@@ -37,8 +37,8 @@ export type RecipientReadState = (typeof RECIPIENT_READ_STATES)[number];
 export const JOURNEY_STATUSES = ["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"] as const;
 export type JourneyStatus = (typeof JOURNEY_STATUSES)[number];
 
-/** TransportLeg 状态（Phase 4 仅规划，最小状态集）。 */
-export const TRANSPORT_LEG_STATUSES = ["PLANNED", "COMPLETED", "CANCELLED"] as const;
+/** TransportLeg 状态（Phase 4 仅规划；Phase 5 引入 ACTIVE 正常推进）。 */
+export const TRANSPORT_LEG_STATUSES = ["PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"] as const;
 export type TransportLegStatus = (typeof TRANSPORT_LEG_STATUSES)[number];
 
 /**
@@ -78,6 +78,14 @@ export class UnknownRulesVersionError extends Error {
 
 /** 秒 / 天，用于 "运输方式速度 → 天数 → 时长" 的换算。 */
 export const SECONDS_PER_DAY = 86400;
+
+/**
+ * 最后一段送达时长（秒，Phase 5：最小确定性 last-mile 方案）。
+ * 最后一个 TransportLeg COMPLETED（到达目标站）≠ Letter DELIVERED；
+ * 必须经过 OUT_FOR_DELIVERY（到达目标站）→ 再过本冻结时长 → DELIVERED。
+ * 冻结常量，内部 Simulation 输入，用户 API / Mobile 严禁暴露 ETA / 倒计时（规范 §18/§45）。
+ */
+export const LAST_MILE_DURATION_SECONDS = 6 * 3600;
 
 /**
  * 按规则版本取运输速度（km/天）。
