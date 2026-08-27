@@ -603,11 +603,13 @@ GPS 仅用于首次定位，不等于地图服务。
 
 ```text
 data/
-├─ maps/
-│  ├─ china-map.svg
-│  └─ china-districts.json
-├─ station_nodes.json
-└─ route_edges.json
+├─ graphs/
+│  ├─ registry.json
+│  └─ <graphVersion>/
+│     ├─ station_nodes.json
+│     ├─ route_edges.json
+│     └─ region_station_map.json
+└─ maps/                         # Phase 8 本地地图资源
 ```
 
 地图运行时不依赖互联网。
@@ -772,10 +774,10 @@ LETTER_MISSING
 
 # 22. 驿站 Graph
 
-V1 目标：
+Phase 4 已冻结的 `china-v1` 基线：
 
 ```text
-约 150~250 个主要驿站节点
+294 个主要驿站节点 / 1949 条无向路线边
 ```
 
 优先覆盖：
@@ -1406,11 +1408,13 @@ yishu/
 │  ├─ config/
 │  └─ db/
 ├─ data/
-│  ├─ maps/
-│  │  ├─ china-map.svg
-│  │  └─ china-districts.json
-│  ├─ station_nodes.json
-│  └─ route_edges.json
+│  ├─ graphs/
+│  │  ├─ registry.json
+│  │  └─ <graphVersion>/
+│  │     ├─ station_nodes.json
+│  │     ├─ route_edges.json
+│  │     └─ region_station_map.json
+│  └─ maps/                    # Phase 8 本地地图资源
 ├─ prisma/
 │  └─ schema.prisma
 ├─ 驿书_V1_Coding_Agent_开发规范.md
@@ -1509,16 +1513,21 @@ id
 letterId
 originNodeId
 destinationNodeId
-totalDistanceKm
-currentNodeId
-lastKnownNodeId
-currentApproximateMapX
-currentApproximateMapY
-uncertaintyRadiusKm
-currentLegIndex
-graphVersion
+status
 rulesVersion
+graphVersion
 simulationSeed
+totalDistanceKm
+startedAtSim
+completedAtSim
+lastAdvancedAtSim
+currentLegSequence
+nextEventIndex
+anomalyType
+anomalyStartedAtSim
+anomalyResolvedAtSim
+resumeAtSim
+lastMileReadyAtSim
 createdAt
 updatedAt
 ```
@@ -1528,6 +1537,7 @@ updatedAt
 - `graphVersion`、`rulesVersion`、`simulationSeed` 必须继承 Letter 已冻结值，Journey 不得重新生成。
 - 初始化时 `completedPath = empty`，`remainingPath = full route`；可以用显式字段或由 Leg 状态确定性派生，但语义必须一致。
 - 以后重新寻路只能改变 `remainingPath`，不得改写已经完成的路径。
+- `currentNodeId`、`lastKnownNodeId`、`currentApproximateMapX/Y`、`uncertaintyRadiusKm` 属 Phase 8 Map View，可由 Journey、Leg 与可见事实派生；截至 Phase 6 不作为 Journey 持久化字段。
 
 ---
 
@@ -1541,11 +1551,13 @@ fromNodeId
 toNodeId
 distanceKm
 transportType
-plannedDuration
+plannedDurationSeconds
 status
-startedAt
-expectedEndAt
-endedAt
+startedAtSim
+completedAtSim
+primaryEventIndex
+primaryEventOutcome
+delaySeconds
 createdAt
 updatedAt
 ```
@@ -1564,14 +1576,22 @@ updatedAt
 
 ```text
 id
-letterId
-type
-happenedAt
+journeyId
+eventIndex
+eventType
+occurredAtSim
 nodeId
-metadata
+transportLegSequence
+payload
+createdAt
 ```
 
-仅服务端内部使用。
+规则：
+
+- `(journeyId, eventIndex)` 必须唯一，`eventIndex` 在事务内单调消费。
+- `nodeId` 必须 `NOT NULL`；`transportLegSequence` 固定事件发生时的 Leg 位置。
+- `payload` 使用 canonical JSON 语义保存事件详情。
+- 仅服务端内部使用，不得直接作为 TimelineEvent 暴露给用户。
 
 ---
 
@@ -1663,6 +1683,13 @@ speed = 1
 1000
 10000
 ```
+
+Phase 6 推进时间契约：
+
+- `now <= lastAdvancedAtSim` 时为真正 no-op，不消费事件、不改写状态。
+- Letter 已进入 `DELIVERED`、`PERMANENTLY_LOST` 或 `DESTROYED` 后，更晚 `now` 只允许单调更新 `lastAdvancedAtSim`；不得改写 terminal status、`deliveredAt`、Legs、WorldEvents、`nextEventIndex` 或 `lastMileReadyAtSim`。
+- last-mile 起点为 `max(completedAtSim, resumeAtSim, 已持久化 lastMileReadyAtSim)`；一旦计算即持久化，retry 与时间倒退不得改变。
+- `deliveredAt = lastMileReadyAtSim + 6h`，且不得早于 `RECOVERED.occurredAtSim`。
 
 ---
 

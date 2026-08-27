@@ -304,8 +304,8 @@ model WorldEvent {
   @@index([journeyId])
 }
 
-// TransportLeg（Phase 4：路线分段；对应开发规范 §55 + Phase 4 Prompt）
-// 仅表达规划结果，不含事件/掉落/疲劳等后续业务字段。
+// TransportLeg（Phase 4 路线分段；Phase 5 推进时间；Phase 6 一级事件冻结字段）。
+// 不承载动态疲劳/NPC 属性；异常历史由 WorldEvent 与 Journey anomaly 字段表达。
 model TransportLeg {
   id         BigInt @id @default(autoincrement())
   journeyId  BigInt

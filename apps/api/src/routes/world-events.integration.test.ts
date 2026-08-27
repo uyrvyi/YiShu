@@ -63,7 +63,7 @@ describe("world events integration", () => {
   } as const;
 
   /** 搜索 seed：draw(seed,0) ∈ [start,end)。 */
-  function findSeed0(transport: TransportType, start: number, end: number, tag: string): string {
+  function findSeed0(start: number, end: number, tag: string): string {
     for (let i = 0; i < 300000; i += 1) {
       const seed = `${tag}-${i}`;
       const d = deterministicDraw(seed, 0);
@@ -162,6 +162,128 @@ describe("world events integration", () => {
     });
   }
 
+  /**
+   * 统一 canonical world snapshot（Gate：A/B replay 全等比较的单一事实来源）。
+   * 完整读取并规范化 Letter / Journey / TransportLeg[] / WorldEvent[] 的全部 deterministic 字段；
+   * 排除 DB internal auto id、createdAt/updatedAt 等真实审计时间（与 replay 无关）。
+   * 数组按稳定 key 排序：legs 按 sequence asc，events 按 eventIndex asc。
+   * payload 递归按 key 排序规范化（Postgres jsonb 不保证 key 顺序）。
+   */
+  interface CanonicalWorldSnapshot {
+    letter: {
+      status: string;
+      currentTransport: string;
+      deliveredAt: number | null;
+    };
+    journey: {
+      status: string;
+      startedAtSim: number | null;
+      completedAtSim: number | null;
+      lastAdvancedAtSim: number | null;
+      resumeAtSim: number | null;
+      lastMileReadyAtSim: number | null;
+      currentLegSequence: number | null;
+      nextEventIndex: number;
+      totalDistanceKm: number;
+      rulesVersion: string;
+      graphVersion: string;
+      anomalyType: string | null;
+      anomalyStartedAtSim: number | null;
+      anomalyResolvedAtSim: number | null;
+    };
+    legs: Array<{
+      sequence: number;
+      fromNodeId: string;
+      toNodeId: string;
+      transportType: string;
+      distanceKm: number;
+      plannedDurationSeconds: number;
+      status: string;
+      startedAtSim: number | null;
+      completedAtSim: number | null;
+      primaryEventIndex: number | null;
+      primaryEventOutcome: string | null;
+      delaySeconds: number;
+    }>;
+    events: Array<{
+      eventIndex: number;
+      eventType: string;
+      occurredAtSim: number;
+      nodeId: string;
+      transportLegSequence: number | null;
+      payload: unknown;
+    }>;
+  }
+
+  function canonicalizePayload(payload: unknown): unknown {
+    if (payload === null || typeof payload !== "object") return payload;
+    if (Array.isArray(payload)) return payload.map(canonicalizePayload);
+    const obj = payload as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(obj).sort()) {
+      out[key] = canonicalizePayload(obj[key]);
+    }
+    return out;
+  }
+
+  async function canonicalWorldSnapshot(letterId: bigint): Promise<CanonicalWorldSnapshot> {
+    const letter = await prisma.letter.findUniqueOrThrow({ where: { id: letterId } });
+    const journey = await prisma.journey.findUniqueOrThrow({ where: { letterId } });
+    const legs = await prisma.transportLeg.findMany({
+      where: { journeyId: journey.id },
+      orderBy: { sequence: "asc" },
+    });
+    const events = await prisma.worldEvent.findMany({
+      where: { journeyId: journey.id },
+      orderBy: { eventIndex: "asc" },
+    });
+    return {
+      letter: {
+        status: letter.status,
+        currentTransport: letter.currentTransport,
+        deliveredAt: letter.deliveredAt?.getTime() ?? null,
+      },
+      journey: {
+        status: journey.status,
+        startedAtSim: journey.startedAtSim?.getTime() ?? null,
+        completedAtSim: journey.completedAtSim?.getTime() ?? null,
+        lastAdvancedAtSim: journey.lastAdvancedAtSim?.getTime() ?? null,
+        resumeAtSim: journey.resumeAtSim?.getTime() ?? null,
+        lastMileReadyAtSim: journey.lastMileReadyAtSim?.getTime() ?? null,
+        currentLegSequence: journey.currentLegSequence,
+        nextEventIndex: journey.nextEventIndex,
+        totalDistanceKm: Math.round(journey.totalDistanceKm * 100) / 100,
+        rulesVersion: journey.rulesVersion,
+        graphVersion: journey.graphVersion,
+        anomalyType: journey.anomalyType,
+        anomalyStartedAtSim: journey.anomalyStartedAtSim?.getTime() ?? null,
+        anomalyResolvedAtSim: journey.anomalyResolvedAtSim?.getTime() ?? null,
+      },
+      legs: legs.map((l) => ({
+        sequence: l.sequence,
+        fromNodeId: l.fromNodeId,
+        toNodeId: l.toNodeId,
+        transportType: l.transportType,
+        distanceKm: Math.round(l.distanceKm * 100) / 100,
+        plannedDurationSeconds: l.plannedDurationSeconds,
+        status: l.status,
+        startedAtSim: l.startedAtSim?.getTime() ?? null,
+        completedAtSim: l.completedAtSim?.getTime() ?? null,
+        primaryEventIndex: l.primaryEventIndex,
+        primaryEventOutcome: l.primaryEventOutcome,
+        delaySeconds: l.delaySeconds,
+      })),
+      events: events.map((e) => ({
+        eventIndex: e.eventIndex,
+        eventType: e.eventType,
+        occurredAtSim: e.occurredAtSim.getTime(),
+        nodeId: e.nodeId,
+        transportLegSequence: e.transportLegSequence,
+        payload: canonicalizePayload(e.payload),
+      })),
+    };
+  }
+
   /** 激活（advance T0）并推进到目标时刻，返回结果。 */
   async function advanceTo(letterId: bigint, clock: TestSimulationClock, targetMs: number) {
     clock.advanceTo(T0);
@@ -253,56 +375,29 @@ describe("world events integration", () => {
     stepsClock.advanceTo(finalMs); // 兜底精确到最终时刻
     await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
 
-    const bigLetter = await prisma.letter.findUniqueOrThrow({ where: { id: big.letterId } });
-    const stepsLetter = await prisma.letter.findUniqueOrThrow({ where: { id: steps.letterId } });
-    expect(bigLetter.status).toBe("DELIVERED");
-    expect(stepsLetter.status).toBe("DELIVERED");
-    expect(stepsLetter.deliveredAt?.getTime()).toBe(bigLetter.deliveredAt?.getTime());
+    // 完整 canonical 全等（Letter.status/deliveredAt、Journey 全字段含 lastMileReadyAtSim、
+    // Legs 完整状态、WorldEvent 完整序列 nodeId/transportLegSequence/payload）
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(bigSnap.letter.status).toBe("DELIVERED");
+    expect(stepsSnap.letter.status).toBe("DELIVERED");
+    expect(stepsSnap).toEqual(bigSnap);
 
-    const jb = await journeyOf(big.letterId);
-    const js = await journeyOf(steps.letterId);
-    expect(js.lastAdvancedAtSim?.getTime()).toBe(jb.lastAdvancedAtSim?.getTime());
-    expect(js.nextEventIndex).toBe(jb.nextEventIndex);
-    expect(js.status).toBe(jb.status);
-    expect(js.currentLegSequence ?? null).toBe(jb.currentLegSequence ?? null);
-    expect(js.completedAtSim?.getTime() ?? null).toBe(jb.completedAtSim?.getTime() ?? null);
-    expect(js.resumeAtSim?.getTime() ?? null).toBe(jb.resumeAtSim?.getTime() ?? null);
+    // lastMileReadyAtSim 生命周期（正常 last-mile）：= journeyCompletedAt（无恢复），已持久化
+    expect(bigSnap.journey.lastMileReadyAtSim).toBe(
+      deliveredMs - LAST_MILE_DURATION_SECONDS * 1000
+    );
+    expect(bigSnap.letter.deliveredAt).toBe(deliveredMs);
 
-    const bigLegs = await prisma.transportLeg.findMany({
-      where: { journeyId: jb.id },
-      orderBy: { sequence: "asc" },
-    });
-    const stepsLegs = await prisma.transportLeg.findMany({
-      where: { journeyId: js.id },
-      orderBy: { sequence: "asc" },
-    });
-    expect(stepsLegs.length).toBe(bigLegs.length);
-    const key = (l: {
-      status: string;
-      startedAtSim: Date | null;
-      completedAtSim: Date | null;
-      primaryEventIndex: number | null;
-      delaySeconds: number;
-    }) => [
-      l.status,
-      l.startedAtSim?.getTime() ?? null,
-      l.completedAtSim?.getTime() ?? null,
-      l.primaryEventIndex,
-      l.delaySeconds,
-    ];
-    expect(stepsLegs.map(key)).toEqual(bigLegs.map(key));
-
-    // deliveredAt 不被重写：再推进 deliveredAt 不变
-    const before = (
-      await prisma.letter.findUniqueOrThrow({ where: { id: big.letterId } })
-    ).deliveredAt?.getTime();
+    // deliveredAt / lastMileReadyAtSim 不被重写：terminal 后再推进两者都不变
+    const before = bigSnap.letter.deliveredAt;
     bigClock.advanceTo(finalMs + DAY_MS);
     const again = await advanceJourneyToNow(prisma, big.letterId, bigClock);
     expect(again.changed).toBe(false);
-    const after = (
-      await prisma.letter.findUniqueOrThrow({ where: { id: big.letterId } })
-    ).deliveredAt?.getTime();
-    expect(after).toBe(before);
+    const afterSnap = await canonicalWorldSnapshot(big.letterId);
+    expect(afterSnap.letter.deliveredAt).toBe(before);
+    // lastMileReadyAtSim 在 terminal 后保持历史值（不被更晚值覆盖、不退化）
+    expect(afterSnap.journey.lastMileReadyAtSim).toBe(bigSnap.journey.lastMileReadyAtSim);
   });
 
   /** 连续两次 reroute：大跳跃 vs 分段全等 + 路线无断链 + totalDistance 一致（BLOCKER-2）。 */
@@ -349,55 +444,57 @@ describe("world events integration", () => {
     stepsClock.advanceTo(finalMs); // 兜底精确到最终时刻
     await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
 
-    const jb2 = await journeyOf(big.letterId);
-    const js2 = await journeyOf(steps.letterId);
-    expect(js2.nextEventIndex).toBe(jb2.nextEventIndex);
-    expect(js2.lastAdvancedAtSim?.getTime()).toBe(jb2.lastAdvancedAtSim?.getTime());
-    expect(js2.status).toBe(jb2.status);
+    // 完整 canonical 全等（两条执行路径的完整 Leg 快照 / WorldEvent / Journey / Letter）
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(stepsSnap).toEqual(bigSnap);
 
-    const bigLegs = await prisma.transportLeg.findMany({
-      where: { journeyId: jb2.id },
-      orderBy: { sequence: "asc" },
-    });
-    const stepsLegs = await prisma.transportLeg.findMany({
-      where: { journeyId: js2.id },
-      orderBy: { sequence: "asc" },
-    });
+    const bigLegs = bigSnap.legs;
+    const stepsLegs = stepsSnap.legs;
     expect(stepsLegs.length).toBe(bigLegs.length);
+    expect(bigLegs.length).toBeGreaterThan(2); // 两次 reroute 重建后仍有剩余路线
 
-    // route continuity：leg[i].to === leg[i+1].from；sequence 连续
-    const checkContinuity = (arr: Array<{ fromNodeId: string; toNodeId: string }>) => {
-      for (let i = 1; i < arr.length; i += 1) {
-        expect(arr[i]?.fromNodeId).toBe(arr[i - 1]?.toNodeId);
+    // sequence = 0,1,2,... 连续；leg[i].toNodeId === leg[i+1].fromNodeId（无断链）
+    const checkContinuity = (arr: CanonicalWorldSnapshot["legs"]) => {
+      for (let i = 0; i < arr.length; i += 1) {
+        expect(arr[i]?.sequence).toBe(i);
+        if (i > 0) expect(arr[i]?.fromNodeId).toBe(arr[i - 1]?.toNodeId);
       }
     };
     checkContinuity(bigLegs);
     checkContinuity(stepsLegs);
 
-    // totalDistanceKm === sum(legs)
-    const sumBig = bigLegs.reduce((a, l) => a + l.distanceKm, 0);
-    expect(Math.abs(jb2.totalDistanceKm - sumBig)).toBeLessThan(0.5);
-    const sumSteps = stepsLegs.reduce((a, l) => a + l.distanceKm, 0);
-    expect(Math.abs(js2.totalDistanceKm - sumSteps)).toBeLessThan(0.5);
+    // 旧 remaining Legs 完全不存在：原计划 leg0.to → leg1.to 边（被排除）不在任何 final legs 中
+    for (const l of [...bigLegs, ...stepsLegs]) {
+      expect(l.fromNodeId === leg0?.toNodeId && l.toNodeId === leg1?.toNodeId).toBe(false);
+    }
 
-    // completed history 不变：leg0 仍 COMPLETED（起点 shanghai）
+    // completed history 不变：leg0 仍 COMPLETED
     expect(bigLegs[0]?.status).toBe("COMPLETED");
     expect(stepsLegs[0]?.status).toBe("COMPLETED");
-    // WorldEvent 全等
-    const bigEvents = await worldEventsOf(jb2.id);
-    const stepsEvents = await worldEventsOf(js2.id);
-    expect(stepsEvents.length).toBe(bigEvents.length);
-    expect(
-      stepsEvents.map((e) => [e.eventIndex, e.eventType, e.occurredAtSim.getTime(), e.nodeId])
-    ).toEqual(
-      bigEvents.map((e) => [e.eventIndex, e.eventType, e.occurredAtSim.getTime(), e.nodeId])
-    );
+
+    // totalDistanceKm === sum(legs)（两条路径都成立）
+    const sumBig = bigLegs.reduce((a, l) => a + l.distanceKm, 0);
+    expect(Math.abs(bigSnap.journey.totalDistanceKm - sumBig)).toBeLessThan(0.01);
+    const sumSteps = stepsLegs.reduce((a, l) => a + l.distanceKm, 0);
+    expect(Math.abs(stepsSnap.journey.totalDistanceKm - sumSteps)).toBeLessThan(0.01);
+
+    // WorldEvent eventIndex 一致且单调
+    for (let i = 1; i < bigSnap.events.length; i += 1) {
+      expect(bigSnap.events[i]?.eventIndex).toBeGreaterThan(
+        bigSnap.events[i - 1]?.eventIndex ?? -1
+      );
+    }
     // 至少 2 次 REROUTED
-    expect(bigEvents.filter((e) => e.eventType === "REROUTED").length).toBeGreaterThanOrEqual(2);
+    expect(bigSnap.events.filter((e) => e.eventType === "REROUTED").length).toBeGreaterThanOrEqual(
+      2
+    );
   });
 
-  /** SET_ASIDE not-before（HIGH）：resume 前保持 PLANNED，跨 resume 后从 resumeAt 续运并消费剩余。 */
-  it("SET_ASIDE：resume 前 Leg PLANNED 无 primary event；跨 resume 后从 resumeAt 续运（一次跳跃 vs 分段一致）", async () => {
+  /** SET_ASIDE（HIGH）：真正 A/B 两条相同 deterministic fixture —— 一次跳跃 vs 分段 → canonical 全等。
+   * resume 前：next Leg 保持 PLANNED / startedAtSim null / 无 primary event；
+   * 跨 resume 后：startedAtSim = resumeAtSim，正确消费剩余模拟时间。 */
+  it("SET_ASIDE：一次跳跃 vs 分段（resume 前/后分段 advance）→ canonical 全等", async () => {
     // 需要 drop + WITHIN_24H + handling=SET_ASIDE(draw3∈[0.9,1))
     // draw: 0=primary(drop) 1=window 2=range 3=handling
     let seed = "";
@@ -418,53 +515,85 @@ describe("world events integration", () => {
       }
     }
     expect(seed).not.toBe("");
-    const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-setaside");
-    await setSeed(letterId, seed);
-    const journey = await journeyOf(letterId);
+    const big = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-setaside-big");
+    const steps = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-setaside-steps");
+    await setSeed(big.letterId, seed);
+    await setSeed(steps.letterId, seed);
+    const journeySteps = await journeyOf(steps.letterId);
     const leg0 = await prisma.transportLeg.findFirstOrThrow({
-      where: { journeyId: journey.id, sequence: 0 },
+      where: { journeyId: journeySteps.id, sequence: 0 },
     });
     const legEnd = T0 + leg0.plannedDurationSeconds * 1000;
+    // finalMs 足够远：覆盖 drop → recovery(SET_ASIDE +24h) → resume 续运 → 多段 remaining → last-mile → DELIVERED
+    const finalMs = legEnd + DAY_MS * 40;
 
-    const clock = new TestSimulationClock(T0);
-    await advanceTo(letterId, clock, legEnd); // drop 发生
-    const dropped = await journeyOf(letterId);
+    // A：一次大跳跃到最终 now
+    const bigClock = new TestSimulationClock(T0);
+    await advanceTo(big.letterId, bigClock, finalMs);
+
+    // B：resume 前 / resume 后分段 advance
+    const stepsClock = new TestSimulationClock(T0);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock); // 激活
+    stepsClock.advanceTo(legEnd);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock); // drop 发生
+    const dropped = await journeyOf(steps.letterId);
     const resolvedMs = dropped.anomalyResolvedAtSim?.getTime() ?? legEnd;
     const resumeAtMs = resolvedMs + SET_ASIDE_DELAY_SECONDS * 1000; // 24h 搁置
+    // 推进到恢复点 → RECOVERED + SET_ASIDE（resumeAtSim 持久化）
+    stepsClock.advanceTo(resolvedMs);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
 
-    // resume 前 12h：Leg 保持 PLANNED、无 primary event、无 startedAtSim
-    clock.advanceTo(resumeAtMs - 12 * HOUR_MS);
-    await advanceJourneyToNow(prisma, letterId, clock); // 恢复已发生（changed=true 属恢复本身）
-    const jMid = await journeyOf(letterId);
+    // resume 前 12h：恢复已发生，next Leg 保持 PLANNED、startedAtSim null、无 primary event
+    stepsClock.advanceTo(resumeAtMs - 12 * HOUR_MS);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    const jMid = await journeyOf(steps.letterId);
     expect(jMid.resumeAtSim?.getTime()).toBe(resumeAtMs);
-    const pendingMid = await prisma.transportLeg.findMany({
-      where: { journeyId: journey.id, sequence: { gte: 1 } },
-    });
+    expect(jMid.lastMileReadyAtSim).toBeNull(); // 非目的站异常：last-mile 尚未进入
+    const pendingMid = (
+      await prisma.transportLeg.findMany({
+        where: { journeyId: journeySteps.id, sequence: { gte: 1 } },
+      })
+    ).sort((a, b) => a.sequence - b.sequence);
     expect(pendingMid.length).toBeGreaterThan(0);
-    expect(pendingMid[0]?.status).toBe("PLANNED");
-    expect(pendingMid[0]?.primaryEventIndex).toBeNull();
-    expect(pendingMid[0]?.startedAtSim).toBeNull();
+    const nextMid = pendingMid.find((l) => l.status !== "COMPLETED");
+    expect(nextMid?.status).toBe("PLANNED");
+    expect(nextMid?.primaryEventIndex).toBeNull();
+    expect(nextMid?.startedAtSim).toBeNull();
 
-    // T+30h（跨 resume 6h）：leg 从 resumeAt 开始，已消费 6h
-    const afterMs = resumeAtMs + 30 * HOUR_MS;
-    clock.advanceTo(afterMs);
-    const crossed = await advanceJourneyToNow(prisma, letterId, clock);
+    // 跨 resume 后（resumeAtMs 时刻）第一次推进：续运起点 = resumeAtMs
+    stepsClock.advanceTo(resumeAtMs);
+    const crossed = await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
     expect(crossed.changed).toBe(true);
-    const jAfter = await journeyOf(letterId);
+    const jAfter = await journeyOf(steps.letterId);
     expect(jAfter.resumeAtSim).toBeNull(); // 已消费清空
     const pendingAfter = (
       await prisma.transportLeg.findMany({
-        where: { journeyId: journey.id, sequence: { gte: 1 } },
+        where: { journeyId: journeySteps.id, sequence: { gte: 1 } },
       })
     ).sort((a, b) => a.sequence - b.sequence);
     const first = pendingAfter.find((l) => l.status !== "COMPLETED");
     expect(first?.startedAtSim?.getTime()).toBe(resumeAtMs); // 续运起点 = resumeAt
     expect(first?.status).toBe("ACTIVE");
+
+    // 继续分段推进到 finalMs：从 resumeAtMs 起每 6h 推进到 finalMs
+    for (let ms = 6 * HOUR_MS; resumeAtMs + ms <= finalMs; ms += 6 * HOUR_MS) {
+      stepsClock.advanceTo(resumeAtMs + ms);
+      await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    }
+    stepsClock.advanceTo(finalMs); // 兜底精确到最终时刻
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+
+    // 最终 canonical 全等
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(stepsSnap).toEqual(bigSnap);
+    expect(bigSnap.letter.status).toBe("DELIVERED");
+    expect(bigSnap.journey.resumeAtSim ?? null).toBeNull(); // 已消费清空
   });
 
   /** 未知 graphVersion reroute rollback（HIGH）：只捕获 NoRouteError。 */
   it("unknown graphVersion reroute：抛 UnknownGraphVersionError，无 WorldEvent / 无状态写入 / 事务回滚", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.REROUTE[0], HC.REROUTE[1], "ev-badgraph");
+    const seed = findSeed0(HC.REROUTE[0], HC.REROUTE[1], "ev-badgraph");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-badgraph");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -639,32 +768,359 @@ describe("world events integration", () => {
     stepsClock.advanceTo(finalMs);
     await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
 
-    const bigLetter = await prisma.letter.findUniqueOrThrow({ where: { id: big.letterId } });
-    const stepsLetter = await prisma.letter.findUniqueOrThrow({ where: { id: steps.letterId } });
-    expect(stepsLetter.status).toBe("DELIVERED");
-    expect(stepsLetter.deliveredAt?.getTime()).toBe(bigLetter.deliveredAt?.getTime());
+    // 完整 canonical 全等：Letter(status/deliveredAt/currentTransport)、Journey 全字段
+    // （status/lastMileReadyAtSim/resumeAtSim/lastAdvancedAtSim/nextEventIndex/anomaly*）、
+    // Legs 完整状态、WorldEvent 完整序列（nodeId/transportLegSequence/payload）
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(stepsSnap.letter.status).toBe("DELIVERED");
+    expect(stepsSnap.letter.deliveredAt).toBe(bigSnap.letter.deliveredAt);
+    expect(stepsSnap).toEqual(bigSnap);
 
-    const jb2 = await journeyOf(big.letterId);
-    const js2 = await journeyOf(steps.letterId);
-    expect(js2.lastAdvancedAtSim?.getTime()).toBe(jb2.lastAdvancedAtSim?.getTime());
-    expect(js2.nextEventIndex).toBe(jb2.nextEventIndex);
-    expect(js2.resumeAtSim?.getTime() ?? null).toBe(jb2.resumeAtSim?.getTime() ?? null);
-    const bigEvents = await worldEventsOf(jb2.id);
-    const stepsEvents = await worldEventsOf(js2.id);
-    expect(stepsEvents.length).toBe(bigEvents.length);
-    expect(stepsEvents.map((e) => [e.eventIndex, e.eventType, e.occurredAtSim.getTime()])).toEqual(
-      bigEvents.map((e) => [e.eventIndex, e.eventType, e.occurredAtSim.getTime()])
+    // 目的站 drop 恢复：lastMileReadyAtSim = max(journeyCompletedAt, resumeAt)（resumeAt 更晚），
+    // deliveredAt = lastMileReadyAtSim + 6h；不得早于 RECOVERED（因果不倒置）
+    const events = bigSnap.events;
+    const recovered = events.find((e) => e.eventType === "RECOVERED");
+    expect(recovered).toBeDefined();
+    expect(bigSnap.journey.lastMileReadyAtSim).not.toBeNull();
+    expect(bigSnap.letter.deliveredAt).toBe(
+      (bigSnap.journey.lastMileReadyAtSim ?? 0) + LAST_MILE_DURATION_SECONDS * 1000
     );
+    expect(bigSnap.letter.deliveredAt ?? 0).toBeGreaterThanOrEqual(recovered?.occurredAtSim ?? 0);
+    // 目的站异常恢复：last-mile 基准 >= 恢复时刻（不早于 legEnd+6h 因果倒置基线）
+    expect(bigSnap.journey.lastMileReadyAtSim ?? 0).toBeGreaterThanOrEqual(
+      recovered?.occurredAtSim ?? 0
+    );
+    // lastAdvancedAtSim 同一最终 now
+    expect(stepsSnap.journey.lastAdvancedAtSim).toBe(bigSnap.journey.lastAdvancedAtSim);
+    expect(stepsSnap.journey.nextEventIndex).toBe(bigSnap.journey.nextEventIndex);
+  });
+
+  /** DELAY replay（HIGH）：一次大跳跃 vs 分段 → canonical 全等；同一 Leg 至多一个 primary event；
+   * frozen delay 相同；effective completion 相同；事件时间不倒序。 */
+  it("DELAY replay：一次大跳跃 vs 分段 → canonical 全等 + delay 冻结一致 + 事件不倒序", async () => {
+    const seed = findSeed0(HC.DELAY[0], HC.DELAY[1], "ev-delay-rp");
+    const big = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-delay-rp-b");
+    const steps = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-delay-rp-s");
+    await setSeed(big.letterId, seed);
+    await setSeed(steps.letterId, seed);
+    const jb = await journeyOf(big.letterId);
+    const leg0 = await prisma.transportLeg.findFirstOrThrow({
+      where: { journeyId: jb.id, sequence: 0 },
+    });
+    const legEnd = T0 + leg0.plannedDurationSeconds * 1000;
+    // DELAY_MAX 12h：finalMs 越过 legEnd + delay + 后续推进
+    const finalMs = legEnd + DAY_MS * 2;
+
+    // A：一次大跳跃
+    const bigClock = new TestSimulationClock(T0);
+    await advanceTo(big.letterId, bigClock, finalMs);
+
+    // B：分段推进（每 3h）
+    const stepsClock = new TestSimulationClock(T0);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    for (let ms = 3 * HOUR_MS; ms < finalMs - T0; ms += 3 * HOUR_MS) {
+      stepsClock.advanceTo(T0 + ms);
+      await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    }
+    stepsClock.advanceTo(finalMs);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(stepsSnap).toEqual(bigSnap);
+
+    // 同一 Leg 至多一个 primary event：leg0 恰好判定一次（DELAYED）
+    const leg0Snap = bigSnap.legs[0];
+    expect(leg0Snap?.primaryEventIndex).not.toBeNull();
+    expect(leg0Snap?.primaryEventOutcome).toBe("DELAYED");
+    // frozen delay 相同（A/B 一致且 > 0）
+    expect(leg0Snap?.delaySeconds).toBeGreaterThan(0);
+    expect(bigSnap.legs[0]?.delaySeconds).toBe(stepsSnap.legs[0]?.delaySeconds);
+    // effective completion 相同 = start + (planned + delay)
+    expect(leg0Snap?.completedAtSim).toBe(
+      (leg0Snap?.startedAtSim ?? 0) +
+        ((leg0Snap?.plannedDurationSeconds ?? 0) + (leg0Snap?.delaySeconds ?? 0)) * 1000
+    );
+    // DELAYED 事件与 leg0.completedAtSim 同一时刻；payload.delaySeconds 与冻结一致
+    const delayed = bigSnap.events.find((e) => e.eventType === "DELAYED");
+    expect(delayed).toBeDefined();
+    expect(delayed?.occurredAtSim).toBe(leg0Snap?.completedAtSim);
+    expect((delayed?.payload as { delaySeconds?: number } | null)?.delaySeconds).toBe(
+      leg0Snap?.delaySeconds
+    );
+    // WorldEvent 时间不倒序
+    for (let i = 1; i < bigSnap.events.length; i += 1) {
+      expect(bigSnap.events[i]?.occurredAtSim ?? 0).toBeGreaterThanOrEqual(
+        bigSnap.events[i - 1]?.occurredAtSim ?? 0
+      );
+    }
+  });
+
+  /** PERMANENTLY_LOST terminal replay（HIGH）：分段推进后提前进入 terminal，再推进到同一最终 now。 */
+  it("PERMANENTLY_LOST terminal replay：一次大跳跃 vs 分段（提前进入 terminal）→ canonical 全等", async () => {
+    const seed = findSeed01(HC.LETTER_DROPPED, DROP_WINDOW.NEVER, "ev-loss-rp");
+    const big = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-loss-rp-b");
+    const steps = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-loss-rp-s");
+    await setSeed(big.letterId, seed);
+    await setSeed(steps.letterId, seed);
+    const jb = await journeyOf(big.letterId);
+    const leg0 = await prisma.transportLeg.findFirstOrThrow({
+      where: { journeyId: jb.id, sequence: 0 },
+    });
+    const legEnd = T0 + leg0.plannedDurationSeconds * 1000;
+    const finalMs = legEnd + DAY_MS * 20; // 越过 7 日丢失点 + 数天
+
+    // A：一次大跳跃
+    const bigClock = new TestSimulationClock(T0);
+    await advanceTo(big.letterId, bigClock, finalMs);
+
+    // B：分段推进（每 6h），中途已进入 terminal，再推进到同一最终 now
+    const stepsClock = new TestSimulationClock(T0);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    for (let ms = 6 * HOUR_MS; ms < finalMs - T0; ms += 6 * HOUR_MS) {
+      stepsClock.advanceTo(T0 + ms);
+      await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    }
+    stepsClock.advanceTo(finalMs);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(bigSnap.letter.status).toBe("PERMANENTLY_LOST");
+    expect(stepsSnap).toEqual(bigSnap);
+    expect(bigSnap.events.some((e) => e.eventType === "PERMANENTLY_LOST")).toBe(true);
+    // 从未进入 last-mile：lastMileReadyAtSim 保持 null
+    expect(bigSnap.journey.lastMileReadyAtSim).toBeNull();
+    // terminal 后再推进：no-op，lastMileReadyAtSim 不变
+    bigClock.advanceTo(finalMs + DAY_MS * 5);
+    const again = await advanceJourneyToNow(prisma, big.letterId, bigClock);
+    expect(again.changed).toBe(false);
+    expect((await canonicalWorldSnapshot(big.letterId)).journey.lastMileReadyAtSim).toBeNull();
+  });
+
+  /** DESTROYED terminal replay（HIGH）：PIGEON 严重事故 → 提前进入 terminal，再推进到同一最终 now。 */
+  it("DESTROYED terminal replay：一次大跳跃 vs 分段（提前进入 terminal）→ canonical 全等", async () => {
+    const seed = findSeed0(PG.SERIOUS_ACCIDENT[0], PG.SERIOUS_ACCIDENT[1], "ev-destroyed-rp");
+    const big = await createDispatchedLetter("bob6", "PIGEON", "ev-destroyed-rp-b");
+    const steps = await createDispatchedLetter("bob6", "PIGEON", "ev-destroyed-rp-s");
+    await setSeed(big.letterId, seed);
+    await setSeed(steps.letterId, seed);
+    const jb = await journeyOf(big.letterId);
+    const leg0 = await prisma.transportLeg.findFirstOrThrow({
+      where: { journeyId: jb.id, sequence: 0 },
+    });
+    const legEnd = T0 + leg0.plannedDurationSeconds * 1000;
+    const finalMs = legEnd + DAY_MS * 10;
+
+    // A：一次大跳跃
+    const bigClock = new TestSimulationClock(T0);
+    await advanceTo(big.letterId, bigClock, finalMs);
+
+    // B：分段推进（每 6h），中途已 DESTROYED，再推进到同一最终 now
+    const stepsClock = new TestSimulationClock(T0);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    for (let ms = 6 * HOUR_MS; ms < finalMs - T0; ms += 6 * HOUR_MS) {
+      stepsClock.advanceTo(T0 + ms);
+      await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+    }
+    stepsClock.advanceTo(finalMs);
+    await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
+
+    const bigSnap = await canonicalWorldSnapshot(big.letterId);
+    const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
+    expect(bigSnap.letter.status).toBe("DESTROYED");
+    expect(stepsSnap).toEqual(bigSnap);
+    expect(bigSnap.events.some((e) => e.eventType === "SERIOUS_ACCIDENT")).toBe(true);
+    expect(bigSnap.journey.lastMileReadyAtSim).toBeNull();
+    // terminal 后再推进：no-op，lastMileReadyAtSim 不变
+    bigClock.advanceTo(finalMs + DAY_MS * 3);
+    const again = await advanceJourneyToNow(prisma, big.letterId, bigClock);
+    expect(again.changed).toBe(false);
+    const afterSnap = await canonicalWorldSnapshot(big.letterId);
+    expect(afterSnap.journey.lastMileReadyAtSim).toBeNull();
+    expect(afterSnap.letter.status).toBe("DESTROYED");
+  });
+
+  /** lastMileReadyAtSim 生命周期（HIGH）：正常 last-mile 持久化、retry/时间倒退不退化、terminal 后不变。 */
+  it("lastMileReadyAtSim：正常 last-mile 持久化 + 同 now 重复/时间倒退不退化 + terminal 后不变", async () => {
+    // PIGEON NORMAL seed（无事件，快速送达）
+    let seed = "";
+    for (let i = 0; i < 200000; i += 1) {
+      const s = `ev-lmr-${i}`;
+      let ok = true;
+      for (let k = 0; k < 8; k += 1) {
+        if (deterministicDraw(s, k) >= PG.NORMAL[1]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
+        seed = s;
+        break;
+      }
+    }
+    expect(seed).not.toBe("");
+    const { letterId } = await createDispatchedLetter("bob6", "PIGEON", "ev-lmr");
+    await setSeed(letterId, seed);
+    const journey = await journeyOf(letterId);
+    const leg0 = await prisma.transportLeg.findFirstOrThrow({
+      where: { journeyId: journey.id, sequence: 0 },
+    });
+    const legEnd = T0 + leg0.plannedDurationSeconds * 1000;
+    const deliveredMs = legEnd + LAST_MILE_DURATION_SECONDS * 1000;
+
+    const clock = new TestSimulationClock(T0);
+    await advanceJourneyToNow(prisma, letterId, clock); // 激活
+    clock.advanceTo(legEnd);
+    const mid = await advanceJourneyToNow(prisma, letterId, clock); // leg 完成 → OUT_FOR_DELIVERY
+    expect(mid.letterStatus).toBe("OUT_FOR_DELIVERY");
+    let j = await journeyOf(letterId);
+    expect(j.lastMileReadyAtSim?.getTime()).toBe(legEnd); // last-mile 起点 = 完成时刻
+
+    // 同 now 重复推进（retry/idempotent）：lastMileReadyAtSim 不退化
+    const again1 = await advanceJourneyToNow(prisma, letterId, clock);
+    expect(again1.changed).toBe(false);
+    j = await journeyOf(letterId);
+    expect(j.lastMileReadyAtSim?.getTime()).toBe(legEnd);
+
+    // 时间倒退：lastMileReadyAtSim 不退化
+    clock.advanceTo(legEnd - HOUR_MS);
+    const back = await advanceJourneyToNow(prisma, letterId, clock);
+    expect(back.changed).toBe(false);
+    j = await journeyOf(letterId);
+    expect(j.lastMileReadyAtSim?.getTime()).toBe(legEnd);
+
+    // 越过送达点 → DELIVERED；lastMileReadyAtSim 保持 legEnd（不被更晚值覆盖）
+    clock.advanceTo(deliveredMs + HOUR_MS);
+    const done = await advanceJourneyToNow(prisma, letterId, clock);
+    expect(done.letterStatus).toBe("DELIVERED");
+    j = await journeyOf(letterId);
+    expect(j.lastMileReadyAtSim?.getTime()).toBe(legEnd);
+    const letter = await prisma.letter.findUniqueOrThrow({ where: { id: letterId } });
+    expect(letter.deliveredAt?.getTime()).toBe(deliveredMs);
+
+    // terminal 后再推进：lastMileReadyAtSim 不变
+    clock.advanceTo(deliveredMs + DAY_MS * 5);
+    const after = await advanceJourneyToNow(prisma, letterId, clock);
+    expect(after.changed).toBe(false);
+    j = await journeyOf(letterId);
+    expect(j.lastMileReadyAtSim?.getTime()).toBe(legEnd);
+  });
+
+  /** lastMileReadyAtSim 生命周期（HIGH）：目的站 drop 恢复 / SET_ASIDE 基准 = max(完成, resumeAt)。 */
+  it("lastMileReadyAtSim：目的站 drop+recovery / drop+SET_ASIDE 基准 = resumeAt（含搁置），因果不倒置", async () => {
+    // 目的站 drop + WITHIN_24H + 普通恢复（d3<0.9）
+    let seed = "";
+    for (let i = 0; i < 1000000; i += 1) {
+      const s = `ev-lmr-rec-${i}`;
+      const d0 = deterministicDraw(s, 0);
+      const d1 = deterministicDraw(s, 1);
+      const d3 = deterministicDraw(s, 3);
+      if (
+        d0 >= PG.LETTER_DROPPED[0] &&
+        d0 < PG.LETTER_DROPPED[1] &&
+        d1 >= DROP_WINDOW.WITHIN_24H[0] &&
+        d1 < DROP_WINDOW.WITHIN_24H[1] &&
+        d3 < 0.9
+      ) {
+        seed = s;
+        break;
+      }
+    }
+    expect(seed).not.toBe("");
+    const { letterId } = await createDispatchedLetter("bob6", "PIGEON", "ev-lmr-rec");
+    await setSeed(letterId, seed);
+    const journey = await journeyOf(letterId);
+    const leg0 = await prisma.transportLeg.findFirstOrThrow({
+      where: { journeyId: journey.id, sequence: 0 },
+    });
+    const legEnd = T0 + leg0.plannedDurationSeconds * 1000;
+
+    const clock = new TestSimulationClock(T0);
+    await advanceTo(letterId, clock, legEnd); // drop 发生（到达目标站）
+    const dropped = await journeyOf(letterId);
+    expect(dropped.anomalyType).toBe("LETTER_DROPPED");
+    const resolvedMs = dropped.anomalyResolvedAtSim?.getTime() ?? legEnd;
+    // 恢复：普通恢复无 setAside，resumeAt = resolvedMs
+    clock.advanceTo(resolvedMs);
+    const rec = await advanceJourneyToNow(prisma, letterId, clock);
+    expect(rec.changed).toBe(true);
+    const afterRec = await journeyOf(letterId);
+    // 目的站异常：last-mile 基准 = max(legEnd, resumeAt) = resumeAt
+    expect(afterRec.lastMileReadyAtSim?.getTime()).toBe(resolvedMs);
+    // deliveredAt = resumeAt + 6h（不早于 RECOVERED，因果不倒置）
+    const deliveredMs = resolvedMs + LAST_MILE_DURATION_SECONDS * 1000;
+    clock.advanceTo(deliveredMs + HOUR_MS);
+    const done = await advanceJourneyToNow(prisma, letterId, clock);
+    expect(done.letterStatus).toBe("DELIVERED");
+    const letter = await prisma.letter.findUniqueOrThrow({ where: { id: letterId } });
+    expect(letter.deliveredAt?.getTime()).toBe(deliveredMs);
+    const j = await journeyOf(letterId);
+    expect(j.lastMileReadyAtSim?.getTime()).toBe(resolvedMs);
+
+    // SET_ASIDE 版本（d3>=0.9）：resumeAt = resolvedMs + 24h
+    let seedSA = "";
+    for (let i = 0; i < 1000000; i += 1) {
+      const s = `ev-lmr-sa-${i}`;
+      const d0 = deterministicDraw(s, 0);
+      const d1 = deterministicDraw(s, 1);
+      const d3 = deterministicDraw(s, 3);
+      if (
+        d0 >= PG.LETTER_DROPPED[0] &&
+        d0 < PG.LETTER_DROPPED[1] &&
+        d1 >= DROP_WINDOW.WITHIN_24H[0] &&
+        d1 < DROP_WINDOW.WITHIN_24H[1] &&
+        d3 >= 0.9
+      ) {
+        seedSA = s;
+        break;
+      }
+    }
+    expect(seedSA).not.toBe("");
+    const { letterId: saId } = await createDispatchedLetter("bob6", "PIGEON", "ev-lmr-sa");
+    await setSeed(saId, seedSA);
+    const saJourney = await journeyOf(saId);
+    const saLeg0 = await prisma.transportLeg.findFirstOrThrow({
+      where: { journeyId: saJourney.id, sequence: 0 },
+    });
+    const saLegEnd = T0 + saLeg0.plannedDurationSeconds * 1000;
+
+    const saClock = new TestSimulationClock(T0);
+    await advanceTo(saId, saClock, saLegEnd);
+    const saDropped = await journeyOf(saId);
+    expect(saDropped.anomalyType).toBe("LETTER_DROPPED");
+    const saResolvedMs = saDropped.anomalyResolvedAtSim?.getTime() ?? saLegEnd;
+    const saResumeAtMs = saResolvedMs + SET_ASIDE_DELAY_SECONDS * 1000;
+    // 恢复（SET_ASIDE）：resumeAt 已持久化，但 now < resumeAt → last-mile 尚未进入
+    saClock.advanceTo(saResolvedMs);
+    await advanceJourneyToNow(prisma, saId, saClock);
+    let saRec = await journeyOf(saId);
+    expect(saRec.resumeAtSim?.getTime()).toBe(saResumeAtMs);
+    expect(saRec.lastMileReadyAtSim).toBeNull();
+    // 推进到 resumeAt → 进入 last-mile：基准 = resumeAt（含 24h 搁置），不早于 RECOVERED
+    saClock.advanceTo(saResumeAtMs);
+    await advanceJourneyToNow(prisma, saId, saClock);
+    saRec = await journeyOf(saId);
+    expect(saRec.lastMileReadyAtSim?.getTime()).toBe(saResumeAtMs);
+    const saDeliveredMs = saResumeAtMs + LAST_MILE_DURATION_SECONDS * 1000;
+    saClock.advanceTo(saDeliveredMs + HOUR_MS);
+    const saDone = await advanceJourneyToNow(prisma, saId, saClock);
+    expect(saDone.letterStatus).toBe("DELIVERED");
+    const saLetter = await prisma.letter.findUniqueOrThrow({ where: { id: saId } });
+    expect(saLetter.deliveredAt?.getTime()).toBe(saDeliveredMs);
+    const saJ = await journeyOf(saId);
+    expect(saJ.lastMileReadyAtSim?.getTime()).toBe(saResumeAtMs);
   });
 
   /** WorldEvent.nodeId 全部非空（LOW）。 */
   it("所有 WorldEvent 均含 nodeId（NOT NULL 语义）", async () => {
     const seeds = [
-      findSeed0("HAND_CARRY", HC.DELAY[0], HC.DELAY[1], "ev-node-delay"),
-      findSeed0("HAND_CARRY", HC.REROUTE[0], HC.REROUTE[1], "ev-node-reroute"),
-      findSeed0("HAND_CARRY", HC.ROBBERY[0], HC.ROBBERY[1], "ev-node-rob"),
-      findSeed0("HAND_CARRY", HC.COURIER_MISSING[0], HC.COURIER_MISSING[1], "ev-node-miss"),
-      findSeed0("HAND_CARRY", HC.LETTER_DROPPED[0], HC.LETTER_DROPPED[1], "ev-node-drop"),
+      findSeed0(HC.DELAY[0], HC.DELAY[1], "ev-node-delay"),
+      findSeed0(HC.REROUTE[0], HC.REROUTE[1], "ev-node-reroute"),
+      findSeed0(HC.ROBBERY[0], HC.ROBBERY[1], "ev-node-rob"),
+      findSeed0(HC.COURIER_MISSING[0], HC.COURIER_MISSING[1], "ev-node-miss"),
+      findSeed0(HC.LETTER_DROPPED[0], HC.LETTER_DROPPED[1], "ev-node-drop"),
     ];
     for (let i = 0; i < seeds.length; i += 1) {
       const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", `ev-node-all-${i}`);
@@ -687,7 +1143,7 @@ describe("world events integration", () => {
   /** 调用频率无关 replay（BLOCKER 核心）：一次大跳跃 vs 多次分段推进必须完全一致。 */
   it("调用频率无关：一次大跳跃 vs 分段推进 → Letter/Journey/Legs/WorldEvent 完全一致", async () => {
     // REROUTE seed：第一段完成触发重建，重建后继续消费剩余时间（同时覆盖 BLOCKER-1/2）
-    const seed = findSeed0("HAND_CARRY", HC.REROUTE[0], HC.REROUTE[1], "ev-freq");
+    const seed = findSeed0(HC.REROUTE[0], HC.REROUTE[1], "ev-freq");
     const big = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-freq-big");
     const steps = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-freq-steps");
     await setSeed(big.letterId, seed);
@@ -795,7 +1251,7 @@ describe("world events integration", () => {
   });
 
   it("reroute 后继续消费剩余模拟时间：同 now 再调用是 no-op（BLOCKER-2）", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.REROUTE[0], HC.REROUTE[1], "ev-reroute-cont");
+    const seed = findSeed0(HC.REROUTE[0], HC.REROUTE[1], "ev-reroute-cont");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-reroute-cont");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -827,7 +1283,7 @@ describe("world events integration", () => {
   });
 
   it("WorldEvent.nodeId / transportLegSequence：事件定位到稳定节点与 Leg（HIGH）", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.COURIER_MISSING[0], HC.COURIER_MISSING[1], "ev-node");
+    const seed = findSeed0(HC.COURIER_MISSING[0], HC.COURIER_MISSING[1], "ev-node");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-node");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -847,7 +1303,7 @@ describe("world events integration", () => {
   });
 
   it("reroute 后 totalDistanceKm === sum(有效 legs)（HIGH）", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.REROUTE[0], HC.REROUTE[1], "ev-dist");
+    const seed = findSeed0(HC.REROUTE[0], HC.REROUTE[1], "ev-dist");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-dist");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -969,7 +1425,7 @@ describe("world events integration", () => {
   });
 
   it("replay：同一 seed 两次独立运行产生完全相同的 WorldEvent 序列", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.ROBBERY[0], HC.ROBBERY[1], "ev-replay");
+    const seed = findSeed0(HC.ROBBERY[0], HC.ROBBERY[1], "ev-replay");
     const a = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-replay-a");
     const b = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-replay-b");
     await setSeed(a.letterId, seed);
@@ -1003,7 +1459,7 @@ describe("world events integration", () => {
 
   it("eventIndex 单调递增；(journeyId,eventIndex) 唯一", async () => {
     // 推进多步触发多个事件：DELAY（完成前消耗）、再推进完成
-    const seed = findSeed0("HAND_CARRY", HC.DELAY[0], HC.DELAY[1], "ev-index");
+    const seed = findSeed0(HC.DELAY[0], HC.DELAY[1], "ev-index");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-index");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -1030,7 +1486,7 @@ describe("world events integration", () => {
   });
 
   it("delay：Leg 完成时刻延后 + WorldEvent DELAYED，随后完成", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.DELAY[0], HC.DELAY[1], "ev-delay");
+    const seed = findSeed0(HC.DELAY[0], HC.DELAY[1], "ev-delay");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-delay");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -1078,7 +1534,7 @@ describe("world events integration", () => {
   });
 
   it("reroute：completedPath 不变，remaining 重建（排除原计划下一条边）", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.REROUTE[0], HC.REROUTE[1], "ev-reroute");
+    const seed = findSeed0(HC.REROUTE[0], HC.REROUTE[1], "ev-reroute");
     const { trackingNo, letterId } = await createDispatchedLetter(
       "bob6",
       "HAND_CARRY",
@@ -1176,12 +1632,7 @@ describe("world events integration", () => {
   });
 
   it("courier missing：COURIER_MISSING 异常 + recoveryWindow", async () => {
-    const seed = findSeed0(
-      "HAND_CARRY",
-      HC.COURIER_MISSING[0],
-      HC.COURIER_MISSING[1],
-      "ev-missing"
-    );
+    const seed = findSeed0(HC.COURIER_MISSING[0], HC.COURIER_MISSING[1], "ev-missing");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-missing");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -1327,12 +1778,7 @@ describe("world events integration", () => {
   });
 
   it("destroyed：PIGEON 严重事故 → DESTROYED terminal", async () => {
-    const seed = findSeed0(
-      "PIGEON",
-      PG.SERIOUS_ACCIDENT[0],
-      PG.SERIOUS_ACCIDENT[1],
-      "ev-destroyed"
-    );
+    const seed = findSeed0(PG.SERIOUS_ACCIDENT[0], PG.SERIOUS_ACCIDENT[1], "ev-destroyed");
     const { trackingNo, letterId } = await createDispatchedLetter("bob6", "PIGEON", "ev-destroyed");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -1359,7 +1805,7 @@ describe("world events integration", () => {
   });
 
   it("并发 advance：恰一套 WorldEvent，无重复事件 / 状态覆盖 / 500", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.ROBBERY[0], HC.ROBBERY[1], "ev-concurrent");
+    const seed = findSeed0(HC.ROBBERY[0], HC.ROBBERY[1], "ev-concurrent");
     const { letterId } = await createDispatchedLetter("bob6", "HAND_CARRY", "ev-concurrent");
     await setSeed(letterId, seed);
     const journey = await journeyOf(letterId);
@@ -1407,7 +1853,7 @@ describe("world events integration", () => {
   });
 
   it("no leak：API 不暴露 WorldEvent / payload / eventIndex / recoveryWindow / seed / anomaly", async () => {
-    const seed = findSeed0("HAND_CARRY", HC.LETTER_DROPPED[0], HC.LETTER_DROPPED[1], "ev-noleak");
+    const seed = findSeed0(HC.LETTER_DROPPED[0], HC.LETTER_DROPPED[1], "ev-noleak");
     const { trackingNo, letterId } = await createDispatchedLetter(
       "bob6",
       "HAND_CARRY",

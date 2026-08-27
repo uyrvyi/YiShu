@@ -54,20 +54,20 @@ MAY START PHASE X+1: YES
 
 # 2. 当前总状态
 
-| Phase    | 名称                                           | 状态            |
-| -------- | ---------------------------------------------- | --------------- |
-| Phase 1  | 项目骨架与基础设施                             | FINAL GATE PASS |
-| Phase 2  | 账号与身份系统                                 | FINAL GATE PASS |
-| Phase 3  | Letter 核心与基础信件流程                      | FINAL GATE PASS |
-| Phase 4  | Journey + Routing + TransportLeg               | 当前阶段        |
-| Phase 5  | Simulation Core + Transport Progression        | 未开始          |
-| Phase 6  | Random Events + Recovery + World Truth         | 未开始          |
-| Phase 7  | Timeline + 用户可见运输事实                    | 未开始          |
-| Phase 8  | Local Map + Journey Visualization              | 未开始          |
-| Phase 9  | Worker Scheduling + Push + Refresh             | 未开始          |
-| Phase 10 | Mobile V1 Integration + UX Closure             | 未开始          |
-| Phase 11 | Security / Reliability / Performance Hardening | 未开始          |
-| Phase 12 | Deployment + Release Gate                      | 未开始          |
+| Phase    | 名称                                           | 状态                 |
+| -------- | ---------------------------------------------- | -------------------- |
+| Phase 1  | 项目骨架与基础设施                             | FINAL GATE PASS      |
+| Phase 2  | 账号与身份系统                                 | FINAL GATE PASS      |
+| Phase 3  | Letter 核心与基础信件流程                      | FINAL GATE PASS      |
+| Phase 4  | Journey + Routing + TransportLeg               | FINAL GATE PASS      |
+| Phase 5  | Simulation Core + Transport Progression        | FINAL GATE PASS      |
+| Phase 6  | Random Events + Recovery + World Truth         | FINAL GATE PASS      |
+| Phase 7  | Timeline + 用户可见运输事实                    | 下一阶段（尚未开始） |
+| Phase 8  | Local Map + Journey Visualization              | 未开始               |
+| Phase 9  | Worker Scheduling + Push + Refresh             | 未开始               |
+| Phase 10 | Mobile V1 Integration + UX Closure             | 未开始               |
+| Phase 11 | Security / Reliability / Performance Hardening | 未开始               |
+| Phase 12 | Deployment + Release Gate                      | 未开始               |
 
 后续 Phase 可以按真实工程需要做小范围拆分，但不得改变冻结产品规则，也不得把多个大阶段一次性合并实施。
 
@@ -89,7 +89,7 @@ MAY START PHASE X+1: YES
 - Prisma
 - PostgreSQL
 - Redis
-- BullMQ 基础依赖/骨架
+- Worker 独立进程与配置加载骨架（Redis/BullMQ 队列消费属 Phase 9）
 - TypeScript strict
 - ESLint / Prettier / Vitest
 - Docker Compose（开发阶段只运行 PostgreSQL + Redis）
@@ -381,7 +381,7 @@ Letter
 - `route_edges.json`
 - 可选 `region_station_map.json`
 
-目标约 150–250 个 major station nodes，覆盖主要省份、直辖市、省会、主要地级市和关键连接节点。
+`china-v1` 冻结基线为 294 个 station nodes、1949 条无向 route edges，覆盖主要省份、直辖市、省会、主要地级市和关键连接节点。
 
 ### StationNode
 
@@ -462,7 +462,8 @@ planned duration 仅内部使用，不得作为 ETA 展示。
 ## 当前状态
 
 ```text
-CURRENT PHASE
+FINAL GATE: PASS
+PHASE 4 COMPLETE: YES
 ```
 
 ---
@@ -551,6 +552,13 @@ target station
 - Delivered 语义正确
 - 无 ETA 暴露
 
+## 当前状态
+
+```text
+FINAL GATE: PASS
+PHASE 5 COMPLETE: YES
+```
+
 ---
 
 # 8. Phase 6 — Random Events + Recovery + World Truth
@@ -617,6 +625,21 @@ WorldEvent 不自动向用户公开。
 - 7 日 permanent loss
 - transport auto-change 正确
 - reroute 不改 completedPath
+- canonical A/B replay 覆盖 NORMAL、DELAY、SET_ASIDE、目的站恢复、multi-reroute 与 DELIVERED / PERMANENTLY_LOST / DESTROYED
+- reroute 后 sequence 连续、路线无断链、completed history 不变、`totalDistanceKm` 与 Legs 总和一致
+- WorldEvent 稳定位置完整，`nodeId` 为 NOT NULL
+- `lastMileReadyAtSim` 跨 retry / 时间倒退 / 终态推进保持稳定，`deliveredAt = lastMileReadyAtSim + 6h`
+- 终态遇更晚 `now` 只允许 `lastAdvancedAtSim` 单调更新，不得改写其他 terminal snapshot 字段
+
+## 当前状态
+
+```text
+FINAL GATE: PASS
+PHASE 6 COMPLETE: YES
+MAY START PHASE 7: YES
+```
+
+Phase 7 尚未开始；必须等待项目负责人明确启动。
 
 ---
 

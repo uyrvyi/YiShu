@@ -106,20 +106,6 @@ export function buildGraph(data: GraphData, graphVersion?: string): Graph {
     nodes.set(node.id, node);
   }
 
-  // 无向边双向展开；先统计重复边（同一无向端点对）
-  const seenUndirected = new Set<string>();
-  const duplicateKeys = new Set<string>();
-  for (const e of data.edges) {
-    const a = String(e.from);
-    const b = String(e.to);
-    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
-    if (seenUndirected.has(key)) {
-      duplicateKeys.add(key);
-    } else {
-      seenUndirected.add(key);
-    }
-  }
-
   const adjacency = new Map<string, AdjacentEdge[]>();
   const ensure = (id: string): AdjacentEdge[] => {
     let list = adjacency.get(id);

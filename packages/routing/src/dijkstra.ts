@@ -148,7 +148,7 @@ export function findShortestPath(
         heap.push(edge.to, nd);
       } else if (nd === existing) {
         // 距离相同：稳定 tie-break（通过 prev 链字典序比较，避免 Map 顺序依赖）
-        if (isBetterPrev(prev.get(edge.to), cur.node, edge, graph)) {
+        if (isBetterPrev(prev.get(edge.to), cur.node, edge)) {
           prev.set(edge.to, { from: cur.node, edge });
           heap.push(edge.to, nd);
         }
@@ -193,8 +193,7 @@ export function findShortestPath(
 function isBetterPrev(
   current: { from: string; edge: AdjacentEdge } | undefined,
   candidateFrom: string,
-  candidateEdge: AdjacentEdge,
-  _graph: Graph
+  candidateEdge: AdjacentEdge
 ): boolean {
   if (!current) return true;
   // 比较候选路径与当前路径在 edge.to 处的前驱链字典序

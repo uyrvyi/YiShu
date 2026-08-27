@@ -673,7 +673,7 @@ git commit -m "feat: implement letter core"
 ```text
 只允许修改：
 
-apps/mobile/app/letter/[trackingNo].tsx
+apps/mobile/app/letters/[trackingNo].tsx
 apps/mobile/components/RouteMap.tsx
 
 不得修改：

@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@types/pg": "^8.23.1",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.3.0",
@@ -35,9 +34,7 @@
     "typescript-eslint": "^8.0.0"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
-    "dotenv": "^16.6.1",
-    "pg": "^8.23.0"
+    "dotenv": "^16.6.1"
   }
 }
