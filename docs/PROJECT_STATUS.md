@@ -1,8 +1,8 @@
 # 驿书 V1 项目状态
 
-> 更新时间：2026-08-27
-> 当前基线：Phase 6 COMPLETE · Final Gate PASS（Random Events + Recovery + World Truth）
-> 下一阶段：Phase 7（Timeline + 用户可见运输事实），尚未开始
+> 更新时间：2026-09-06
+> 当前基线：Phase 6 Final Gate PASS（Random Events + Recovery + World Truth）
+> 下一阶段：Phase 7 — Timeline + 用户可见运输事实
 
 ## Phase 完成情况
 
@@ -25,10 +25,10 @@
 - Production build：PASS（含 Mobile Android Expo export）
 - Prisma validate / generate：PASS
 - 开发库与测试库 migration：10 个 migration 均 applied，checksum 与文件一致（Phase 6 新增 `20260826130000_phase6_world_truth` / `20260826140000_phase6_gate_fixes` / `20260826150000_phase6_terminal_resume` / `20260826160000_phase6_lastmile_ready`：WorldEvent 表 + JourneyAnomalyType + Journey 事件/异常字段 + TransportLeg primary event 持久化 + WorldEvent 位置字段（nodeId NOT NULL）+ Journey.resumeAtSim + Journey.lastMileReadyAtSim）
-- Runtime：Node 24.19.0 / pnpm 11.22.0 / PostgreSQL 17.11 / Redis 7.4.11 healthy（当前 Gate 使用本机同版本服务，无需 Docker）
+- Runtime：Node 24.14.0 / pnpm 11.22.0 / PostgreSQL 17.11 / Redis 7.4.11 healthy（本轮 Gate 由 `docker compose up -d` 启动 `postgres:17` 与 `redis:7.4-alpine`，端口仅绑定 localhost；dev=`yishu` / test=`yishu_test` 严格分离）
 - Production API：production 构建可启动，`GET /api/v1/health` 返回 HTTP 200
 - 测试隔离：破坏性集成测试只允许 `*_test` 数据库，开发库不被清理（Phase 6 Gate 探针：test 库 0 悬挂事务 / 0 未授权锁，dev 库 9 表 0 残留）
-- Git 工程闭环：Phase 1–5 baseline 为 `e755cb2`（feat: complete phase 5 simulation progression）；Phase 6 主实现与 migration 已提交至 `141a66c`（feat: complete phase 6 random events and world truth）；Final Gate deterministic replay 测试强化仍在当前 working tree，待项目负责人建立最终可回滚 baseline Commit
+- Git 工程闭环：Phase 1–4 baseline `bcba2e5`、Phase 5 `e755cb2`、Phase 6 `141a66c`；Phase 6 主实现、migration、canonical replay 测试已全部进入 Git 历史。Phase 6 Final Gate maintenance changes（Prettier 格式修复 + 文档状态修正）已提交（`chore: finalize phase 6 gate`）
 
 ## 安全基线
 

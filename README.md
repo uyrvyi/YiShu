@@ -2,8 +2,8 @@
 
 「现代世界 + 古代通信方式」的点对点通信 App。
 
-> 当前基线：**Phase 6 COMPLETE · Final Gate PASS（Random Events + Recovery + World Truth）**
-> 下一阶段：**Phase 7（Timeline + 用户可见运输事实），尚未开始**
+> 当前基线：**Phase 6 Final Gate PASS（Random Events + Recovery + World Truth）**
+> 下一阶段：**Phase 7 — Timeline + 用户可见运输事实**
 > 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进，以及 Phase 6：WorldEvent 世界真相 + 固定概率随机事件（delay/reroute/robbery/missing/drop/accident）+ Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED。地图 / Timeline / Push 等后续业务仍未实现。
 
 当前进度、验收结果与已知限制见 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
