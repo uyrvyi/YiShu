@@ -49,7 +49,7 @@
 - ~~TimelineEvent 与用户可见运输事实 / visibility~~ → **Phase 7 已完成**（TimelineEvent + IMMEDIATE/DELAYED/HIDDEN 映射 + `GET /letters/:trackingNo/timeline`）；WorldEvent 仍为服务器世界真相，绝不直接暴露给用户
 - Mobile 上的完整 Timeline UI / Letter Detail 时间线展示（Phase 10；Phase 7 只提供 API / domain contract）
 - BullMQ Simulation Worker（Phase 9；Phase 5/6 已提供确定性推进 service `advanceJourneyToNow` 与 WorldEvent 事件内核，生产环境由 worker 按模拟时钟调度消费）
-- 离线地图、轨迹、掉落范围与最后确报（Phase 8）
+- 离线地图、轨迹、近似位置与最后确报（Phase 8；**`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则**，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图不得暴露掉落原因）
 - Polling、Push 与开发调试面板（Phase 9）
 
 ## 已知限制与外部风险
@@ -66,6 +66,7 @@
 - **随机游标与事件编号已解耦（2026-09-13 Gate 修复）**：`Journey.nextRandomDrawIndex`（随机决策游标）与 `Journey.nextWorldEventIndex`（WorldEvent 编号分配器）分离；记录派生事实（canonical COURIER_MISSING / TRANSPORT_CHANGED / PERMANENTLY_LOST）不再消费随机数。**该修复改变了 LOST_PATH / 恢复 / 终态路径的随机序列**（此前多消费的错误行为已消除）。事件编号在**实际创建 WorldEvent 时**才分配：新 Journey 等待期不占号（`primaryEventIndex = null`）、编号连续；由旧版本升级的 Journey 允许继承历史 gap（`primaryEventIndex` 预留编号被保留并优先使用）。**正式不变量 = eventIndex 唯一 + 单调 + 不碰撞**（不强制历史 Journey 满足 `nextWorldEventIndex === 事件数`）。升级兼容由 `20260913130000` 校准与迁移 13→14→15 真实临时库 fixture 验证（无 P2002、frozen outcome 未重抽、随机游标保留）。
 - **dev 库 migration checksum 漂移已消除（BLOCKER）**：dev 曾有一条 `20260908130000` 成功记录保存了修正前的 checksum（历史 `resolve --rolled-back` 后重部署未刷新该书签）。处置方式为**从 canonical 磁盘 history 重建 dev（及 test）数据库**（业务表当时全 0，无数据损失），未使用 `UPDATE _prisma_migrations`、未手工改 checksum、未修改任何 migration 文件；重建后逐条 checksum 与磁盘一致（0 drift）。
 - **Mobile public DTO 类型契约**：`apps/mobile` 的 `LetterView.status` 使用 `PublicLetterStatus`（不含 `LETTER_DROPPED`），与 `@yishu/shared` 的 `toPublicLetterStatus` 对齐；客户端不存在 `LETTER_DROPPED` UI 分支。
+- **Phase 8 地图可见性规范对齐（2026-09-13，文档级）**：`LETTER_DROPPED` = HIDDEN 为**全局**用户可见性规则（不限于 Timeline）；禁止经 Letter API / Timeline / Journey projection / Mobile / Map 或任何其他用户 projection 暴露 `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因。规范与阶段规划中旧的「掉落范围 / 半透明圆形范围 / `DropAreaLayer` / Map API `dropArea` / 既定事实节点优先级中的信件掉落」已按项目负责人最新决定移除或改写。**本轮只做规范对齐，Phase 8 实现尚未开始**（无代码 / schema / migration 改动）。
 - **行尾策略**：仓库已加入 `.gitattributes`（`* text=auto eol=lf`，`*.bat`/`*.cmd` 为 CRLF）并随 Phase 7 baseline commit 提交；**未执行 `git add --renormalize .`**（避免把全仓大规模 EOL 变更混入 Phase 7 baseline commit）。受控 renormalize 仍保持独立决策，需项目负责人单独指示。
 
 ## 封板与进入下一阶段规则

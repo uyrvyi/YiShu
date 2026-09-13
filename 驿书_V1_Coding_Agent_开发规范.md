@@ -83,8 +83,8 @@ V1 必须满足：
 - 已走路线实线
 - 未走路线虚线
 - 当前大概位置
-- 掉落范围
-- 遗失最后确报
+- 遗失最后确报（失联后不再生成新的推测位置）
+- 信件掉落全局不展示任何范围（HIDDEN，V1 不做掉落范围）
 - 已发生事实节点
 - 双方同步运输状态
 - DELIVERED 后 Recipient 解锁正文
@@ -674,7 +674,6 @@ RouteMap
 ├─ CompletedRouteLayer
 ├─ RemainingRouteLayer
 ├─ ApproximatePositionLayer
-├─ DropAreaLayer
 ├─ LastKnownPositionLayer
 └─ FactNodeLayer
 ```
@@ -705,33 +704,75 @@ RouteMap
 终点
 ```
 
-当前大概位置不得展示精确 GPS 点。
+当前大概位置不得展示精确 GPS 点；任何用户可见地图模式（含特殊事件期间）都不得展示精确 GPS 点。
+
+以下为 **Phase 8 地图可见性冻结规则（项目负责人 2026-09-13，最新决定优先于本规范其它旧文本）**：
+
+正常运输（无用户可确认异常）：
+
+```text
+起点
+━━ 已走路线（实线）
+◉ 当前大概位置
+- - 未走路线（虚线）
+终点
+```
+
+无 ETA、无倒计时、无预测事件。
+
+信使失联（用户可确认事实 = canonical `COURIER_MISSING`）：
+
+- 不再生成新的当前推测位置
+- 已走实线停在最后确报位置，只显示 LastKnownPosition
+- 未走路线仍可以虚线保留
+- 不得暴露后台 cause（`LOST_PATH` / `ROBBERY` / 事故原因 / 信使死亡）
+
+隐藏掉落期间（internal `LETTER_DROPPED`）：
+
+- 地图不产生任何新的用户可确认事实
+- 地图不得读取 internal `LETTER_DROPPED` 改变用户可见地图模式
+- 用户可见 Letter 状态仍为 `IN_TRANSIT`（见 §37 与 `toPublicLetterStatus`）
+
+终态（`PERMANENTLY_LOST` / `DESTROYED`）：
+
+- 只表达终态确认结果，保持最后可确认位置
+- 不得暴露后台原因（掉落 / 事故 / 信使死亡等）
 
 ---
 
-# 19. 信件掉落
+# 19. 信件掉落（Phase 8 冻结：完全 HIDDEN）
 
-状态：
+状态（仅服务器世界真相）：
 
 ```text
 LETTER_DROPPED
 ```
 
-地图显示：
+用户可见性（项目负责人 2026-09-13 正式冻结，优先于本规范任何旧文本）：
 
 ```text
-半透明圆形范围
+LETTER_DROPPED = HIDDEN（全局用户可见性规则，不限于 Timeline）
 ```
 
-用户端不返回精确掉落坐标。
-
-范围半径：
+禁止通过以下任何用户 projection 暴露 `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因：
 
 ```text
-10~40 km
+Letter API
+Timeline
+Journey projection
+Mobile
+Map
+其他任何用户 projection
 ```
 
-双方看到相同范围。
+地图行为：
+
+- 不显示掉落范围 / 半透明圆形范围（**V1 不做 DropArea**，旧设计的 10~40 km 半径不再实现）
+- 不返回精确掉落坐标，也不返回任何近似掉落范围
+- 隐藏掉落期间不产生新的用户可确认事实
+- 用户可见 Letter 状态保持 `IN_TRANSIT`
+
+V1 不实现 `dropArea`，也不实现 `DropAreaLayer`。
 
 ---
 
@@ -750,6 +791,11 @@ LETTER_MISSING
 - 只显示最后确报位置
 - 未走路线仍可保留虚线
 - 7 个模拟日未恢复后转 PERMANENTLY_LOST
+- 不暴露后台 cause（迷路 / 抢劫 / 事故 / 掉落）
+
+V1 实现说明：用户可见状态名以 canonical `COURIER_MISSING`（信使失联）为准；本章的 `LETTER_MISSING` 为规范早期状态名，V1 推进不产生该状态（见 §37）。
+
+`PERMANENTLY_LOST` 只表达终态确认结果，保持最后可确认位置；不得在 Map / Timeline 暴露掉落、事故或信使死亡等后台原因。
 
 ---
 
@@ -759,14 +805,25 @@ LETTER_MISSING
 
 地图默认最多显示最近 5 个重要事实。
 
-优先级：
+优先级（**只允许用户可见 Timeline 事实**）：
 
 1. 运输方式改变
-2. 信件掉落
-3. 信件被找回
-4. 信使失联
-5. 到达重要驿站
-6. 普通经过驿站
+2. 信件被找回
+3. 信使失联
+4. 到达重要驿站
+5. 普通经过驿站
+
+事实来源限制：既定事实节点只能来自用户可见 Timeline 或等价 safe projection。
+
+禁止来源：
+
+```text
+WorldEvent payload
+Journey anomaly
+internal Letter.status
+```
+
+因此 HIDDEN 事件（`ROBBERY` / `REROUTED` / `LOST_PATH` / `LETTER_DROPPED` / `SERIOUS_ACCIDENT`）永远不能成为事实节点；**`信件掉落` 不再是既定事实类型**。
 
 点击节点仅显示事件详情，不提供任何操作。
 
@@ -873,7 +930,7 @@ completedPath 永远不可修改
 - 临时停留
 - 迷路
 - 失联
-- 掉落
+- 掉落（仅后台 WorldEvent，用户不可见）
 - 严重事故
 
 ---
@@ -966,7 +1023,7 @@ TransportLeg
 
 ---
 
-# 33. 掉落后拾获
+# 33. 掉落后拾获（后台世界机制，用户不可见）
 
 ```text
 24 小时内      50%
@@ -1012,6 +1069,8 @@ PERMANENTLY_LOST
 ↓
 改为飞鸽传书
 ```
+
+以上为后台因果链（WorldEvent 世界真相）：`信件掉落` 与 `被路人拾获` 属 HIDDEN，用户侧只能看到「寄送方式已变更」（以及此前的「信使失联」）。任何用户可见 projection（Letter API / Timeline / Journey projection / Mobile / Map）都不得出现 `信件掉落` 及其 cause。
 
 双方同步：
 
@@ -1067,6 +1126,16 @@ DELIVERED
 PERMANENTLY_LOST
 DESTROYED
 ```
+
+用户可见状态使用 `PublicLetterStatus`（`@yishu/shared`）：
+
+```text
+PublicLetterStatus = Exclude<LetterStatus, "LETTER_DROPPED">
+```
+
+内部 `LETTER_DROPPED` 为服务器世界真相（HIDDEN），统一投影为 `IN_TRANSIT`，绝不进入 Letter API / Timeline / Journey projection / Mobile / Map 或任何其他用户 projection。状态投影必须使用 exhaustive switch，禁止 `return letter.status` fallback。
+
+本枚举中的 `LETTER_MISSING` 为规范早期状态名，V1 推进不产生该状态；用户可见的「信使失联」以 canonical `COURIER_MISSING`（§20）为准。
 
 ---
 
@@ -1622,6 +1691,8 @@ metadata
 visibleAt <= SimulationClock.now()
 ```
 
+`uncertaintyRadiusKm` 说明（Phase 8 冻结）：V1 中掉落范围全局 HIDDEN，因此该字段**没有用户可确认来源**，Phase 7 实际恒为 `NULL`；Map 不得用它推导掉落范围 / DropArea。
+
 ---
 
 # 58. RecipientState
@@ -1727,6 +1798,8 @@ SIMULATION_SEED=demo-001
 ↓
 DELIVERED
 ```
+
+`信件掉落` 与 `路人拾获` 是后台剧情（HIDDEN WorldEvent）：Demo 中用户可见的只有「信使失联」与「寄送方式已变更」，地图不得出现掉落范围 / 掉落原因。
 
 ---
 
@@ -2043,11 +2116,17 @@ GET /api/v1/letters/:trackingNo/map
   "completedPath": [],
   "remainingPath": [],
   "approximatePosition": {},
-  "dropArea": null,
   "lastKnownPosition": {},
   "facts": []
 }
 ```
+
+Phase 8 冻结：
+
+- **不返回 `dropArea` / 掉落范围 / 掉落原因**（`LETTER_DROPPED` 全局 HIDDEN）
+- `status` 只输出用户可见状态（`PublicLetterStatus`；内部 `LETTER_DROPPED` → `IN_TRANSIT`）
+- `facts` 只能来自用户可见 Timeline（禁止 WorldEvent payload / Journey anomaly / internal `Letter.status`）
+- 隐藏掉落期间不得因 internal `LETTER_DROPPED` 产生新的用户可确认事实或改变地图模式
 
 所有地图业务坐标来自本地数据。
 
@@ -2150,7 +2229,7 @@ __DEV__
 - 完成当前 Leg
 - 强制抢劫
 - 强制信使失联
-- 强制掉落
+- 强制掉落（仅后台注入 HIDDEN 世界真相，不得改变任何用户可见状态 / 地图模式）
 - 强制拾获
 - 强制改飞鸽
 - 强制 Delivered
@@ -2203,8 +2282,8 @@ seed
 - 状态转移
 - Recipient 正文权限
 - Sender 无 readState
-- dropped 返回范围
-- missing 只返回最后确报
+- dropped 全局 HIDDEN（不返回范围 / 不返回掉落原因 / 不改变用户可见状态与地图模式）
+- missing 只返回最后确报（canonical `COURIER_MISSING`）
 - rulesVersion
 - graphVersion
 - Seed 可复现
@@ -2250,6 +2329,8 @@ B = OPENED
 ↓
 A API 仍然完全不知道 B 已读
 ```
+
+以上流程中的 `信件掉落` / `被拾获` 属后台世界真相（HIDDEN）；用户可见 Timeline 只能表现为「信使失联」→「寄送方式已变更」。
 
 ---
 
@@ -2460,11 +2541,11 @@ V1 完成必须满足：
 10. 已走路线是实线
 11. 未走路线是虚线
 12. 正常运输只显示大概位置
-13. 掉落显示大概范围圆
+13. 掉落完全 HIDDEN（地图与 Timeline 均不出现掉落范围 / 掉落原因）
 14. 遗失只显示最后确报
-15. 既定事实显示在地图和 Timeline
+15. 既定事实显示在地图和 Timeline（事实只来自用户可见 Timeline）
 16. 随机事件使用固定概率
-17. 支持掉落、失联、拾获、改运输方式
+17. 支持信使失联、拾获恢复与自动改变运输方式（`信件掉落` 属后台 HIDDEN cause，用户不可确认）
 18. 7 个模拟日未找回可永久遗失
 19. 极低概率可彻底失败
 20. Delivered 后 Recipient 可拆信
@@ -2473,6 +2554,7 @@ V1 完成必须满足：
 23. 同一 Seed 可复现同一旅程
 24. 地图完全离线
 25. App 可在 iPhone Development Build 真机运行
+26. 地图在隐藏掉落期间不产生新的用户可确认事实，且不出现 `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因
 
 满足以上全部条件：
 

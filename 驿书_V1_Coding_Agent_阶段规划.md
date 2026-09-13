@@ -669,7 +669,7 @@ Phase 7 已由项目负责人启动实施，并已由独立 Gate Reviewer 正式
 
 支持 visibility policy：immediate / delayed / hidden。
 
-后端真实发生 `courier died + letter dropped` 时，用户可能暂时只知道“信使失联”。
+后端真实发生 `courier died + letter dropped` 时，用户可能暂时只知道“信使失联”。`letter dropped` / `courier died` 属 HIDDEN 世界真相，绝不进入任何用户 projection（Letter API / Timeline / Journey projection / Mobile / Map）。
 
 ### 双方一致
 
@@ -730,7 +730,6 @@ REMAINING BLOCKERS: NONE
 - CompletedRouteLayer
 - RemainingRouteLayer
 - ApproximatePositionLayer
-- DropAreaLayer
 - LastKnownPositionLayer
 - FactNodeLayer
 
@@ -743,17 +742,24 @@ REMAINING BLOCKERS: NONE
 
 只能显示近似位置，不得返回精确 GPS。
 
-### Drop
+### Drop（Phase 8 冻结：完全 HIDDEN）
 
-显示 10–40 km approximate circle，不得给客户端 exact drop coordinate。
+`LETTER_DROPPED` = HIDDEN（全局用户可见性规则）。旧设计「显示 10–40 km approximate circle」**已废除**：
+
+- 不显示掉落范围 / 半透明圆形范围，不返回 exact drop coordinate，也不返回任何近似掉落范围
+- 隐藏掉落期间不产生新的用户可确认事实，用户可见 Letter 状态保持 `IN_TRANSIT`
+- 禁止经 Letter API / Timeline / Journey projection / Mobile / Map 或任何其他用户 projection 暴露 `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因
+- V1 不实现 `dropArea` 字段，也不实现 `DropAreaLayer`
 
 ### Missing
 
-只显示 last confirmed position。
+只显示 last confirmed position；不再生成新的当前推测位置，未走路线可保留虚线，不暴露后台 cause（迷路 / 抢劫 / 事故 / 掉落）。
 
 ### Map Fact Nodes
 
-最多展示最新 5 个高优先事实，优先级：transport changed > drop/recovery > courier missing > important station > ordinary station。
+最多展示最新 5 个高优先事实，优先级：transport changed > recovery > courier missing > important station > ordinary station。
+
+事实只能来自用户可见 Timeline（禁止 WorldEvent payload / Journey anomaly / internal `Letter.status`）；`drop` 不再是事实类型。
 
 ## 禁止
 
@@ -761,6 +767,7 @@ REMAINING BLOCKERS: NONE
 - 在线 tile / 在线 geocoder
 - exact GPS
 - ETA
+- 掉落范围 / DropArea / `dropArea` / 掉落原因（`LETTER_DROPPED` 全局 HIDDEN）
 
 ## Gate 核心
 
@@ -768,10 +775,19 @@ REMAINING BLOCKERS: NONE
 - mapX/mapY 正确
 - sender/recipient 同图
 - approximate location
-- dropped circle 安全
+- drop 全局 HIDDEN（无掉落范围 / 无掉落原因泄漏）
+- map facts 只来自用户可见 Timeline
 - missing last-known-position
 - completed/remaining route 正确
 - 无 ETA
+
+## 当前状态
+
+```text
+PHASE 8 NOT STARTED
+```
+
+2026-09-13 仅完成启动前规范对齐（文档级：`LETTER_DROPPED` = HIDDEN 全局用户可见性规则；移除掉落范围 / `DropAreaLayer` / `dropArea` / 事实节点中的「信件掉落」）。实现尚未开始：无地图业务代码 / 无 schema / 无 migration 改动。
 
 ---
 
@@ -1068,7 +1084,7 @@ V1 RELEASE READY: YES
 | TimelineEvent                              |     7 |
 | User knowledge / visibility                |     7 |
 | Local China Map                            |     8 |
-| Approximate position / Drop circle         |     8 |
+| Approximate position / Last known position |     8 |
 | BullMQ transport scheduling                |     9 |
 | Push / Polling                             |     9 |
 | Full Mobile V1 flow                        |    10 |
@@ -1094,6 +1110,7 @@ V1 RELEASE READY: YES
 - Attachments / images / audio / video / files / rich text
 - Read-once / auto expiry
 - External map API / external geocoder
+- `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因 的任何用户可见展示（含地图）
 - WebSocket V1
 - Dynamic NPC stats
 - Weather/security/fatigue routing weights

@@ -330,7 +330,7 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 
 ### 未完成（后续 Phase）
 
-以下业务**尚未实现**：地图可视化 / 本地离线中国地图 / 近似位置与掉落范围（Phase 8）、Push 与 BullMQ Worker 正式接入（Phase 9）、完整 Mobile V1 流程与 Letter Detail Timeline UI（Phase 10）。Phase 7 已完成 WorldEvent→TimelineEvent 的可见性转换与 API/domain contract（按阶段规划，完整 Mobile timeline 属 Phase 10）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
+以下业务**尚未实现**：地图可视化 / 本地离线中国地图 / 近似位置与最后确报（Phase 8；`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`）、Push 与 BullMQ Worker 正式接入（Phase 9）、完整 Mobile V1 流程与 Letter Detail Timeline UI（Phase 10）。Phase 7 已完成 WorldEvent→TimelineEvent 的可见性转换与 API/domain contract（按阶段规划，完整 Mobile timeline 属 Phase 10）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
 
 ## 已知限制与维护事项
 
