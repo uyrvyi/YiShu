@@ -1522,7 +1522,8 @@ startedAtSim
 completedAtSim
 lastAdvancedAtSim
 currentLegSequence
-nextEventIndex
+nextRandomDrawIndex
+nextWorldEventIndex
 anomalyType
 anomalyStartedAtSim
 anomalyResolvedAtSim
@@ -1687,7 +1688,7 @@ speed = 1
 Phase 6 推进时间契约：
 
 - `now <= lastAdvancedAtSim` 时为真正 no-op，不消费事件、不改写状态。
-- Letter 已进入 `DELIVERED`、`PERMANENTLY_LOST` 或 `DESTROYED` 后，更晚 `now` 只允许单调更新 `lastAdvancedAtSim`；不得改写 terminal status、`deliveredAt`、Legs、WorldEvents、`nextEventIndex` 或 `lastMileReadyAtSim`。
+- Letter 已进入 `DELIVERED`、`PERMANENTLY_LOST` 或 `DESTROYED` 后，更晚 `now` 只允许单调更新 `lastAdvancedAtSim`；不得改写 terminal status、`deliveredAt`、Legs、WorldEvents、`nextRandomDrawIndex` / `nextWorldEventIndex` 或 `lastMileReadyAtSim`。
 - last-mile 起点为 `max(completedAtSim, resumeAtSim, 已持久化 lastMileReadyAtSim)`；一旦计算即持久化，retry 与时间倒退不得改变。
 - `deliveredAt = lastMileReadyAtSim + 6h`，且不得早于 `RECOVERED.occurredAtSim`。
 

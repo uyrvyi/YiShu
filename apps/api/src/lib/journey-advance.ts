@@ -89,6 +89,17 @@ const TERMINAL_LETTER_STATUSES: ReadonlySet<LetterStatus> = new Set([
 const LEG_ACTIVE: TransportLegStatus = "ACTIVE";
 const LEG_COMPLETED: TransportLegStatus = "COMPLETED";
 
+/**
+ * 仅测试使用的 WorldEvent 持久化故障注入点（默认 null → 生产行为完全不变）。
+ * 用途：验证 LOST_PATH + canonical COURIER_MISSING 双事件的 all-or-nothing 事务语义。
+ */
+let worldEventPersistFaultForTest: (() => void) | null = null;
+
+/** 仅测试使用：设置 / 清除 WorldEvent 持久化故障注入（测试结束必须恢复为 null）。 */
+export function setWorldEventPersistFaultForTest(fault: (() => void) | null): void {
+  worldEventPersistFaultForTest = fault;
+}
+
 /** 新重建 legs 的占位 id 上限（负 id；persist 时跳过这些 change 的 update，由 createMany 落库）。
  * 负 id 保证每个新 leg 唯一，避免 changes.some(c.id===l.id) 串扰（0 会全部匹配）。 */
 const MAX_NEW_LEG_ID = BigInt(0);
@@ -122,7 +133,10 @@ interface AdvanceState {
   journeyCompletedAt: Date | null;
   currentLegSequence: number | null;
   deliveredAtMs: number | null;
-  eventIndex: number;
+  /** 随机决策游标：只有真实随机决策（primary 判定 / 恢复窗口 / 时长 / 拾获处理 / 运输选择）才推进。 */
+  randomDrawIndex: number;
+  /** WorldEvent 编号分配器：仅分配事件身份/顺序，与随机游标完全无关。 */
+  worldEventIndex: number;
   anomalyType: JourneyAnomalyType | null;
   anomalyStartedAtMs: number | null;
   anomalyResolvedAtMs: number | null;
@@ -143,15 +157,23 @@ interface AdvanceState {
   anyStateChanged: boolean;
 }
 
+/**
+ * 随机决策：推进 random cursor 并返回 deterministic 值。
+ * `index` 是本次随机决策在 seed 序列中的位置（仅用于诊断/replay 断言），**不得**当作 WorldEvent 编号。
+ */
 type DrawFn = () => { value: number; index: number };
+/**
+ * 记录 WorldEvent：编号由 `allocateWorldEventIndex()` 分配（或用 explicitIndex 复用 Leg primary 预分配编号）。
+ * 返回最终 eventIndex。**记录事实绝不消费随机游标**。
+ */
 type RecordFn = (
   type: WorldEventType,
   occurredAtMs: number,
-  index: number,
   nodeId: string,
   transportLegSequence: number | null,
-  payload?: Prisma.InputJsonValue
-) => void;
+  payload?: Prisma.InputJsonValue,
+  explicitIndex?: number
+) => number;
 
 /**
  * 将 Letter 的 Journey 按模拟时钟推进到当前时刻。
@@ -241,7 +263,8 @@ export async function advanceJourneyToNow(
       journeyCompletedAt: lockedJourney.completedAtSim,
       currentLegSequence: lockedJourney.currentLegSequence,
       deliveredAtMs: null,
-      eventIndex: lockedJourney.nextEventIndex,
+      randomDrawIndex: lockedJourney.nextRandomDrawIndex,
+      worldEventIndex: lockedJourney.nextWorldEventIndex,
       anomalyType: lockedJourney.anomalyType,
       anomalyStartedAtMs: lockedJourney.anomalyStartedAtSim?.getTime() ?? null,
       anomalyResolvedAtMs: lockedJourney.anomalyResolvedAtSim?.getTime() ?? null,
@@ -256,15 +279,29 @@ export async function advanceJourneyToNow(
       anyStateChanged: false,
     };
 
-    // 确定性随机源（eventIndex 单调递增，持久化后 replay 一致；retry/rollback 不重复消费）
+    // 确定性随机源：只有真实随机决策才推进 random cursor（持久化后 replay 一致；retry/rollback 不重复消费）
     const draw: DrawFn = () => {
-      const index = state.eventIndex;
-      state.eventIndex += 1;
+      const index = state.randomDrawIndex;
+      state.randomDrawIndex += 1;
       return { value: deterministicDraw(lockedJourney.simulationSeed, index), index };
     };
-    const record: RecordFn = (type, occurredAtMs, index, nodeId, transportLegSequence, payload) => {
+    // 事件编号分配器：与随机游标完全独立（记录派生事实不会改变未来随机决策）
+    const allocateWorldEventIndex = (): number => {
+      const index = state.worldEventIndex;
+      state.worldEventIndex += 1;
+      return index;
+    };
+    const record: RecordFn = (
+      type,
+      occurredAtMs,
+      nodeId,
+      transportLegSequence,
+      payload,
+      explicitIndex
+    ) => {
+      const eventIndex = explicitIndex ?? allocateWorldEventIndex();
       state.worldEvents.push({
-        eventIndex: index,
+        eventIndex,
         eventType: type,
         occurredAtMs,
         nodeId,
@@ -272,6 +309,7 @@ export async function advanceJourneyToNow(
         payload,
       });
       state.anyStateChanged = true;
+      return eventIndex;
     };
 
     // 可重复 progression loop：以理论事件时间为游标，直到 now 不足以推进或到达终态。
@@ -280,7 +318,8 @@ export async function advanceJourneyToNow(
 
     const changed =
       state.anyStateChanged ||
-      state.eventIndex !== lockedJourney.nextEventIndex ||
+      state.randomDrawIndex !== lockedJourney.nextRandomDrawIndex ||
+      state.worldEventIndex !== lockedJourney.nextWorldEventIndex ||
       state.anomalyType !== lockedJourney.anomalyType ||
       (state.anomalyStartedAtMs ?? null) !==
         (lockedJourney.anomalyStartedAtSim?.getTime() ?? null) ||
@@ -354,7 +393,9 @@ function runProgression(
     if (!leg) return;
 
     // 5) 首次激活该 Leg：判定 primary event 并持久化（每 Leg 最多一次）
-    if (leg.primaryEventIndex === null) {
+    // 判定标志 = primaryEventOutcome（持久化后恒非 null，含 "NORMAL"）；不能再以 primaryEventIndex 判定，
+    // 因为不产生事件的 outcome（NORMAL / 收尾 REROUTE）不再预分配事件编号（避免 eventIndex 空洞）。
+    if (leg.primaryEventOutcome === null) {
       const legStartMs = resolveLegStartMs(state, legs, cursor, nowMs);
       judgePrimaryEvent(state, leg, legStartMs, rulesVersion, draw);
       // 已把 startedAtSim 定为 resumeAt：not-before 边界使命完成，清空（持久化 null）
@@ -382,19 +423,33 @@ function runProgression(
       case "NORMAL":
         continue;
       case "DELAYED": {
-        record("DELAYED", effectiveMs, leg.primaryEventIndex ?? -1, leg.toNodeId, leg.sequence, {
-          delaySeconds: leg.delaySeconds ?? 0,
-          transportType: leg.transportType,
-        });
+        recordPrimaryEvent(
+          state,
+          leg,
+          "DELAYED",
+          effectiveMs,
+          {
+            delaySeconds: leg.delaySeconds ?? 0,
+            transportType: leg.transportType,
+          },
+          record
+        );
         continue;
       }
       case "ROBBERY_ESCAPE":
       case "ROBBERY_INJURED": {
         const branch = outcome === "ROBBERY_ESCAPE" ? "ESCAPE_DELAY" : "INJURED_CONTINUE";
-        record("ROBBERY", effectiveMs, leg.primaryEventIndex ?? -1, leg.toNodeId, leg.sequence, {
-          branch,
-          transportType: leg.transportType,
-        });
+        recordPrimaryEvent(
+          state,
+          leg,
+          "ROBBERY",
+          effectiveMs,
+          {
+            branch,
+            transportType: leg.transportType,
+          },
+          record
+        );
         continue;
       }
       case "REROUTE": {
@@ -414,99 +469,130 @@ function runProgression(
           // 只把"真正无替代路线"转换为 COURIER_MISSING 世界事件；
           // UnknownGraphVersionError / 节点错误 / 数据损坏 / 未知异常必须继续抛出 → 事务回滚
           if (!(err instanceof NoRouteError)) throw err;
-          record(
+          recordPrimaryEvent(
+            state,
+            leg,
             "COURIER_MISSING",
             effectiveMs,
-            leg.primaryEventIndex ?? -1,
-            leg.toNodeId,
-            leg.sequence,
             {
               transportType: leg.transportType,
               excludedEdge,
               reason: "no_alternative_route",
-            }
+            },
+            record
           );
           enterAnomaly(state, "COURIER_MISSING", effectiveMs, leg, draw);
           continue;
         }
         if (!route) continue;
-        record("REROUTED", effectiveMs, leg.primaryEventIndex ?? -1, leg.toNodeId, leg.sequence, {
-          excludedEdge,
-          newLegCount: route.edges.length,
-          newTotalDistanceKm: route.totalDistanceKm,
-        });
+        recordPrimaryEvent(
+          state,
+          leg,
+          "REROUTED",
+          effectiveMs,
+          {
+            excludedEdge,
+            newLegCount: route.edges.length,
+            newTotalDistanceKm: route.totalDistanceKm,
+          },
+          record
+        );
         rebuildRemaining(state, legs, journey, cursor + 1, route, rulesVersion);
         continue; // 重建后继续消费事件时刻 → now 的剩余模拟时间（BLOCKER-2 修复）
       }
-      case "LOST_PATH":
-        record("LOST_PATH", effectiveMs, leg.primaryEventIndex ?? -1, leg.toNodeId, leg.sequence, {
+      case "LOST_PATH": {
+        // World Truth 完整性：LOST_PATH 是后台真实世界原因（HIDDEN），必须保留为 WorldEvent；
+        // 同时该 transition 原子产生**唯一 canonical** WorldEvent.COURIER_MISSING（用户可确认事实）。
+        // 编号：1) LOST_PATH 走 recordPrimaryEvent（legacy 用预留编号 / 新 Journey 现场分配）；
+        //       2) canonical 由事件编号分配器分配（严格大于 LOST_PATH 编号）。
+        // **二者都不消费随机游标** —— 记录派生事实不得改变未来随机决策。
+        recordPrimaryEvent(
+          state,
+          leg,
+          "LOST_PATH",
+          effectiveMs,
+          {
+            transportType: leg.transportType,
+            pigeon: leg.transportType === "PIGEON",
+          },
+          record
+        );
+        record("COURIER_MISSING", effectiveMs, leg.toNodeId, leg.sequence, {
           transportType: leg.transportType,
-          pigeon: leg.transportType === "PIGEON",
+          cause: "LOST_PATH", // 后台 cause 标记（Timeline 不读；绝不向用户暴露）
         });
         enterAnomaly(state, "COURIER_MISSING", effectiveMs, leg, draw);
         continue;
+      }
       case "COURIER_MISSING":
-        record(
+        recordPrimaryEvent(
+          state,
+          leg,
           "COURIER_MISSING",
           effectiveMs,
-          leg.primaryEventIndex ?? -1,
-          leg.toNodeId,
-          leg.sequence,
           {
             transportType: leg.transportType,
-          }
+          },
+          record
         );
         enterAnomaly(state, "COURIER_MISSING", effectiveMs, leg, draw);
         continue;
       case "LETTER_DROPPED":
-        record(
+        recordPrimaryEvent(
+          state,
+          leg,
           "LETTER_DROPPED",
           effectiveMs,
-          leg.primaryEventIndex ?? -1,
-          leg.toNodeId,
-          leg.sequence,
           {
             transportType: leg.transportType,
-          }
+          },
+          record
         );
         enterAnomaly(state, "LETTER_DROPPED", effectiveMs, leg, draw);
         continue;
       case "ROBBERY_MISSING":
       case "ROBBERY_DEAD": {
         const branch = outcome === "ROBBERY_MISSING" ? "MISSING_DROPPED" : "DEAD_DROPPED";
-        record("ROBBERY", effectiveMs, leg.primaryEventIndex ?? -1, leg.toNodeId, leg.sequence, {
-          branch,
-          transportType: leg.transportType,
-        });
+        recordPrimaryEvent(
+          state,
+          leg,
+          "ROBBERY",
+          effectiveMs,
+          {
+            branch,
+            transportType: leg.transportType,
+          },
+          record
+        );
         enterAnomaly(state, "LETTER_DROPPED", effectiveMs, leg, draw);
         continue;
       }
       case "SERIOUS_ACCIDENT":
         if (leg.transportType === "PIGEON") {
           // 飞鸽严重事故 → DESTROYED（唯一允许 DESTROYED 的严重事故分支）
-          record(
+          recordPrimaryEvent(
+            state,
+            leg,
             "SERIOUS_ACCIDENT",
             effectiveMs,
-            leg.primaryEventIndex ?? -1,
-            leg.toNodeId,
-            leg.sequence,
             {
               transportType: leg.transportType,
-            }
+            },
+            record
           );
           state.letterStatus = "DESTROYED";
           state.anyStateChanged = true;
           return;
         }
-        record(
+        recordPrimaryEvent(
+          state,
+          leg,
           "SERIOUS_ACCIDENT",
           effectiveMs,
-          leg.primaryEventIndex ?? -1,
-          leg.toNodeId,
-          leg.sequence,
           {
             transportType: leg.transportType,
-          }
+          },
+          record
         );
         enterAnomaly(state, "LETTER_DROPPED", effectiveMs, leg, draw);
         continue;
@@ -600,7 +686,10 @@ function judgePrimaryEvent(
       break;
   }
 
-  leg.primaryEventIndex = primary.index;
+  // 判定阶段**只消费真实的 primary random draw** 并冻结 outcome：
+  // 不分配 WorldEvent 编号（编号只在实际记录事件时分配，见 recordPrimaryEvent）。
+  // leg.primaryEventIndex 保持原值：新 model 下为 null；旧版本（migration 13 及之前）可能已有
+  // 合法预留编号 → 属于 legacy reservation，绝不能在此清空或改写。
   leg.primaryEventOutcome = frozenOutcome;
   leg.delaySeconds = delay;
   leg.startedAtSim = new Date(legStartMs);
@@ -610,10 +699,37 @@ function judgePrimaryEvent(
     undefined,
     leg.startedAtSim,
     undefined,
-    primary.index,
+    undefined,
     frozenOutcome,
     delay
   );
+}
+
+/**
+ * 记录 Leg primary 事件（唯一入口）。
+ *
+ * - **legacy Journey**（`leg.primaryEventIndex !== null`）：旧版本已合法预留编号 → 必须用该 explicit 编号，
+ *   且不修改该字段（保留冻结值）。
+ * - **新 Journey**（`null`）：此刻才 `allocateWorldEventIndex()` 分配编号，并把实际编号写回
+ *   `leg.primaryEventIndex`（供 recoveryWindow patch 与审计使用）。
+ *
+ * 编号分配与随机游标完全无关（记录事实绝不消费 random draw）。
+ */
+function recordPrimaryEvent(
+  state: AdvanceState,
+  leg: TransportLeg,
+  type: WorldEventType,
+  occurredAtMs: number,
+  payload: Prisma.InputJsonValue,
+  record: RecordFn
+): number {
+  const explicit = leg.primaryEventIndex ?? undefined; // legacy reservation（若有）
+  const eventIndex = record(type, occurredAtMs, leg.toNodeId, leg.sequence, payload, explicit);
+  if (explicit === undefined) {
+    leg.primaryEventIndex = eventIndex;
+    pushLegChange(state, leg.id, undefined, undefined, undefined, eventIndex, undefined, undefined);
+  }
+  return eventIndex;
 }
 
 /** last-mile：全 legs 完成 → OUT_FOR_DELIVERY → 冻结时长后 DELIVERED（deliveredAt 只设置一次）。
@@ -736,7 +852,8 @@ function resolveAnomalyIfDue(
       RECOVERY_TRANSPORT_CHANGE[state.letterTransport]
     );
     const oldTransport = state.letterTransport;
-    record("RECOVERED", resolvedMs, transportDraw.index, currentNodeId, null, {
+    // 编号由事件分配器给出（transportDraw 只提供随机决策值，不作为事件编号）
+    record("RECOVERED", resolvedMs, currentNodeId, null, {
       anomalyType: wasAnomaly,
       handling,
       setAsideSeconds: setAsideMs / 1000,
@@ -753,7 +870,8 @@ function resolveAnomalyIfDue(
 
     if (newTransport !== oldTransport) {
       state.letterTransport = newTransport;
-      record("TRANSPORT_CHANGED", resolvedMs, draw().index, currentNodeId, null, {
+      // 纯派生事实记录：不消费随机游标（此前 draw().index 会整体偏移后续随机决策）
+      record("TRANSPORT_CHANGED", resolvedMs, currentNodeId, null, {
         from: oldTransport,
         to: newTransport,
       });
@@ -767,7 +885,8 @@ function resolveAnomalyIfDue(
     // 7 模拟日未恢复 → PERMANENTLY_LOST（terminal，Recipient 正文仍锁定）
     state.letterStatus = "PERMANENTLY_LOST";
     state.currentLegSequence = null;
-    record("PERMANENTLY_LOST", sevenDaysMs, draw().index, currentNodeId, null, {
+    // 纯派生事实记录：不消费随机游标
+    record("PERMANENTLY_LOST", sevenDaysMs, currentNodeId, null, {
       anomalyType: wasAnomaly,
     });
     state.anomalyType = null;
@@ -967,6 +1086,8 @@ async function persistAdvance(
     }
   }
   if (state.worldEvents.length > 0) {
+    // 仅测试使用的故障注入点（默认 null，生产路径不改变行为；用于验证双事件 all-or-nothing）
+    if (worldEventPersistFaultForTest !== null) worldEventPersistFaultForTest();
     await tx.worldEvent.createMany({
       data: state.worldEvents.map((event) => ({
         journeyId: journey.id,
@@ -985,7 +1106,8 @@ async function persistAdvance(
     completedAtSim: state.journeyCompletedAt,
     lastAdvancedAtSim: new Date(nowMs),
     currentLegSequence: state.currentLegSequence,
-    nextEventIndex: state.eventIndex,
+    nextRandomDrawIndex: state.randomDrawIndex,
+    nextWorldEventIndex: state.worldEventIndex,
     anomalyType: state.anomalyType,
     anomalyStartedAtSim:
       state.anomalyStartedAtMs !== null ? new Date(state.anomalyStartedAtMs) : null,

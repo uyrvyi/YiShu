@@ -1,4 +1,4 @@
-import type { LetterStatus, RecipientReadState, TransportType } from "@yishu/shared";
+import type { PublicLetterStatus, RecipientReadState, TransportType } from "@yishu/shared";
 
 /**
  * Mobile Letter API 服务（最小真实流程）。
@@ -26,7 +26,11 @@ export interface JourneyView {
 
 export interface LetterView {
   trackingNo: string;
-  status: LetterStatus;
+  /**
+   * 用户可见状态：服务端只返回 PublicLetterStatus（内部 `LETTER_DROPPED` 等 HIDDEN 状态绝不出现）。
+   * 客户端契约与 `@yishu/shared` 的 `toPublicLetterStatus` 保持一致，不得在此接受内部 LetterStatus。
+   */
+  status: PublicLetterStatus;
   initialTransport: TransportType;
   currentTransport: TransportType;
   origin: { province: string; city: string; district: string };

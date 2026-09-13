@@ -1,0 +1,13 @@
+# 驿书 V1 行尾统一策略
+#
+# 背景：开发机 Windows `core.autocrlf=true` 且仓库此前无 .gitattributes，
+# 导致检出为 CRLF 而 Prettier 要求 LF（`pnpm format:check` 反复报大量文件）。
+#
+# 规则：默认所有文本文件在仓库内统一 LF；Windows 批处理脚本保持 CRLF（解释器要求）。
+# 说明：本文件只声明策略，未执行 `git add --renormalize .`（避免把大规模 EOL 变更
+# 混入业务提交）。下一次 checkout / 受控 renormalize 时行尾会按本策略统一。
+# 不要在业务 Phase 提交中混入 renormalize 产生的大批量 diff。
+
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

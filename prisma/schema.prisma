@@ -1,8 +1,8 @@
 // 驿书 V1 Prisma Schema
 // Phase 4：Journey + TransportLeg 本地路线规划（对应开发规范 §54/§55）。
 // Phase 6：WorldEvent（服务器世界真相）已实现（对应规范 §56）。
-// 业务模型：User / Block / RefreshToken / Letter / RecipientState / SenderState / Journey / TransportLeg / WorldEvent。
-// TimelineEvent 等在 Phase 7 引入。
+// Phase 7：TimelineEvent（用户可见运输事实）已实现（对应规范 §57）。
+// 业务模型：User / Block / RefreshToken / Letter / RecipientState / SenderState / Journey / TransportLeg / WorldEvent / TimelineEvent。
 
 generator client {
   provider               = "prisma-client"
@@ -86,6 +86,22 @@ enum WorldEventType {
   TRANSPORT_CHANGED
   PERMANENTLY_LOST
   DESTROYED
+}
+
+// TimelineEvent 类型（Phase 7：用户可见、可确认的运输事实；对应开发规范 §57）。
+// 命名表达"已确认事实"，不表达后台世界真相（例如没有 ROBBERY / SERIOUS_ACCIDENT 等上帝视角类型）。
+enum TimelineEventType {
+  DISPATCHED // 已寄出
+  DEPARTED_STATION // 已从某站发出
+  ARRIVED_STATION // 已到达某站
+  TRANSPORT_DELAYED // 运输延误
+  COURIER_MISSING // 信使失联
+  LETTER_RECOVERED // 信件已被拾获
+  TRANSPORT_CHANGED // 寄送方式已变更
+  OUT_FOR_DELIVERY // 派送中
+  DELIVERED // 已送达
+  PERMANENTLY_LOST // 已确认永久遗失
+  DESTROYED // 信件已损毁
 }
 
 // 用户（对应开发规范 §52）
@@ -200,6 +216,8 @@ model Letter {
 
   // Letter : Journey = 1 : 1（对应开发规范 §54 + Phase 4 Prompt §9）
   journey Journey?
+  // Phase 7：用户可见运输事实（Sender / Recipient 同视图）
+  timelineEvents TimelineEvent[]
 
   @@unique([senderId, clientRequestId])
   @@index([recipientId])
@@ -257,8 +275,12 @@ model Journey {
   lastAdvancedAtSim  DateTime? // 最近一次推进到的模拟时刻（幂等 / 倒退判定基准）
   currentLegSequence Int?      // 当前 ACTIVE Leg 的 sequence；无 ACTIVE（未开始或已全部完成）为 null
 
-  // 随机事件 cursor（Phase 6：单调递增，事务内消耗，replay 可重现；retry/rollback 不重复消费）
-  nextEventIndex Int @default(0)
+  // 随机决策游标（Phase 6 引入；Phase 7 Gate 与事件编号解耦并更名）：
+  // 唯一用途是 deterministicDraw(simulationSeed, nextRandomDrawIndex) —— 只有真实随机决策才推进。
+  nextRandomDrawIndex Int @default(0)
+  // WorldEvent 编号分配器（Phase 7 Gate 新增）：只负责事件身份/稳定顺序，
+  // 记录派生事实（canonical COURIER_MISSING / TRANSPORT_CHANGED / PERMANENTLY_LOST 等）**绝不消费随机游标**。
+  nextWorldEventIndex Int @default(0)
 
   // 异常状态（Phase 6：World Truth；运输暂停，恢复窗口后继续或 7 模拟日未恢复 → PERMANENTLY_LOST）
   anomalyType          JourneyAnomalyType?
@@ -337,4 +359,58 @@ model TransportLeg {
 
   @@unique([journeyId, sequence])
   @@index([journeyId])
+}
+
+// TimelineEvent（Phase 7：用户可见、可确认的运输事实；对应开发规范 §57）。
+//
+// WorldEvent != TimelineEvent：本表只保存 Sender / Recipient 可以确认的事实，
+// 由 `apps/api/src/lib/timeline.ts` 的 projection 层从 WorldEvent + Journey/Leg/Letter 单向派生，
+// 绝不复制 WorldEvent.payload（规范 §39/§40：不得暴露上帝视角）。
+//
+// 幂等：(letterId, sourceKey) UNIQUE —— 同一来源（WorldEvent 或 normal fact）最多生成一个
+// TimelineEvent；重复 materialize / 并发请求由数据库唯一约束兜底（规范 §66）。
+// 排序：ORDER BY happenedAt, sequence —— 两者均由 projection 确定性计算，
+// 不依赖 createdAt 或自增 id。
+model TimelineEvent {
+  id       BigInt @id @default(autoincrement())
+  letterId BigInt
+
+  // 稳定来源标识（幂等键）：如 `we:12`（WorldEvent eventIndex）、`leg:3:arrived`（normal fact）
+  sourceKey String
+  // 确定性排序序号（projection 计算；同一 Letter 内稳定）
+  sequence Int
+
+  type        TimelineEventType
+  title       String
+  description String
+
+  // 用户可见位置事实（规范 §57）。
+  // district 语义：station 冻结数据只到 province/city；仅当事件有可确认的区域来源
+  // （如 DISPATCHED 用 Letter.origin、DELIVERED/OUT_FOR_DELIVERY 用 Letter.target）且驿站城市
+  // 与区域城市一致时才写真实 district；否则为 NULL（禁止空串伪装 / 禁止按 city 猜测区县）。
+  province String
+  city     String
+  district String?
+  // 稳定节点锚点（内部定位；Phase 8 Map 使用；API 不直接暴露 nodeId）
+  nodeId               String?
+  mapX                 Float?
+  mapY                 Float?
+  uncertaintyRadiusKm  Float?
+
+  // 模拟时间语义（SimulationClock；规范 §57 字段名）：happenedAt = 事实发生，visibleAt = 用户可确认时刻。
+  // API 只返回 visibleAt <= simulationClock.now() 的行（规范 §75）。
+  happenedAt DateTime
+  visibleAt  DateTime
+
+  // 事实重要度（规范 §21 优先级：改运输方式 > 掉落 > 找回 > 失联 > 重要驿站 > 普通驿站）
+  importance Int
+  // 用户可见安全附加数据（如 transportType / 新运输方式）；绝不保存 WorldEvent payload 原文
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  letter Letter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+
+  @@unique([letterId, sourceKey])
+  @@index([letterId, happenedAt, sequence])
 }

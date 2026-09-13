@@ -62,8 +62,8 @@ MAY START PHASE X+1: YES
 | Phase 4  | Journey + Routing + TransportLeg               | FINAL GATE PASS      |
 | Phase 5  | Simulation Core + Transport Progression        | FINAL GATE PASS      |
 | Phase 6  | Random Events + Recovery + World Truth         | FINAL GATE PASS      |
-| Phase 7  | Timeline + 用户可见运输事实                    | 下一阶段（尚未开始） |
-| Phase 8  | Local Map + Journey Visualization              | 未开始               |
+| Phase 7  | Timeline + 用户可见运输事实                    | FINAL GATE PASS      |
+| Phase 8  | Local Map + Journey Visualization              | 下一阶段（尚未开始） |
 | Phase 9  | Worker Scheduling + Push + Refresh             | 未开始               |
 | Phase 10 | Mobile V1 Integration + UX Closure             | 未开始               |
 | Phase 11 | Security / Reliability / Performance Hardening | 未开始               |
@@ -639,7 +639,7 @@ PHASE 6 COMPLETE: YES
 MAY START PHASE 7: YES
 ```
 
-Phase 7 尚未开始；必须等待项目负责人明确启动。
+Phase 7 已由项目负责人启动实施，并已由独立 Gate Reviewer 正式复审通过（BLOCKER / HIGH / MEDIUM / LOW 均为 NONE）；详见 §9 的当前状态。Phase 8 尚未开始，须在项目负责人确认启动后才允许实施。
 
 ---
 
@@ -694,6 +694,17 @@ Sender 与 Recipient 必须看到完全相同的用户可见运输 Timeline。�
 - Sender/Recipient Timeline 一致
 - readState 隔离
 - Timeline 不删除历史确认事实
+
+## 当前状态
+
+```text
+FINAL GATE: PASS
+PHASE 7 COMPLETE: YES
+MAY START PHASE 8: YES
+REMAINING BLOCKERS: NONE
+```
+
+独立 Gate Review 结论：BLOCKER / HIGH / MEDIUM / LOW 均为 NONE。Phase 8（Local Map + Journey Visualization）尚未开始，须等项目负责人正式启动。
 
 ---
 

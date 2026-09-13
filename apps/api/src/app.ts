@@ -4,11 +4,13 @@ import { ZodError } from "zod";
 import { loadConfig, type AppConfig } from "@yishu/config";
 import { API_PREFIX } from "@yishu/shared";
 import type { PrismaClient } from "@yishu/db";
+import { SystemSimulationClock, type SimulationClock } from "@yishu/simulation";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
 import { letterRoutes } from "./routes/letters.js";
 import { journeyRoutes } from "./routes/journeys.js";
+import { timelineRoutes } from "./routes/timelines.js";
 
 /**
  * buildApp 所需依赖（便于测试注入）。
@@ -16,12 +18,19 @@ import { journeyRoutes } from "./routes/journeys.js";
 export interface AppDeps {
   /** PostgreSQL Prisma Client 实例。 */
   prisma: PrismaClient;
+  /**
+   * 模拟时钟（Phase 7：Timeline 可见性判定）。
+   * 生产/默认：SystemSimulationClock(speed = 1)；测试可注入 TestSimulationClock 控制时间。
+   */
+  simulationClock?: SimulationClock;
 }
 
 declare module "fastify" {
   interface FastifyInstance {
     prisma: PrismaClient;
     config: AppConfig;
+    /** 统一业务时钟：simulationClock.now()（禁止业务直接 Date.now()）。 */
+    simulationClock: SimulationClock;
     /** 校验 Authorization Bearer JWT，失败返回 401。 */
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
@@ -62,6 +71,8 @@ export function buildApp(
   // 注入 Prisma Client 与配置，供路由层访问。
   app.decorate("prisma", deps.prisma);
   app.decorate("config", config);
+  // 统一模拟时钟（默认生产 speed = 1；测试可注入 TestSimulationClock）
+  app.decorate("simulationClock", deps.simulationClock ?? new SystemSimulationClock(1));
 
   // 认证 preHandler：校验 Bearer JWT，失败返回 401。
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
@@ -95,6 +106,7 @@ export function buildApp(
   void app.register(userRoutes, { prefix: API_PREFIX });
   void app.register(letterRoutes, { prefix: API_PREFIX });
   void app.register(journeyRoutes, { prefix: API_PREFIX });
+  void app.register(timelineRoutes, { prefix: API_PREFIX });
 
   return app;
 }

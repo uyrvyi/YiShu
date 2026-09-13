@@ -29,6 +29,40 @@ export const LETTER_STATUSES = [
 ] as const;
 export type LetterStatus = (typeof LETTER_STATUSES)[number];
 
+/**
+ * 用户可见 Letter 状态（内部状态投影，Phase 7 Gate BLOCKER）。
+ *
+ * 冻结可见性规则：内部 `LETTER_DROPPED` 完全 HIDDEN——不得经 Letter API / Mobile / Timeline
+ * 向用户暴露"信件掉落"。掉落期间用户没有新的可确认运输事实 → 投影为 `IN_TRANSIT`。
+ * 其它内部状态（含推进实际不产生的规范状态）按现有冻结用户可见语义 1:1 保留，
+ * 禁止使用 `return letter.status` 作为 fallback。
+ */
+export type PublicLetterStatus = Exclude<LetterStatus, "LETTER_DROPPED">;
+
+/** 统一用户可见状态投影（全局用户可见性规则，不止 Timeline）。 */
+export function toPublicLetterStatus(status: LetterStatus): PublicLetterStatus {
+  switch (status) {
+    case "CREATED":
+    case "DISPATCHED":
+    case "IN_TRANSIT":
+    case "AT_STATION":
+    case "TRANSFER":
+    case "DELAYED":
+    case "COURIER_MISSING":
+    case "LETTER_MISSING":
+    case "RECOVERED":
+    case "TRANSPORT_CHANGED":
+    case "OUT_FOR_DELIVERY":
+    case "DELIVERED":
+    case "PERMANENTLY_LOST":
+    case "DESTROYED":
+      return status;
+    case "LETTER_DROPPED":
+      // 掉落完全 HIDDEN：无独立可确认事实 → 保持在途（不映射为 DELAYED/COURIER_MISSING，避免创造用户知识）
+      return "IN_TRANSIT";
+  }
+}
+
 /** 收件人阅读状态（对应开发规范 §42）。 */
 export const RECIPIENT_READ_STATES = ["UNOPENED", "OPENED"] as const;
 export type RecipientReadState = (typeof RECIPIENT_READ_STATES)[number];
@@ -317,3 +351,112 @@ export function selectWeightedOutcome<T extends string>(
   if (!last) throw new Error("selectWeightedOutcome: empty table");
   return last.outcome; // 浮点累计误差兜底：取最后一项
 }
+
+// ---------------------------------------------------------------------------
+// Phase 7 — Timeline + 用户可见运输事实（开发规范 §39 / §40 / §57 / §75）
+// ---------------------------------------------------------------------------
+
+/**
+ * TimelineEvent 用户可见事件类型（对应开发规范 §57）。
+ *
+ * 命名一律表达"用户已确认的事实"（已寄出 / 到达 / 延误 / 失联 / 拾获 / 改方式 / 派送中 / 送达 / 遗失 / 损毁），
+ * **不存在** ROBBERY / SERIOUS_ACCIDENT 等上帝视角类型（规范 §39/§40）。
+ */
+export const TIMELINE_EVENT_TYPES = [
+  "DISPATCHED",
+  "DEPARTED_STATION",
+  "ARRIVED_STATION",
+  "TRANSPORT_DELAYED",
+  "COURIER_MISSING",
+  "LETTER_RECOVERED",
+  "TRANSPORT_CHANGED",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "PERMANENTLY_LOST",
+  "DESTROYED",
+] as const;
+export type TimelineEventType = (typeof TIMELINE_EVENT_TYPES)[number];
+
+/**
+ * visibility 策略（阶段规划 Phase 7：immediate / delayed / hidden）。
+ *
+ * - IMMEDIATE：事件发生后即成为用户可确认事实。
+ * - DELAYED：WorldEvent 已真实发生，但用户直到 visibleAt 才可确认（禁止提前下发再靠前端隐藏）。
+ * - HIDDEN：只存在于 World Truth，永不产生任何用户可见 Timeline 信息（也不得用 placeholder/count 暗示其存在）。
+ */
+export const TIMELINE_VISIBILITY_POLICIES = ["IMMEDIATE", "DELAYED", "HIDDEN"] as const;
+export type TimelineVisibilityPolicy = (typeof TIMELINE_VISIBILITY_POLICIES)[number];
+
+/**
+ * 用户可见事实重要度（对应开发规范 §21 既定事实节点优先级，数值越大越重要）：
+ * 1. 运输方式改变 2. 信件掉落 3. 信件被找回 4. 信使失联 5. 重要驿站 6. 普通驿站。
+ * 规范未列出优先级的类型（寄出 / 派送 / 延误 / 终态）取工程中性值：终态 3，其余 2。
+ */
+export const TIMELINE_IMPORTANCE: Record<TimelineEventType, number> = {
+  TRANSPORT_CHANGED: 6,
+  LETTER_RECOVERED: 4,
+  COURIER_MISSING: 3,
+  DELIVERED: 3,
+  PERMANENTLY_LOST: 3,
+  DESTROYED: 3,
+  DISPATCHED: 2,
+  OUT_FOR_DELIVERY: 2,
+  TRANSPORT_DELAYED: 2,
+  DEPARTED_STATION: 1,
+  ARRIVED_STATION: 1,
+};
+
+/**
+ * WorldEvent 类型键（与 Prisma `WorldEventType` 枚举保持一致；本包不依赖 Prisma）。
+ * 仅用于声明 World Truth → User Fact 的冻结映射，不作为用户可见类型。
+ */
+export type WorldEventTypeKey =
+  | "DELAYED"
+  | "REROUTED"
+  | "ROBBERY"
+  | "COURIER_MISSING"
+  | "LOST_PATH"
+  | "LETTER_DROPPED"
+  | "SERIOUS_ACCIDENT"
+  | "RECOVERED"
+  | "TRANSPORT_CHANGED"
+  | "PERMANENTLY_LOST"
+  | "DESTROYED";
+
+export interface WorldEventVisibilityRule {
+  policy: TimelineVisibilityPolicy;
+  /** 该 WorldEvent 对应的用户可见事实类型；HIDDEN 策略下为 null（永不产生 TimelineEvent）。 */
+  timelineType: TimelineEventType | null;
+}
+
+/**
+ * World Truth → User Fact **冻结映射**（项目负责人 2026-09-08 明确冻结，禁止再自行推导）。
+ *
+ * 直接可见事实（IMMEDIATE）：
+ * - DELAYED → TRANSPORT_DELAYED
+ * - COURIER_MISSING → COURIER_MISSING
+ * - RECOVERED → LETTER_RECOVERED
+ * - TRANSPORT_CHANGED → TRANSPORT_CHANGED
+ *
+ * 后台原因（HIDDEN，不得直接生成 TimelineEvent）：
+ * - ROBBERY / REROUTED / LOST_PATH / LETTER_DROPPED / SERIOUS_ACCIDENT
+ *
+ * 终态（WorldEvent 本身不泄漏 cause chain，但 Letter/Journey 进入明确 terminal 时
+ * 可产生用户确认结果）：
+ * - PERMANENTLY_LOST → "已确认永久遗失"
+ * - DESTROYED → "信件已损毁"
+ * 二者不得说明 robbery / serious accident / courier death / branch / recovery roll。
+ */
+export const WORLD_EVENT_VISIBILITY: Record<WorldEventTypeKey, WorldEventVisibilityRule> = {
+  DELAYED: { policy: "IMMEDIATE", timelineType: "TRANSPORT_DELAYED" },
+  COURIER_MISSING: { policy: "IMMEDIATE", timelineType: "COURIER_MISSING" },
+  RECOVERED: { policy: "IMMEDIATE", timelineType: "LETTER_RECOVERED" },
+  TRANSPORT_CHANGED: { policy: "IMMEDIATE", timelineType: "TRANSPORT_CHANGED" },
+  ROBBERY: { policy: "HIDDEN", timelineType: null },
+  REROUTED: { policy: "HIDDEN", timelineType: null },
+  LOST_PATH: { policy: "HIDDEN", timelineType: null },
+  LETTER_DROPPED: { policy: "HIDDEN", timelineType: null },
+  SERIOUS_ACCIDENT: { policy: "HIDDEN", timelineType: null },
+  PERMANENTLY_LOST: { policy: "HIDDEN", timelineType: null },
+  DESTROYED: { policy: "HIDDEN", timelineType: null },
+};

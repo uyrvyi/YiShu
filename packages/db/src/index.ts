@@ -26,6 +26,8 @@ export type {
   TransportType,
   WorldEvent,
   WorldEventType,
+  TimelineEvent,
+  TimelineEventType,
 } from "../../../generated/prisma/client.js";
 
 /**

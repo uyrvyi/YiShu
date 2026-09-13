@@ -7,7 +7,13 @@
  */
 
 import type { Letter, RecipientState, SenderState } from "@yishu/db";
-import type { LetterStatus, RecipientReadState, TransportType } from "@yishu/shared";
+import type {
+  LetterStatus,
+  PublicLetterStatus,
+  RecipientReadState,
+  TransportType,
+} from "@yishu/shared";
+import { toPublicLetterStatus } from "@yishu/shared";
 
 export const DELIVERED: LetterStatus = "DELIVERED";
 export const CREATED: LetterStatus = "CREATED";
@@ -20,7 +26,8 @@ export interface LetterRegion {
 
 export interface LetterView {
   trackingNo: string;
-  status: LetterStatus;
+  /** 用户可见状态（内部 LETTER_DROPPED 等 HIDDEN 状态绝不直接输出）。 */
+  status: PublicLetterStatus;
   initialTransport: TransportType;
   currentTransport: TransportType;
   origin: LetterRegion;
@@ -65,7 +72,7 @@ function toTargetRegion(l: Letter): LetterRegion {
 function baseView(l: Letter, content: string | null): LetterView {
   return {
     trackingNo: l.trackingNo,
-    status: l.status as LetterStatus,
+    status: toPublicLetterStatus(l.status as LetterStatus),
     initialTransport: l.initialTransport,
     currentTransport: l.currentTransport,
     origin: toRegion(l),

@@ -2,9 +2,9 @@
 
 「现代世界 + 古代通信方式」的点对点通信 App。
 
-> 当前基线：**Phase 6 Final Gate PASS（Random Events + Recovery + World Truth）**
-> 下一阶段：**Phase 7 — Timeline + 用户可见运输事实**
-> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进，以及 Phase 6：WorldEvent 世界真相 + 固定概率随机事件（delay/reroute/robbery/missing/drop/accident）+ Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED。地图 / Timeline / Push 等后续业务仍未实现。
+> 当前基线：**Phase 7 Final Gate PASS · Phase 7 COMPLETE（Timeline + 用户可见运输事实）**
+> 下一阶段：**Phase 8 — Local Map + Journey Visualization**（尚未开始）
+> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进、Phase 6 WorldEvent 世界真相 + 固定概率随机事件 + Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED，以及 Phase 7：TimelineEvent 用户可见运输事实（WorldEvent ≠ TimelineEvent；visibility 冻结映射：直接可见 / 后台原因 HIDDEN / 终态确认结果）。地图（Phase 8）/ Push（Phase 9）/ 完整 Mobile UI（Phase 10）等后续业务仍未实现。
 
 当前进度、验收结果与已知限制见 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
 
@@ -210,7 +210,7 @@ pnpm prisma:validate    # Prisma schema 校验
 pnpm prisma:generate    # 生成 Prisma Client 到 generated/prisma（install 时自动执行）
 ```
 
-Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Letter**、**RecipientState**、**SenderState**、**Journey**、**TransportLeg**、**WorldEvent**（含 `LetterStatus` / `TransportType` / `RecipientReadState` / `JourneyStatus` / `TransportLegStatus` / `JourneyAnomalyType` / `WorldEventType` enum）。以下模型属于后续 Phase，尚未实现：TimelineEvent 等领域模型。
+Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Letter**、**RecipientState**、**SenderState**、**Journey**、**TransportLeg**、**WorldEvent**、**TimelineEvent**（含 `LetterStatus` / `TransportType` / `RecipientReadState` / `JourneyStatus` / `TransportLegStatus` / `JourneyAnomalyType` / `WorldEventType` / `TimelineEventType` enum）。地图与推送等领域模型属于后续 Phase，尚未实现。
 
 ## packages/db（已正式接受的数据库基础设施）
 
@@ -297,7 +297,7 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 ### 已完成（Phase 6：Random Events + Recovery + World Truth）
 
 - **WorldEvent 模型**（Prisma `WorldEvent` + `WorldEventType` enum）：`(journeyId, eventIndex)` UNIQUE，事件顺序可 replay；字段 `journeyId/eventIndex/eventType/occurredAtSim/nodeId（NOT NULL）/transportLegSequence/payload/createdAt`（nodeId 为事件稳定位置，Phase 7 Timeline / Phase 8 Map 直接可用，不依赖按时间反推）；仅服务器世界真相，API 绝不直接暴露（Phase 7 才做 TimelineEvent/visibility）
-- **确定性随机消费**：每完成一个 Leg 做一次一级事件判定，`deterministicDraw(simulationSeed, eventIndex)`；`Journey.nextEventIndex` 持久化（事务内单调递增，retry/rollback 不重复消费随机数，replay 一致）；全程无 `Math.random`
+- **确定性随机消费**：每完成一个 Leg 做一次一级事件判定，`deterministicDraw(simulationSeed, drawIndex)`；`Journey.nextRandomDrawIndex` 持久化（事务内单调递增，retry/rollback 不重复消费随机数，replay 一致）；**随机游标与 WorldEvent 编号解耦**（另有 `Journey.nextWorldEventIndex`，记录派生事实绝不消费随机数）；全程无 `Math.random`
 - **冻结概率（shared，禁止魔法数字）**：HAND_CARRY（§28 8 项）/ HORSE_RELAY（§29）/ EXPRESS_RELAY（§30）/ PIGEON（§31）一级事件表 + 总和/分段自动测试；ROBBERY 二级分支 55/25/15/5（§32）；掉落恢复窗口 50/25/15/10（§33）；拾获处理 70/20/10（§34）；恢复后自动运输变更倾向（HAND 60/25/15、HORSE 80/15/5、PIGEON 70/30）；`selectWeightedOutcome` 确定性抽样；未知 `rulesVersion` 明确失败
 - **事件应用**（`advanceJourneyToNow` 内联，保留 Phase 5 全部契约）：DELAY/OTHER/DEVIATION/TEMPORARY_STOP → 理论完成时刻延后；REROUTE → 排除原计划下一条边重新 Dijkstra（`planRouteExcluding`，PIGEON 不走 road graph），只重建 remaining、completed 永久保留；LOST_PATH/LOST/COURIER_MISSING → `COURIER_MISSING` 异常；LETTER_DROPPED/ROBBERY(MISSING/DEAD 分支)/ground 严重事故 → `LETTER_DROPPED` 异常；PIGEON 严重事故 → `DESTROYED`（唯一 DESTROYED 分支）
 - **Recovery**：异常运输暂停；恢复窗口（确定性抽取）到期自动恢复（`RECOVERED`），可自动变更运输方式（`TRANSPORT_CHANGED`，剩余 legs 切换字段与时长），7 模拟日未恢复 → `PERMANENTLY_LOST`（terminal，Recipient 正文仍锁定）
@@ -307,9 +307,30 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 - **Phase 6 测试**：shared 概率表（总和 1.0 / 分段 / 未知版本拒绝 / 分支 / 窗口）7 项；world-events 集成 33 项，统一 `canonicalWorldSnapshot` 对照 Letter / Journey / Legs / WorldEvents 的全部 deterministic 字段；一次大跳跃 vs 分段推进覆盖 NORMAL、DELAY、SET_ASIDE、目的站 drop/recovery、连续两次 reroute 以及 DELIVERED / PERMANENTLY_LOST / DESTROYED 三终态；同时覆盖每 Leg 一次 primary event、恢复运输方式重建、lastMileReadyAtSim 生命周期、WorldEvent.nodeId、totalDistanceKm、rollback、并发与 API 无泄漏（固定 seed，关键 replay fixture 连续 3 轮无 flaky）
 - **门禁**：全 workspace 233 tests 0 failed；typecheck / lint / format:check / build / prisma:validate / prisma:generate 全 PASS；两库 10 个 migration applied、checksum 10/10 且 schema diff 为空；PostgreSQL 17.11 / Redis 7.4.11 healthy；API production smoke `/api/v1/health`=200；Expo Android bundle 1245 modules PASS
 
+### 已完成（Phase 7：Timeline + 用户可见运输事实）
+
+- **TimelineEvent 模型**（Prisma `TimelineEvent` + `TimelineEventType` enum，对应开发规范 §57）：字段 `letterId/sourceKey/sequence/type/title/description/province/city/district/nodeId/mapX/mapY/uncertaintyRadiusKm/happenedAt/visibleAt/importance/metadata/createdAt`；`(letterId, sourceKey)` UNIQUE 作为幂等兜底（规范 §66），`sequence` 由 projection 确定性计算，排序只依赖 `(happenedAt, sequence)`，不依赖 createdAt / 自增 id
+- **World Truth → User Fact 单向投影**（`apps/api/src/lib/timeline.ts`）：`projectTimelineFacts()` 纯函数由 WorldEvent + Journey/Leg/Letter 生成候选事实；**绝不复制 `WorldEvent.payload`**；不反向修改 World Truth
+- **visibility 冻结表**（`packages/shared` `WORLD_EVENT_VISIBILITY`，项目负责人 2026-09-08 冻结，禁止自行推导）：
+  - `IMMEDIATE`（直接可见）：DELAYED → 运输延误；COURIER_MISSING → 信使失联；RECOVERED → 运输已恢复；TRANSPORT_CHANGED → 寄送方式已变更
+  - `HIDDEN`（后台原因，不得直接生成 TimelineEvent）：ROBBERY / REROUTED / LOST_PATH / LETTER_DROPPED / SERIOUS_ACCIDENT
+  - canonical missing（World Truth 双事件，确定性冻结顺序）：LOST_PATH transition 原子记录 `WorldEvent.LOST_PATH`（HIDDEN cause，eventIndex = primary）+ `WorldEvent.COURIER_MISSING`（canonical，独立单调 draw index）；Timeline 只消费 canonical（sourceKey = `we:{canonicalEventIndex}`），每次 logical missing transition 恰好一条"信使失联"，不暴露 LOST_PATH/cause
+  - 终态：PERMANENTLY_LOST / DESTROYED 只表达用户确认结果（已确认永久遗失 / 信件已损毁，happenedAt = 实际损毁时刻），绝不泄漏 cause chain
+- **统一 Public Letter Status**（shared `toPublicLetterStatus`）：所有 Letter API 出口（Sender/Recipient list/detail、创建返回）只输出用户可见状态；内部 `LETTER_DROPPED` → `IN_TRANSIT`（掉落完全 HIDDEN，无新可确认事实）；exhaustive switch，禁止 `return letter.status` fallback
+- **normal transport facts（只取不可变来源）**：寄出（Letter.sentAt/createdAt 冻结）/ 从某站发出 / 到达某站（Leg.startedAtSim/completedAtSim）/ 派送中（lastMileReadyAtSim）/ 已送达（deliveredAt）/ 终态确认结果；**禁止**从会变化的当前状态（anomalyType / 瞬时 status / 变化中的 fallback timestamp）投影永久历史；`TimelineEventType` enum **不含 LETTER_DROPPED**（corrective migration 已从 PostgreSQL 删除该枚举值）
+- **Timeline district（可空语义）**：`TimelineEvent.district` 为 `String?`；station 冻结数据只到 province/city，故**只有区域锚点事件**（寄出=DISPATCHED 用 Letter origin 快照、送达=OUT_FOR_DELIVERY/DELIVERED 用 target 快照）且在驿站城市与区域城市一致时才写真实 district；其余事件 district = `NULL`（**禁止空串伪装 / 禁止按 city 猜测区县**）；API DTO 不暴露 district
+- **refresh-frequency independence**：同一 World Truth + 同一最终 simulation now，GET 1 次 / 多次最终 DB canonical snapshot 与 API DTO 完全一致（sequence 由完整 canonical set 分配并同步，不按本轮 missing 数组编号）
+- **已确认事实永久保留**：reroute 不删除已完成 Leg 的到达事实；同一 sourceKey 的事实内容永不变化
+- **幂等 / 并发**：lazy materialization + `skipDuplicates` + **P2002 精确判断（仅吞 (letterId, sourceKey) 复合唯一，其它 rethrow）**；100 次刷新不新增重复、不改顺序、不改 World Truth；并发 GET 无重复、无 500
+- **Timeline API**：`GET /api/v1/letters/:trackingNo/timeline`（规范 §75）—— Sender / Recipient 返回**完全相同**的用户可见事实，第三方 404；只提供 GET（无 POST /reveal /confirm /advance）
+- **safe DTO**：只含 `type/title/description/location{province,city}/happenedAt`；递归扫描确认不含 internal id / letterId / journeyId / worldEventId / eventIndex / payload / seed / visibleAt / nodeId / mapX / mapY / metadata / ETA
+- **边界保持**：Recipient 非 DELIVERED（含 PERMANENTLY_LOST / DESTROYED）正文仍为 `null`；Sender 任意响应完全不存在 `readState` / `openedAt`
+- **Phase 7 测试**：`timeline.integration.test.ts` 36 项（IMMEDIATE 四种 / HIDDEN（ROBBERY/REROUTED/LETTER_DROPPED/SERIOUS_ACCIDENT）/ 仅独立 DELAYED 生成延误 / LOST_PATH 双事件（LOST_PATH + canonical COURIER_MISSING）唯一性 / **random cursor golden（PIGEON LOST_PATH cursor 恰为 5 次真实决策）** / **derived 事件不消费随机游标（PERMANENTLY_LOST / TRANSPORT_CHANGED）** / **双事件 fault-injection rollback（all-or-nothing）** / **district province+city 双校验（同名城市/省级 fallback 不误套）** / DISPATCHED 不可变时间戳 / late vs many GET 完整 matrix（NORMAL/DELAY/direct missing/LOST_PATH/RECOVERED+TRANSPORT_CHANGED/PERMANENTLY_LOST/DESTROYED）/ drop 异常期间 GET vs 恢复后首 GET / canonicalTimelineSnapshot / 100 次刷新幂等 / 并发 / Sender-Recipient 一致 / 第三方 404 / 正文边界 / read privacy / 递归+文本级泄漏扫描 / Phase 6 World Truth 不变 / P2002 单来源精确判断 / **WorldEvent 编号连续无空洞（NORMAL 不占号）** / **legacy 预留编号兼容（升级后复用预留编号、canonical 从其后分配）** / **legacy reservation 在回滚后保留** / DESTROYED happenedAt=实际损毁时刻）+ `letter-visibility.integration.test.ts` 5 项（LETTER_DROPPED→public IN_TRANSIT、Sender/Recipient list+detail+Timeline 全 API 攻击、ROBBERY missing/dead 旁路、**Letter refresh-frequency 双端 5 场景对照（含 deliveredAt）**、enum 结构无 LETTER_DROPPED），固定 seed 连续 3 轮无 flaky
+- **门禁（Final Gate PASS）**：Phase 7 定向 **41/41 PASS × 3 轮**、Phase 5/6 回归 **50/50 PASS**、全 workspace **274 passed / 0 failed**（api 185 = Phase 6 的 144 + Phase 7 的 41）；typecheck / lint / format:check / build / prisma:validate / prisma:generate 全 PASS；dev / test 两库由 canonical 磁盘 history **从 0 重建**（各 **15 个** migration、逐条 checksum **0 drift**、无 rolled-back 残留），schema diff 为空（corrective：`20260908120000` 删 `LETTER_DROPPED` 枚举值、`20260908130000` district 改 `String?`、`20260913120000` 解耦 `nextRandomDrawIndex` / `nextWorldEventIndex`、`20260913130000` 校准事件编号下界含旧预留）；全新空库一次性跑通 15 migrations（fresh DB Gate PASS）；PostgreSQL 17.11 / Redis 7.4.11 healthy；**本地 production-mode smoke** `GET /api/v1/health` = HTTP 200（本地 smoke，不是线上 deployment acceptance）
+
 ### 未完成（后续 Phase）
 
-以下业务**尚未实现**：TimelineEvent 与用户可见运输事实 / visibility（Phase 7）、地图可视化（Phase 8）、Push 与 BullMQ Worker 正式接入（Phase 9）、WorldEvent→Timeline 的可见性转换（Phase 7）。Phase 5/6 已提供确定性推进与事件内核（`advanceJourneyToNow` + WorldEvent）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
+以下业务**尚未实现**：地图可视化 / 本地离线中国地图 / 近似位置与掉落范围（Phase 8）、Push 与 BullMQ Worker 正式接入（Phase 9）、完整 Mobile V1 流程与 Letter Detail Timeline UI（Phase 10）。Phase 7 已完成 WorldEvent→TimelineEvent 的可见性转换与 API/domain contract（按阶段规划，完整 Mobile timeline 属 Phase 10）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
 
 ## 已知限制与维护事项
 

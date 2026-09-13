@@ -183,7 +183,8 @@ describe("world events integration", () => {
       resumeAtSim: number | null;
       lastMileReadyAtSim: number | null;
       currentLegSequence: number | null;
-      nextEventIndex: number;
+      nextRandomDrawIndex: number;
+      nextWorldEventIndex: number;
       totalDistanceKm: number;
       rulesVersion: string;
       graphVersion: string;
@@ -251,7 +252,8 @@ describe("world events integration", () => {
         resumeAtSim: journey.resumeAtSim?.getTime() ?? null,
         lastMileReadyAtSim: journey.lastMileReadyAtSim?.getTime() ?? null,
         currentLegSequence: journey.currentLegSequence,
-        nextEventIndex: journey.nextEventIndex,
+        nextRandomDrawIndex: journey.nextRandomDrawIndex,
+        nextWorldEventIndex: journey.nextWorldEventIndex,
         totalDistanceKm: Math.round(journey.totalDistanceKm * 100) / 100,
         rulesVersion: journey.rulesVersion,
         graphVersion: journey.graphVersion,
@@ -614,7 +616,7 @@ describe("world events integration", () => {
     );
 
     // 回滚：本次推进未写 WorldEvent / 未消费 eventIndex / 未改变 leg 状态
-    // （首次"激活"在独立事务已提交：leg0 ACTIVE、nextEventIndex=1、lastAdvanced=T0）
+    // （首次"激活"在独立事务已提交：leg0 ACTIVE、nextRandomDrawIndex=1、lastAdvanced=T0）
     const events = await worldEventsOf(journey.id);
     expect(events).toHaveLength(0);
     const legAfter = await prisma.transportLeg.findFirstOrThrow({
@@ -622,7 +624,7 @@ describe("world events integration", () => {
     });
     expect(legAfter.status).toBe("ACTIVE"); // 首次激活的结果，未被本次回滚改变
     const j = await journeyOf(letterId);
-    expect(j.nextEventIndex).toBe(1); // 本次推进未再消费
+    expect(j.nextRandomDrawIndex).toBe(1); // 本次推进未再消费
     expect(j.lastAdvancedAtSim?.getTime()).toBe(T0); // 本次推进未前进（回滚）
   });
 
@@ -769,7 +771,7 @@ describe("world events integration", () => {
     await advanceJourneyToNow(prisma, steps.letterId, stepsClock);
 
     // 完整 canonical 全等：Letter(status/deliveredAt/currentTransport)、Journey 全字段
-    // （status/lastMileReadyAtSim/resumeAtSim/lastAdvancedAtSim/nextEventIndex/anomaly*）、
+    // （status/lastMileReadyAtSim/resumeAtSim/lastAdvancedAtSim/nextRandomDrawIndex/anomaly*）、
     // Legs 完整状态、WorldEvent 完整序列（nodeId/transportLegSequence/payload）
     const bigSnap = await canonicalWorldSnapshot(big.letterId);
     const stepsSnap = await canonicalWorldSnapshot(steps.letterId);
@@ -793,7 +795,8 @@ describe("world events integration", () => {
     );
     // lastAdvancedAtSim 同一最终 now
     expect(stepsSnap.journey.lastAdvancedAtSim).toBe(bigSnap.journey.lastAdvancedAtSim);
-    expect(stepsSnap.journey.nextEventIndex).toBe(bigSnap.journey.nextEventIndex);
+    expect(stepsSnap.journey.nextRandomDrawIndex).toBe(bigSnap.journey.nextRandomDrawIndex);
+    expect(stepsSnap.journey.nextWorldEventIndex).toBe(bigSnap.journey.nextWorldEventIndex);
   });
 
   /** DELAY replay（HIGH）：一次大跳跃 vs 分段 → canonical 全等；同一 Leg 至多一个 primary event；
@@ -1174,7 +1177,8 @@ describe("world events integration", () => {
     const bigJourney = await journeyOf(big.letterId);
     const stepsJourney = await journeyOf(steps.letterId);
     expect(stepsJourney.status).toBe(bigJourney.status);
-    expect(stepsJourney.nextEventIndex).toBe(bigJourney.nextEventIndex);
+    expect(stepsJourney.nextRandomDrawIndex).toBe(bigJourney.nextRandomDrawIndex);
+    expect(stepsJourney.nextWorldEventIndex).toBe(bigJourney.nextWorldEventIndex);
     expect(stepsJourney.currentLegSequence ?? null).toBe(bigJourney.currentLegSequence ?? null);
     expect(stepsJourney.lastAdvancedAtSim?.getTime()).toBe(bigJourney.lastAdvancedAtSim?.getTime());
     expect(stepsJourney.anomalyType ?? null).toBe(bigJourney.anomalyType ?? null);
@@ -1502,10 +1506,13 @@ describe("world events integration", () => {
       where: { journeyId: journey.id, sequence: 0 },
     });
     expect(legAfter.status).toBe("ACTIVE");
-    expect(legAfter.primaryEventIndex).not.toBeNull();
     expect(legAfter.delaySeconds).toBeGreaterThan(0);
     // 未完成前无 DELAYED 事件（事件在完成点记录）；primary event 只判定一次
     expect(legAfter.primaryEventOutcome).toBe("DELAYED");
+    // 新语义（Gate M1）：判定阶段**不预占** WorldEvent 编号 —— 事件真正落库后才分配并回写
+    expect(legAfter.primaryEventIndex).toBeNull();
+    const journeyWaiting = await journeyOf(letterId);
+    expect(journeyWaiting.nextWorldEventIndex).toBe(0);
     let events = await worldEventsOf(journey.id);
     expect(events.some((e) => e.eventType === "DELAYED")).toBe(false);
 
@@ -1530,6 +1537,11 @@ describe("world events integration", () => {
     );
     // 事件时间不倒序：DELAYED.occurredAt === leg.completedAt
     expect(delayed?.occurredAtSim.getTime()).toBe(legDone.completedAtSim?.getTime());
+    // 事件真正落库后：编号回写到 Leg，且事件编号分配器已推进（不再有预占空洞）
+    expect(legDone.primaryEventIndex).toBe(delayed?.eventIndex ?? -1);
+    const journeyAfterEvent = await journeyOf(letterId);
+    expect(journeyAfterEvent.nextWorldEventIndex).toBeGreaterThan(0);
+    expect(delayed?.eventIndex).toBe(0);
     void first;
   });
 
@@ -1848,7 +1860,7 @@ describe("world events integration", () => {
     const after = await worldEventsOf(journey.id);
     expect(after).toHaveLength(0); // 无半个事件历史
     const j = await journeyOf(letterId);
-    expect(j.nextEventIndex).toBe(0);
+    expect(j.nextRandomDrawIndex).toBe(0);
     expect(j.anomalyType).toBeNull();
   });
 
