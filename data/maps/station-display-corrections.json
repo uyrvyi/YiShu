@@ -1,0 +1,10 @@
+{
+  "china-v1": {
+    "yangquan": {
+      "lat": 37.8575,
+      "lng": 113.563333,
+      "source": "GeoNames: Yangquan, Shanxi, China",
+      "reason": "china-v1 冻结坐标 lat 35.1975 / lng 113.5841 经复核偏差约 295 km，落在河南省一侧（地图跨省）。此处仅为用户可见地图的**显示坐标修正**：不改写冻结的 station_nodes.json，不影响路由、距离、World Truth，也不修改已存在信件的数据。"
+    }
+  }
+}

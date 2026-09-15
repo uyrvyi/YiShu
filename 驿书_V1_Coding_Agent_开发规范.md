@@ -606,13 +606,24 @@ data/
 ├─ graphs/
 │  ├─ registry.json
 │  └─ <graphVersion>/
-│     ├─ station_nodes.json
+│     ├─ station_nodes.json      # 路网 / 站点（route anchor、Journey 几何）
 │     ├─ route_edges.json
 │     └─ region_station_map.json
-└─ maps/                         # Phase 8 本地地图资源
+├─ maps/
+│  ├─ source/                    # vendored 静态行政边界源（离线只读；SHA-256 冻结）
+│  ├─ china-map.svg              # 生成产物（预览）
+│  └─ china-districts.json       # 生成产物（canonical 几何 + fit / 来源元数据）
+├─ map_projection.cjs            # lng/lat → mapX/mapY（边界与站点共用同一投影）
+└─ gen_map.cjs                   # 地图资产生成器（pnpm map:generate）
 ```
 
-地图运行时不依赖互联网。
+- 地图运行时不依赖互联网：无在线瓦片 / geocoder / 商业地图 SDK；**构建期也不下载**边界数据（已 vendored）。
+- **两类数据源职责独立，禁止互相推导**：
+  - `graphs/`：路网与站点位置（route anchor / Journey 几何），**不是**行政边界来源；
+  - `maps/source/`：行政边界底图（`ChinaOutlineLayer` / `ProvinceBoundaryLayer` 的唯一几何来源）。
+- 边界几何只允许：canonical projection + 定点小数序列化（**禁止**凸包 / 外扩 / buffer / 自研简化）。
+- 上游 provider、dataset、boundaryID、年份、许可与源文件 SHA-256 **只在 `data/maps/README.md` 记录**
+  （单一真相源，禁止在其他文档复制具体版本号以免漂移）。
 
 ---
 

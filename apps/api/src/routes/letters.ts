@@ -18,6 +18,7 @@ import {
   type LetterView,
 } from "../lib/letter-view.js";
 import { stationName } from "../lib/journey.js";
+import { getDefaultGraphVersion } from "../lib/stationGraph.js";
 
 interface LetterWithState extends Letter {
   recipientState?: RecipientState | null;
@@ -127,7 +128,8 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                   clientRequestId: body.clientRequestId,
                   requestFingerprint: fingerprint,
                   rulesVersion: "1.0",
-                  graphVersion: "china-v1",
+                  // 图版本来自注册表（禁止硬编码）：Phase 8 起新信件默认 china-v2
+                  graphVersion: getDefaultGraphVersion(),
                   simulationSeed: generateSimulationSeed(),
                   sentAt: new Date(),
                   recipientState: {

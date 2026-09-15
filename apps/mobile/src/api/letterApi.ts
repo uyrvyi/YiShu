@@ -1,4 +1,10 @@
-import type { PublicLetterStatus, RecipientReadState, TransportType } from "@yishu/shared";
+import {
+  routeMapViewSchema,
+  type PublicLetterStatus,
+  type RecipientReadState,
+  type RouteMapViewParsed,
+  type TransportType,
+} from "@yishu/shared";
 
 /**
  * Mobile Letter API 服务（最小真实流程）。
@@ -105,6 +111,25 @@ export function createLetterApi(deps: LetterApiDeps) {
       }
       const body = (await res.json()) as { letter: LetterView };
       return body.letter;
+    },
+
+    /**
+     * 信件旅程地图（Phase 8 §74）。
+     *
+     * 使用 `@yishu/shared` 的 `routeMapViewSchema` **strip-parse**：
+     * - 任何意外多出的内部字段（internal id / dropArea / 掉落原因等）在进入 UI 前被剥离；
+     * - 解析失败（结构不符）直接抛错，不静默降级。
+     * 客户端不请求、不推导、不渲染掉落范围（`LETTER_DROPPED` 全局 HIDDEN）。
+     */
+    async getRouteMap(trackingNo: string): Promise<RouteMapViewParsed> {
+      const res = await doFetch(`${deps.baseUrl}/api/v1/letters/${trackingNo}/map`, {
+        method: "GET",
+        headers: await headers(),
+      });
+      if (!res.ok) {
+        throw new Error(`get_route_map_failed:${res.status}`);
+      }
+      return routeMapViewSchema.parse(await res.json());
     },
 
     /** 创建信件。 */

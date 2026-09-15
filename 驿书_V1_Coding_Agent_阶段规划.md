@@ -54,20 +54,20 @@ MAY START PHASE X+1: YES
 
 # 2. 当前总状态
 
-| Phase    | 名称                                           | 状态                 |
-| -------- | ---------------------------------------------- | -------------------- |
-| Phase 1  | 项目骨架与基础设施                             | FINAL GATE PASS      |
-| Phase 2  | 账号与身份系统                                 | FINAL GATE PASS      |
-| Phase 3  | Letter 核心与基础信件流程                      | FINAL GATE PASS      |
-| Phase 4  | Journey + Routing + TransportLeg               | FINAL GATE PASS      |
-| Phase 5  | Simulation Core + Transport Progression        | FINAL GATE PASS      |
-| Phase 6  | Random Events + Recovery + World Truth         | FINAL GATE PASS      |
-| Phase 7  | Timeline + 用户可见运输事实                    | FINAL GATE PASS      |
-| Phase 8  | Local Map + Journey Visualization              | 下一阶段（尚未开始） |
-| Phase 9  | Worker Scheduling + Push + Refresh             | 未开始               |
-| Phase 10 | Mobile V1 Integration + UX Closure             | 未开始               |
-| Phase 11 | Security / Reliability / Performance Hardening | 未开始               |
-| Phase 12 | Deployment + Release Gate                      | 未开始               |
+| Phase    | 名称                                           | 状态                                                |
+| -------- | ---------------------------------------------- | --------------------------------------------------- |
+| Phase 1  | 项目骨架与基础设施                             | FINAL GATE PASS                                     |
+| Phase 2  | 账号与身份系统                                 | FINAL GATE PASS                                     |
+| Phase 3  | Letter 核心与基础信件流程                      | FINAL GATE PASS                                     |
+| Phase 4  | Journey + Routing + TransportLeg               | FINAL GATE PASS                                     |
+| Phase 5  | Simulation Core + Transport Progression        | FINAL GATE PASS                                     |
+| Phase 6  | Random Events + Recovery + World Truth         | FINAL GATE PASS                                     |
+| Phase 7  | Timeline + 用户可见运输事实                    | FINAL GATE PASS                                     |
+| Phase 8  | Local Map + Journey Visualization              | implementation complete · Final Gate pending review |
+| Phase 9  | Worker Scheduling + Push + Refresh             | 未开始                                              |
+| Phase 10 | Mobile V1 Integration + UX Closure             | 未开始                                              |
+| Phase 11 | Security / Reliability / Performance Hardening | 未开始                                              |
+| Phase 12 | Deployment + Release Gate                      | 未开始                                              |
 
 后续 Phase 可以按真实工程需要做小范围拆分，但不得改变冻结产品规则，也不得把多个大阶段一次性合并实施。
 
@@ -639,7 +639,7 @@ PHASE 6 COMPLETE: YES
 MAY START PHASE 7: YES
 ```
 
-Phase 7 已由项目负责人启动实施，并已由独立 Gate Reviewer 正式复审通过（BLOCKER / HIGH / MEDIUM / LOW 均为 NONE）；详见 §9 的当前状态。Phase 8 尚未开始，须在项目负责人确认启动后才允许实施。
+Phase 7 已由项目负责人启动实施，并已由独立 Gate Reviewer 正式复审通过（BLOCKER / HIGH / MEDIUM / LOW 均为 NONE）；详见 §9 的当前状态。Phase 8 已由项目负责人启动实施（状态见 §10 当前状态：implementation complete · Final Gate pending review）。
 
 ---
 
@@ -704,7 +704,7 @@ MAY START PHASE 8: YES
 REMAINING BLOCKERS: NONE
 ```
 
-独立 Gate Review 结论：BLOCKER / HIGH / MEDIUM / LOW 均为 NONE。Phase 8（Local Map + Journey Visualization）尚未开始，须等项目负责人正式启动。
+独立 Gate Review 结论：BLOCKER / HIGH / MEDIUM / LOW 均为 NONE。Phase 8（Local Map + Journey Visualization）已由项目负责人正式启动（当前状态见 §10：implementation complete · Final Gate pending review；存在 Gate M5 边界语义 BLOCKED）。
 
 ---
 
@@ -784,10 +784,33 @@ REMAINING BLOCKERS: NONE
 ## 当前状态
 
 ```text
-PHASE 8 NOT STARTED
+PHASE 8 IMPLEMENTATION COMPLETE
+PHASE 8 FINAL GATE: FAIL (2026-09-15 re-review: BLOCKER 0 / HIGH 0 / MEDIUM 2)
+PHASE 8 COMPLETE: NO
+MAY START PHASE 9: NO
+PHASE 9 NOT STARTED
 ```
 
-2026-09-13 仅完成启动前规范对齐（文档级：`LETTER_DROPPED` = HIDDEN 全局用户可见性规则；移除掉落范围 / `DropAreaLayer` / `dropArea` / 事实节点中的「信件掉落」）。实现尚未开始：无地图业务代码 / 无 schema / 无 migration 改动。
+2026-09-13 完成启动前规范对齐（文档级：`LETTER_DROPPED` = HIDDEN 全局用户可见性规则；移除掉落范围 / `DropAreaLayer` / `dropArea` / 事实节点中的「信件掉落」）与 Phase 8 实现：
+
+- 本地资产：`pnpm map:generate`（`data/gen_map.cjs`）读取 **vendored 行政边界源**（`data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`，pinned revision + SHA-256 校验）与站点锚点 `data/graphs/china-v1/station_nodes.json`，确定性生成 `data/maps/china-map.svg`、`data/maps/china-districts.json`、`apps/mobile/src/map/chinaMapData.ts`（34 个 ADM1 行政单元 / 31 个 route province 映射 / 294 站点锚点；生成器不写时间戳 / 随机值 / 环境相关值，重复执行零新增 diff，构建期与运行时均不访问网络）。
+- 共享契约：`MAP_VIEWBOX`(0 0 1000 800) / `MAP_FIT_MARGIN` / `MAP_DATA_BOUNDS`（= 行政边界底图 ∪ 站点锚点范围）/ `MAP_FIT`（等比映射，Y 为限制维度，禁 X/Y 独立拉伸）/ `MAP_FACT_LIMIT` / `MAP_APPROXIMATE_MAX_RATIO` + §74 DTO；§21 事实优先级注释同步为「信件掉落不参与」。
+- API：`GET /api/v1/letters/:trackingNo/map`（`apps/api/src/lib/map-view.ts` 纯投影；只读用户可见 Timeline 事实 + 冻结规划 + SimulationClock；sender/recipient 同图、第三方 404、无 ETA / 无 GPS / 无掉落范围，隐藏掉落与正常世界 DTO 完全等价）。
+- Mobile：`apps/mobile/src/map/*` 七层 RouteMap（无 `DropAreaLayer`）+ Letter Detail「查看旅程地图」入口；未引入 polling / push / foreground refresh。
+- **无 Prisma schema / migration 改动**（磁盘仍 15 个 migration）。
+- 工程门禁（2026-09-14 M5 修复后复验）：`typecheck` / `lint` / `format:check` / `test`（**341 passed / 0 failed / 0 skipped**，35 个测试文件）/ `build`（含 Mobile Expo export 1375 modules）/ `prisma validate` + `prisma generate` 全 PASS；**Phase 8 定向 63/63 PASS × 3 轮**、**Phase 5–7 重点回归 91/91 PASS**；`pnpm map:generate` 幂等（连续两次执行字节一致；source 与三产物 SHA-256 见 `data/maps/README.md`）；站点空间归属 283/294 落在本省 ADM1 内、0 个跨省；运行时：PostgreSQL 17.11 / Redis PONG、dev 与 test 各 15 migrations 0 drift、schema diff 空、0 悬挂事务 / 0 未授权锁、production-mode smoke HTTP 200。
+- **Phase 8 Gate Repair（2026-09-14）**：H1 剩余 / 已走路线改为**有序 Leg progression**（禁止 `nodeId` 反查、禁止找不到就回退整条路线；DELIVERED / 终态 / 无剩余 leg → `remainingPath = []`）、M1 大概位置时间锚点改为**该段起点站最新可见 `DEPARTED_STATION`**、M3 地图事实时间固定 `Asia/Shanghai`、M4 补**真实 API 响应安全扫描**与 RouteMap / 图层 / FactList **渲染树测试**、L1 底图描边 scale 补偿、L2 删除未使用 helper。
+- ✅ **M5 地图边界语义已修复（2026-09-14，项目负责人裁定数据源）**：`ProvinceBoundaryLayer` / `CHINA_MAP_OUTLINE_D` 改为 **vendored 静态行政边界源**（geoBoundaries `gbOpen / CHN / ADM1`，pinned revision、SHA-256 校验；来源 / 许可 / 版本以 `data/maps/README.md` 为唯一真相源）。station 点云不再参与边界生成（凸包 / 外扩 / 六边形逻辑删除）；轮廓 = 34 个 ADM1 geometry 的 union（保留岛屿与 MultiPolygon）；34 个 ADM1 feature 与 31 个 route province 明确区分（31/31 显式映射，其余 3 个仅作底图）。站点空间归属：283/294 严格落在本省 feature 内、**0 个跨省**，11 个容差用例在 Gate 报告列明。运行时与构建期均离线（无在线 tile / geocoder / 商业 SDK）。
+
+- **Phase 8 Gate 复核修复：Yangquan 跨省显示（2026-09-15，未 commit）**：① **数据层**新增图版本 `china-v2`（`data/gen_graph.cjs` 的 `VERSION_OVERRIDES` 承载**唯一获批**的 `yangquan` 坐标修正；生成算法不变、其余站点与 `china-v1` 逐项一致；`registry.json` 登记 `china-v2` 并设为 `defaultVersion`；`china-v1` 三资产保持**字节冻结**，SHA-256 断言 + 重生成逐字节一致）；② **显示层**新增人工批准、可追溯的 `data/maps/station-display-corrections.json`，由 `apps/api/src/lib/map-station-point.ts` 在**加载时**完整校验后缓存：顶层 / 版本 / 条目必须是普通对象、版本 key 必须在 `data/graphs/registry.json` 登记、nodeId 必须属于该版本、每条必须带非空 `source` / `reason` 且**不得有未知字段**、`lat`/`lng` 必须在合法范围且投影到 `mapX/mapY` 后落在 `MAP_DATA_BOUNDS` 内、版本对象不得为空；**任一不满足立即抛 `station_display_corrections_invalid`**（fail fast，绝不静默回退到冻结坐标）。只影响用户可见地图渲染坐标，不改路由 / 距离 / World Truth / Timeline 事实；地图生成产物不随 display-only 修正漂移（`data/gen_map.cjs` 路线锚点固定 `china-v1`）。测试：`apps/api/src/lib/graph-data.test.ts`（`china-v1` 三资产 SHA-256 冻结 + 重生成逐字节一致 + `china-v1`↔`china-v2` 差异清单仅 `yangquan`）、`apps/api/src/lib/map-station-point.test.ts`（修正生效 / 范围封闭 / **20 例内存故障注入：结构 / 版本 / 站点 / 来源字段 / 坐标边界全部必须抛错**）、mobile `boundary.test.ts` 增补「显示坐标 0 跨省 + `yangquan` 不再落入他省」。
+- **工程门禁（2026-09-15 复验）**：`typecheck` / `lint` / `format:check` / `test`（**385 passed / 0 failed / 0 skipped**，37 个测试文件）/ `build` 全 PASS；**Phase 8 定向 107/107 PASS × 3 轮**、**Phase 5–7 重点回归 91/91 PASS**。
+- ⛔ **独立 Final Gate re-review 结论（2026-09-15）**：`BLOCKER: NONE` / `HIGH: NONE` / **2 项 MEDIUM**（MEDIUM-1 = 显示修正表未实现完整 fail-fast 校验；MEDIUM-2 = 阶段规划与状态文档的「当前状态」与实测矛盾）→ **`FINAL GATE: FAIL` / `PHASE 8 COMPLETE: NO` / `MAY START PHASE 9: NO`**。两项均已在工作区修复（MEDIUM-1 见上；MEDIUM-2 = 本节与 `docs/PROJECT_STATUS.md` 的当前状态更新），**待再次独立复审**。
+
+当前状态（2026-09-15）= **实现完成、Gate Repair 完成、M5 边界语义已修复、Yangquan 跨省显示已修复、复核 MEDIUM-1 / MEDIUM-2 已修复、未 Commit**；但**尚未通过独立 Final Gate**（最近一次 re-review 结论为 FAIL，须经再次独立复审确认）。
+
+历史记录（**不作为当前状态**）：2026-09-14 Gate Repair 报告中的「M5 边界语义 BLOCKED」与「Final Gate 尚未开始」为当时状态，已被上述进展取代。
+
+不得声明 `Phase 8 COMPLETE` / `MAY START PHASE 9`，也不得进入 Phase 9。
 
 ---
 

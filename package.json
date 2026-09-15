@@ -22,12 +22,14 @@
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema prisma/schema.prisma",
-    "graph:validate": "node data/validate_graph.cjs"
+    "graph:validate": "node data/validate_graph.cjs",
+    "map:generate": "node data/gen_map.cjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",
+    "polygon-clipping": "0.15.7",
     "prettier": "^3.3.0",
     "prisma": "7.9.1",
     "typescript": "^5.6.0",

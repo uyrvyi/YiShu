@@ -5,6 +5,12 @@
 # 自动生成 / 锁文件
 pnpm-lock.yaml
 
+# 生成的矢量资产（node data/gen_map.cjs；Prettier 无 SVG 解析器）
+data/maps/china-map.svg
+
+# vendored 上游边界源（必须与 pinned revision 字节一致；禁止任何再格式化）
+data/maps/source
+
 # 构建产物
 node_modules
 dist

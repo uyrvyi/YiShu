@@ -2,6 +2,7 @@
 // 用法：
 //   node data/validate_graph.cjs            # 先自测（selftest），再校验 data/graphs/<version>/ 并写出 GRAPH_VALIDATION_REPORT.json
 //   node data/validate_graph.cjs --selftest # 仅运行语义自测（isolated / disabled / duplicate-disabled fixtures），不写报告
+//   node data/validate_graph.cjs --json     # 先自测，再把 registry 全版本校验报告 JSON 打到 stdout（不写文件）
 // 根脚本：pnpm graph:validate
 // gen_graph.cjs 重新生成数据后也会调用本文件，保证报告与数据永不漂移。
 const fs = require("fs");
@@ -133,9 +134,9 @@ function analyzeGraph(nodes, edges, region) {
   };
 }
 
-/** 校验单个图版本目录，返回统计与问题列表。 */
-function validateGraphDir(version) {
-  const dir = path.join(GRAPHS_DIR, version);
+/** 校验单个图版本目录，返回统计与问题列表（graphsDir 可指向仓库外的生成输出）。 */
+function validateGraphDir(version, graphsDir = GRAPHS_DIR) {
+  const dir = path.join(graphsDir, version);
   const nodes = loadJson(path.join(dir, "station_nodes.json"));
   const edges = loadJson(path.join(dir, "route_edges.json"));
   const region = loadJson(path.join(dir, "region_station_map.json"));
@@ -194,13 +195,13 @@ function selftest() {
   return true;
 }
 
-/** 校验 registry 中所有版本并写 GRAPH_VALIDATION_REPORT.json。返回是否全部通过。 */
-function run() {
-  const registry = loadJson(path.join(GRAPHS_DIR, "registry.json"));
+/** 构建 registry 全版本校验报告（纯函数，不写文件）。 */
+function buildReport(graphsDir = GRAPHS_DIR) {
+  const registry = loadJson(path.join(graphsDir, "registry.json"));
   const graphs = {};
   let ok = true;
   for (const v of registry.versions) {
-    const r = validateGraphDir(v);
+    const r = validateGraphDir(v, graphsDir);
     graphs[v] = r;
     if (
       !r.fullyConnected ||
@@ -211,17 +212,38 @@ function run() {
       ok = false;
     }
   }
-  const report = {
+  return {
     generatedAt: new Date().toISOString(),
     defaultVersion: registry.defaultVersion,
     graphs,
     ok,
   };
-  fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2) + "\n");
-  return ok;
 }
 
-module.exports = { run, validateGraphDir, analyzeGraph, selftest, GRAPHS_DIR, REPORT_PATH };
+/**
+ * 校验 registry 中所有版本并写出 GRAPH_VALIDATION_REPORT.json。返回是否全部通过。
+ * @param {{ graphsDir?: string, reportPath?: string|null }} [options]
+ *   graphsDir：图数据根目录（默认 data/graphs）；reportPath 传 null 表示不写报告（仓库外输出）。
+ */
+function run(options = {}) {
+  const graphsDir = options.graphsDir ?? GRAPHS_DIR;
+  const reportPath = options.reportPath === undefined ? REPORT_PATH : options.reportPath;
+  const report = buildReport(graphsDir);
+  if (reportPath !== null) {
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
+  }
+  return report.ok;
+}
+
+module.exports = {
+  run,
+  buildReport,
+  validateGraphDir,
+  analyzeGraph,
+  selftest,
+  GRAPHS_DIR,
+  REPORT_PATH,
+};
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -232,6 +254,12 @@ if (require.main === module) {
     process.exit(0);
   }
   selftest();
+  if (args.includes("--json")) {
+    // 只输出报告 JSON（不写文件、不改仓库），供门禁 / 测试读取真实的跨版本校验结果
+    const report = buildReport();
+    console.log(JSON.stringify(report));
+    process.exit(report.ok ? 0 : 1);
+  }
   const ok = run();
   console.log(`graph validation: ${ok ? "OK" : "FAILED"} (selftest PASS) -> ${REPORT_PATH}`);
   process.exit(ok ? 0 : 1);

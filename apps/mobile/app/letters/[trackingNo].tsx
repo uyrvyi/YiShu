@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Link, useLocalSearchParams } from "expo-router";
 import type { LetterView } from "../../src/api/letterApi";
 
 /** 信件详情（Phase 3 最小真实流程）。
@@ -35,6 +35,11 @@ export default function LetterDetailScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{letter.trackingNo}</Text>
+      {letter.journey ? (
+        <Link href={`/letters/${trackingNo}/map`} style={styles.mapLink}>
+          <Text>查看旅程地图</Text>
+        </Link>
+      ) : null}
       <Text>状态：{letter.status}</Text>
       <Text>运输方式：{letter.currentTransport}</Text>
       <Text>
@@ -68,6 +73,7 @@ export default function LetterDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 16 },
   title: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
+  mapLink: { color: "#1a73e8", marginBottom: 8 },
   contentBox: { marginTop: 16, borderWidth: 1, borderColor: "#ddd", borderRadius: 8, padding: 12 },
   contentLabel: { fontWeight: "600", marginBottom: 4 },
   error: { color: "red", padding: 16 },

@@ -2,6 +2,7 @@ import type { PrismaClient, Journey, TransportLeg } from "@yishu/db";
 import type { TransportType, JourneyStatus, TransportLegStatus } from "@yishu/shared";
 import { plannedDurationSeconds } from "@yishu/shared";
 import { resolveStationForRegion, planRoute, getStationNode } from "./stationGraph.js";
+import { resolveDisplayStationPoint } from "./map-station-point.js";
 
 // 供路由层统一捕获处理（类型化错误）
 export { NoStationMappingError, UnknownGraphVersionError } from "./stationGraph.js";
@@ -241,7 +242,12 @@ export function stationName(nodeId: string, graphVersion: string): string {
   return getStationNode(nodeId, graphVersion).name;
 }
 
-/** 取路线节点公共视图（name + mapX/mapY，不含 internal id；按 graphVersion）。 */
+/**
+ * 取路线节点公共视图（name + mapX/mapY，不含 internal id；按 graphVersion）。
+ *
+ * 坐标经 `map-station-point.ts` 解析（冻结图坐标 + 版本化显示修正），与 Map DTO / Timeline
+ * 保持同一显示位置；显示修正不改变路由与距离。
+ */
 export function publicRouteNodes(
   nodeIds: string[],
   graphVersion: string
@@ -252,6 +258,7 @@ export function publicRouteNodes(
 }> {
   return nodeIds.map((id) => {
     const n = getStationNode(id, graphVersion);
-    return { name: n.name, mapX: n.mapX, mapY: n.mapY };
+    const point = resolveDisplayStationPoint(id, graphVersion);
+    return { name: n.name, mapX: point.x, mapY: point.y };
   });
 }

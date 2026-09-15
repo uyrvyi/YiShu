@@ -3,7 +3,7 @@ import { loadConfig, requireTestDatabaseUrl } from "@yishu/config";
 import { createPrismaClient, type PrismaClient } from "@yishu/db";
 import { buildApp } from "../app.js";
 import type { FastifyInstance } from "fastify";
-import { resetStationGraphCache } from "../lib/stationGraph.js";
+import { getDefaultGraphVersion, resetStationGraphCache } from "../lib/stationGraph.js";
 
 /**
  * Phase 4 Journey 集成测试（fsharp：ground/Pigeon/继承字段/并发幂等/安全序列化）。
@@ -145,7 +145,8 @@ describe("journey integration", () => {
       include: { legs: true },
     });
     expect(dbJourney.rulesVersion).toBe("1.0");
-    expect(dbJourney.graphVersion).toBe("china-v1");
+    // Journey 继承 Letter 冻结的 graphVersion；新信件默认版本来自注册表（Phase 8：china-v2）
+    expect(dbJourney.graphVersion).toBe(getDefaultGraphVersion());
     expect(dbJourney.simulationSeed).toBeTruthy();
     // simulationSeed 必须等于 Letter 的 simulationSeed
     const letter = await prisma.letter.findUniqueOrThrow({ where: { id: dbJourney.letterId } });

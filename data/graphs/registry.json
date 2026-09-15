@@ -1,4 +1,4 @@
 {
-  "versions": ["china-v1"],
-  "defaultVersion": "china-v1"
+  "versions": ["china-v1", "china-v2"],
+  "defaultVersion": "china-v2"
 }

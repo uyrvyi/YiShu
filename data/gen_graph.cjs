@@ -1,12 +1,30 @@
-// 一次性生成静态路网数据（Phase 4 静态数据，非运行时依赖）。
-// 生成：station_nodes.json / route_edges.json / region_station_map.json
+// 确定性生成版本化静态路网数据（Phase 4 静态数据，非运行时依赖）。
+//
+// 生成（每个 graphVersion 一个目录）：
+//   data/graphs/<version>/{station_nodes,route_edges,region_station_map}.json
+//   data/graphs/registry.json（versions 稳定顺序 + defaultVersion）
+//
+// 版本策略（Phase 8「Yangquan 修复」）：
+// - `china-v1` = Phase 4 冻结基线，**字节冻结**：重新生成出现任何字节差异都视为回归。
+// - `china-v2` = 同一算法 + 唯一获批坐标修正（VERSION_OVERRIDES.yangquan）。
+//   由修正自然导致的 mapX/mapY、Haversine 距离、最近邻边与 edge.distanceKm 变化属于正常结果。
+// - 所有版本共用同一份 BASE_RAW，差异只在 VERSION_OVERRIDES 声明（禁止第二份 RAW）。
+//
+// 坐标系：mapX/mapY 由 `./map_projection.cjs`（canonical helper）投影，与 map 生成链共用同一公式。
+//
+// 用法：
+//   node data/gen_graph.cjs                  # 写入 data/graphs/（含 registry + 校验报告）
+//   node data/gen_graph.cjs --out-root=<dir> # 写入 <dir>（不改仓库数据；供字节一致性测试使用）
+//
 // 仅使用真实中国城市经纬度（近似），不依赖任何外部 API。
 const fs = require("fs");
 const path = require("path");
+const prettier = require("prettier");
+const { projectStation } = require("./map_projection.cjs");
 
-// 约 180 个主要城市：[id, name, province, city, lat, lng]
-// id 使用城市拼音（稳定、唯一）
-const RAW = [
+// 中国主要城市基线：[id, name, province, city, lat, lng]
+// id 使用城市拼音（稳定、唯一）。**不得原地修改**：版本差异只在 VERSION_OVERRIDES 声明。
+const BASE_RAW = [
   ["beijing", "北京", "北京市", "北京市", 39.9042, 116.4074],
   ["tianjin", "天津", "天津市", "天津市", 39.3434, 117.3616],
   ["chongqing", "重庆", "重庆市", "重庆市", 29.563, 106.5514],
@@ -303,6 +321,31 @@ const RAW = [
   ["hami", "哈密", "新疆维吾尔自治区", "哈密市", 41.5767, 93.0461],
 ];
 
+/** 版本覆盖（唯一获批的数据修正入口；不得改写 BASE_RAW）。 */
+const VERSION_OVERRIDES = {
+  "china-v1": {},
+  "china-v2": {
+    // 阳泉：Phase 4 冻结近似坐标（lat 35.1975 / lng 113.5841）经复核偏差 ≈295 km，
+    // 落入河南一侧；china-v2 采用 GeoNames「Yangquan, Shanxi, China」坐标。
+    yangquan: { lat: 37.8575, lng: 113.563333 },
+  },
+};
+
+/** registry.versions 稳定顺序 + 新信件默认图版本（source of truth = data/graphs/registry.json）。 */
+const GRAPH_VERSIONS = ["china-v1", "china-v2"];
+const DEFAULT_GRAPH_VERSION = "china-v2";
+
+/** 应用版本覆盖 → 该版本所用 raw 行（新数组；绝不改写 BASE_RAW）。 */
+function applyVersionOverrides(version) {
+  const overrides = VERSION_OVERRIDES[version];
+  if (overrides === undefined) throw new Error(`未登记的 graphVersion: ${version}`);
+  return BASE_RAW.map((row) => {
+    const override = overrides[row[0]];
+    if (override === undefined) return row;
+    return [row[0], row[1], row[2], row[3], override.lat, override.lng];
+  });
+}
+
 function toRad(d) {
   return (d * Math.PI) / 180;
 }
@@ -316,265 +359,314 @@ function haversine(a, b) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-const nodes = RAW.map((r) => ({
-  id: r[0],
-  name: r[1],
-  province: r[2],
-  city: r[3],
-  lat: r[4],
-  lng: r[5],
-  // 简化等距投影到 1000x800 viewBox（仅用于前端，非地理精确）
-  mapX: Math.round(((r[5] + 180) / 360) * 1000 * 10) / 10,
-  mapY: Math.round(((90 - r[4]) / 180) * 800 * 10) / 10,
-}));
-
-const allowedAll = ["HAND_CARRY", "HORSE_RELAY", "EXPRESS_RELAY"];
-
-// 生成边：每个节点连接最近的 K 个邻居 + 同省互连，保证连通
-const edges = [];
-const seen = new Set();
-function addEdge(i, j) {
-  const a = RAW[i],
-    b = RAW[j];
-  const key = a[0] < b[0] ? `${a[0]}|${b[0]}` : `${b[0]}|${a[0]}`;
-  if (seen.has(key)) return;
-  seen.add(key);
-  const d = haversine(a, b);
-  if (d > 1600) return; // 距离过远不直连（避免虚假长边）
-  edges.push({
-    from: a[0],
-    to: b[0],
-    distanceKm: Math.round(d * 10) / 10,
-    enabled: true,
-    allowedTransport: allowedAll,
+/** station 节点（mapX/mapY 由 canonical helper 投影；禁止内联第二套投影公式）。 */
+function buildStationNodes(raw) {
+  return raw.map((r) => {
+    const [mapX, mapY] = projectStation(r[5], r[4]);
+    return {
+      id: r[0],
+      name: r[1],
+      province: r[2],
+      city: r[3],
+      lat: r[4],
+      lng: r[5],
+      mapX,
+      mapY,
+    };
   });
 }
 
-// 1) 每个节点连最近 4 个邻居
-for (let i = 0; i < RAW.length; i++) {
-  const dists = [];
-  for (let j = 0; j < RAW.length; j++) {
-    if (i === j) continue;
-    dists.push([j, haversine(RAW[i], RAW[j])]);
-  }
-  dists.sort((x, y) => x[1] - y[1]);
-  for (let k = 0; k < Math.min(4, dists.length); k++) {
-    addEdge(i, dists[k][0]);
-  }
-}
+/** 生成单个图版本（nodes / edges / regionStationMap）。 */
+function generateGraphVersion(version) {
+  const raw = applyVersionOverrides(version);
+  const nodes = buildStationNodes(raw);
 
-// 2) 同省节点互连（保证省内可达，避免孤岛）
-const byProv = {};
-RAW.forEach((r, idx) => {
-  (byProv[r[2]] ??= []).push(idx);
-});
-for (const prov in byProv) {
-  const list = byProv[prov];
-  for (let a = 0; a < list.length; a++) {
-    for (let b = a + 1; b < list.length; b++) {
-      addEdge(list[a], list[b]);
+  const allowedAll = ["HAND_CARRY", "HORSE_RELAY", "EXPRESS_RELAY"];
+
+  // 生成边：每个节点连接最近的 K 个邻居 + 同省互连，保证连通
+  const edges = [];
+  const seen = new Set();
+  function addEdge(i, j) {
+    const a = raw[i],
+      b = raw[j];
+    const key = a[0] < b[0] ? `${a[0]}|${b[0]}` : `${b[0]}|${a[0]}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const d = haversine(a, b);
+    if (d > 1600) return; // 距离过远不直连（避免虚假长边）
+    edges.push({
+      from: a[0],
+      to: b[0],
+      distanceKm: Math.round(d * 10) / 10,
+      enabled: true,
+      allowedTransport: allowedAll,
+    });
+  }
+
+  // 1) 每个节点连最近 4 个邻居
+  for (let i = 0; i < raw.length; i++) {
+    const dists = [];
+    for (let j = 0; j < raw.length; j++) {
+      if (i === j) continue;
+      dists.push([j, haversine(raw[i], raw[j])]);
+    }
+    dists.sort((x, y) => x[1] - y[1]);
+    for (let k = 0; k < Math.min(4, dists.length); k++) {
+      addEdge(i, dists[k][0]);
     }
   }
+
+  // 2) 同省节点互连（保证省内可达，避免孤岛）
+  const byProv = {};
+  raw.forEach((r, idx) => {
+    (byProv[r[2]] ??= []).push(idx);
+  });
+  for (const prov in byProv) {
+    const list = byProv[prov];
+    for (let a = 0; a < list.length; a++) {
+      for (let b = a + 1; b < list.length; b++) {
+        addEdge(list[a], list[b]);
+      }
+    }
+  }
+
+  // 3) 主干连接（区域间走廊），确保全国连通：按经度/纬度链若干远距离骨干
+  const backbone = [
+    ["beijing", "tianjin"],
+    ["beijing", "shijiazhuang"],
+    ["shijiazhuang", "taiyuan"],
+    ["taiyuan", "xian", "chang'an"],
+    ["chang'an", "chengdu"],
+    ["chengdu", "kunming"],
+    ["chang'an", "zhengzhou"],
+    ["zhengzhou", "wuhan"],
+    ["wuhan", "changsha"],
+    ["changsha", "guangzhou"],
+    ["guangzhou", "shenzhen"],
+    ["nanning", "guangzhou"],
+    ["wuhan", "nanjing"],
+    ["nanjing", "shanghai"],
+    ["shanghai", "hangzhou"],
+    ["hangzhou", "fuzhou"],
+    ["fuzhou", "xiamen"],
+    ["zhengzhou", "jinan"],
+    ["jinan", "qingdao"],
+    ["jinan", "beijing"],
+    ["shenyang", "beijing"],
+    ["changchun", "shenyang"],
+    ["haerbin", "changchun"],
+    ["lanzhou", "chang'an"],
+    ["lanzhou", "xining"],
+    ["lanzhou", "wulumuqi"],
+    ["chengdu", "lanzhou"],
+    ["kunming", "guiyang"],
+    ["guiyang", "changsha"],
+    ["nanning", "guiyang"],
+    ["guangzhou", "haikou"],
+    ["haikou", "sanya"],
+    ["lasa", "xining"],
+    ["wulumuqi", "lanzhou"],
+    ["huhehaote", "beijing"],
+    ["baotou", "huhehaote"],
+    ["yinchuan", "lanzhou"],
+    ["xianyang", "chang'an"],
+  ];
+  for (const pair of backbone) {
+    const ai = raw.findIndex((r) => r[0] === pair[0]);
+    const bi = raw.findIndex((r) => r[0] === pair[1]);
+    if (ai >= 0 && bi >= 0) addEdge(ai, bi);
+  }
+  // 修正：backbone 中有些是三元（含 'xian' 别名），单独处理
+  const backbonePairs = [
+    ["beijing", "tianjin"],
+    ["beijing", "shijiazhuang"],
+    ["shijiazhuang", "taiyuan"],
+    ["taiyuan", "chang'an"],
+    ["chang'an", "chengdu"],
+    ["chengdu", "kunming"],
+    ["chang'an", "zhengzhou"],
+    ["zhengzhou", "wuhan"],
+    ["wuhan", "changsha"],
+    ["changsha", "guangzhou"],
+    ["guangzhou", "shenzhen"],
+    ["nanning", "guangzhou"],
+    ["wuhan", "nanjing"],
+    ["nanjing", "shanghai"],
+    ["shanghai", "hangzhou"],
+    ["hangzhou", "fuzhou"],
+    ["fuzhou", "xiamen"],
+    ["zhengzhou", "jinan"],
+    ["jinan", "qingdao"],
+    ["jinan", "beijing"],
+    ["shenyang", "beijing"],
+    ["changchun", "shenyang"],
+    ["haerbin", "changchun"],
+    ["lanzhou", "chang'an"],
+    ["lanzhou", "xining"],
+    ["lanzhou", "wulumuqi"],
+    ["chengdu", "lanzhou"],
+    ["kunming", "guiyang"],
+    ["guiyang", "changsha"],
+    ["nanning", "guiyang"],
+    ["guangzhou", "haikou"],
+    ["haikou", "sanya"],
+    ["lasa", "xining"],
+    ["wulumuqi", "lanzhou"],
+    ["huhehaote", "beijing"],
+    ["baotou", "huhehaote"],
+    ["yinchuan", "lanzhou"],
+    ["xianyang", "chang'an"],
+    ["chongqing", "chang'an"],
+    ["chongqing", "chengdu"],
+  ];
+  for (const [a, b] of backbonePairs) {
+    const ai = raw.findIndex((r) => r[0] === a);
+    const bi = raw.findIndex((r) => r[0] === b);
+    if (ai >= 0 && bi >= 0) addEdge(ai, bi);
+  }
+
+  // region → station 映射：city → node id（精确优先），并留 province → 省会 fallback
+  const regionStationMap = { cities: {}, provinces: {} };
+  const provinceCapital = {
+    北京市: "beijing",
+    天津市: "tianjin",
+    上海市: "shanghai",
+    重庆市: "chongqing",
+    河北省: "shijiazhuang",
+    山西省: "taiyuan",
+    内蒙古自治区: "huhehaote",
+    辽宁省: "shenyang",
+    吉林省: "changchun",
+    黑龙江省: "haerbin",
+    江苏省: "nanjing",
+    浙江省: "hangzhou",
+    安徽省: "hefei",
+    福建省: "fuzhou",
+    江西省: "nanchang",
+    山东省: "jinan",
+    河南省: "zhengzhou",
+    湖北省: "wuhan",
+    湖南省: "changsha",
+    广东省: "guangzhou",
+    广西壮族自治区: "nanning",
+    海南省: "haikou",
+    四川省: "chengdu",
+    贵州省: "guiyang",
+    云南省: "kunming",
+    西藏自治区: "lasa",
+    陕西省: "chang'an",
+    甘肃省: "lanzhou",
+    青海省: "xining",
+    宁夏回族自治区: "yinchuan",
+    新疆维吾尔自治区: "wulumuqi",
+  };
+  for (const r of raw) {
+    regionStationMap.cities[r[3]] = r[0];
+    if (provinceCapital[r[2]] && !regionStationMap.provinces[r[2]]) {
+      regionStationMap.provinces[r[2]] = provinceCapital[r[2]];
+    }
+  }
+
+  // 映射自动校验（Phase 4 Final Gate HIGH-1）：
+  // 1) 同一 city 不得出现多个节点（防止后写覆盖 canonical station）
+  const cityCount = {};
+  for (const r of raw) cityCount[r[3]] = (cityCount[r[3]] ?? 0) + 1;
+  const dupCities = Object.keys(cityCount).filter((c) => cityCount[c] > 1);
+  if (dupCities.length > 0) {
+    throw new Error(`region map 存在重复 city（会导致映射覆盖）: ${dupCities.join(", ")}`);
+  }
+  // 2) 每个 city / province 映射必须指向有效节点
+  const nodeIds = new Set(raw.map((r) => r[0]));
+  for (const [k, v] of Object.entries(regionStationMap.cities)) {
+    if (!nodeIds.has(v)) throw new Error(`cities.${k} -> 无效节点 ${v}`);
+  }
+  for (const [k, v] of Object.entries(regionStationMap.provinces)) {
+    if (!nodeIds.has(v)) throw new Error(`provinces.${k} -> 无效节点 ${v}`);
+  }
+  // 3) 省级覆盖：每个出现的 province 必须有省级映射
+  const nodeProvinces = new Set(raw.map((r) => r[2]));
+  for (const p of nodeProvinces) {
+    if (!regionStationMap.provinces[p]) throw new Error(`province 无省级映射: ${p}`);
+  }
+
+  return { nodes, edges, regionStationMap };
 }
 
-// 3) 主干连接（区域间走廊），确保全国连通：按经度/纬度链若干远距离骨干
-const backbone = [
-  ["beijing", "tianjin"],
-  ["beijing", "shijiazhuang"],
-  ["shijiazhuang", "taiyuan"],
-  ["taiyuan", "xian", "chang'an"],
-  ["chang'an", "chengdu"],
-  ["chengdu", "kunming"],
-  ["chang'an", "zhengzhou"],
-  ["zhengzhou", "wuhan"],
-  ["wuhan", "changsha"],
-  ["changsha", "guangzhou"],
-  ["guangzhou", "shenzhen"],
-  ["nanning", "guangzhou"],
-  ["wuhan", "nanjing"],
-  ["nanjing", "shanghai"],
-  ["shanghai", "hangzhou"],
-  ["hangzhou", "fuzhou"],
-  ["fuzhou", "xiamen"],
-  ["zhengzhou", "jinan"],
-  ["jinan", "qingdao"],
-  ["jinan", "beijing"],
-  ["shenyang", "beijing"],
-  ["changchun", "shenyang"],
-  ["haerbin", "changchun"],
-  ["lanzhou", "chang'an"],
-  ["lanzhou", "xining"],
-  ["lanzhou", "wulumuqi"],
-  ["chengdu", "lanzhou"],
-  ["kunming", "guiyang"],
-  ["guiyang", "changsha"],
-  ["nanning", "guiyang"],
-  ["guangzhou", "haikou"],
-  ["haikou", "sanya"],
-  ["lasa", "xining"],
-  ["wulumuqi", "lanzhou"],
-  ["huhehaote", "beijing"],
-  ["baotou", "huhehaote"],
-  ["yinchuan", "lanzhou"],
-  ["xianyang", "chang'an"],
-];
-for (const [a, , c] of backbone) {
-} // noop
-for (const pair of backbone) {
-  const ai = RAW.findIndex((r) => r[0] === pair[0]);
-  const bi = RAW.findIndex((r) => r[0] === pair[1]);
-  if (ai >= 0 && bi >= 0) addEdge(ai, bi);
-}
-// 修正：backbone 中有些是三元（含 'xian' 别名），单独处理
-const backbonePairs = [
-  ["beijing", "tianjin"],
-  ["beijing", "shijiazhuang"],
-  ["shijiazhuang", "taiyuan"],
-  ["taiyuan", "chang'an"],
-  ["chang'an", "chengdu"],
-  ["chengdu", "kunming"],
-  ["chang'an", "zhengzhou"],
-  ["zhengzhou", "wuhan"],
-  ["wuhan", "changsha"],
-  ["changsha", "guangzhou"],
-  ["guangzhou", "shenzhen"],
-  ["nanning", "guangzhou"],
-  ["wuhan", "nanjing"],
-  ["nanjing", "shanghai"],
-  ["shanghai", "hangzhou"],
-  ["hangzhou", "fuzhou"],
-  ["fuzhou", "xiamen"],
-  ["zhengzhou", "jinan"],
-  ["jinan", "qingdao"],
-  ["jinan", "beijing"],
-  ["shenyang", "beijing"],
-  ["changchun", "shenyang"],
-  ["haerbin", "changchun"],
-  ["lanzhou", "chang'an"],
-  ["lanzhou", "xining"],
-  ["lanzhou", "wulumuqi"],
-  ["chengdu", "lanzhou"],
-  ["kunming", "guiyang"],
-  ["guiyang", "changsha"],
-  ["nanning", "guiyang"],
-  ["guangzhou", "haikou"],
-  ["haikou", "sanya"],
-  ["lasa", "xining"],
-  ["wulumuqi", "lanzhou"],
-  ["huhehaote", "beijing"],
-  ["baotou", "huhehaote"],
-  ["yinchuan", "lanzhou"],
-  ["xianyang", "chang'an"],
-  ["chongqing", "chang'an"],
-  ["chongqing", "chengdu"],
-];
-for (const [a, b] of backbonePairs) {
-  const ai = RAW.findIndex((r) => r[0] === a);
-  const bi = RAW.findIndex((r) => r[0] === b);
-  if (ai >= 0 && bi >= 0) addEdge(ai, bi);
+// ---- 输出（所有版本确定性生成；china-v1 必须字节冻结） ----
+
+const OUT_ROOT_FLAG = "--out-root=";
+const outRootArg = process.argv.find((arg) => arg.startsWith(OUT_ROOT_FLAG));
+const DEFAULT_GRAPHS_DIR = path.join(__dirname, "graphs");
+/** 输出目录：默认仓库 `data/graphs/`；`--out-root=<dir>` 供测试在仓库外做字节一致性校验。 */
+const OUT_ROOT =
+  outRootArg === undefined
+    ? DEFAULT_GRAPHS_DIR
+    : path.resolve(outRootArg.slice(OUT_ROOT_FLAG.length));
+const IS_REPO_OUTPUT = OUT_ROOT === DEFAULT_GRAPHS_DIR;
+
+/** BFS 连通性自检（返回 connected / isolated）。 */
+function connectivityCheck(nodes, edges) {
+  const adj = {};
+  for (const e of edges) {
+    (adj[e.from] ??= []).push(e.to);
+    (adj[e.to] ??= []).push(e.from);
+  }
+  const visited = new Set();
+  const stack = [nodes[0].id];
+  while (stack.length) {
+    const c = stack.pop();
+    if (visited.has(c)) continue;
+    visited.add(c);
+    for (const n of adj[c] ?? []) if (!visited.has(n)) stack.push(n);
+  }
+  const isolated = nodes.filter((n) => !visited.has(n.id)).length;
+  return { connected: visited.size, isolated };
 }
 
-// region → station 映射：city → node id（精确优先），并留 province → 省会 fallback
-const regionStationMap = { cities: {}, provinces: {} };
-const provinceCapital = {
-  北京市: "beijing",
-  天津市: "tianjin",
-  上海市: "shanghai",
-  重庆市: "chongqing",
-  河北省: "shijiazhuang",
-  山西省: "taiyuan",
-  内蒙古自治区: "huhehaote",
-  辽宁省: "shenyang",
-  吉林省: "changchun",
-  黑龙江省: "haerbin",
-  江苏省: "nanjing",
-  浙江省: "hangzhou",
-  安徽省: "hefei",
-  福建省: "fuzhou",
-  江西省: "nanchang",
-  山东省: "jinan",
-  河南省: "zhengzhou",
-  湖北省: "wuhan",
-  湖南省: "changsha",
-  广东省: "guangzhou",
-  广西壮族自治区: "nanning",
-  海南省: "haikou",
-  四川省: "chengdu",
-  贵州省: "guiyang",
-  云南省: "kunming",
-  西藏自治区: "lasa",
-  陕西省: "chang'an",
-  甘肃省: "lanzhou",
-  青海省: "xining",
-  宁夏回族自治区: "yinchuan",
-  新疆维吾尔自治区: "wulumuqi",
-};
-for (const r of RAW) {
-  regionStationMap.cities[r[3]] = r[0];
-  if (provinceCapital[r[2]] && !regionStationMap.provinces[r[2]]) {
-    regionStationMap.provinces[r[2]] = provinceCapital[r[2]];
+/**
+ * 写出 JSON：先 `JSON.stringify(x, null, 2)`，再按仓库 Prettier 配置格式化。
+ * 冻结基线 `data/graphs/china-v1/*.json` 本身就是 Prettier 产物（数组折叠成单行、文件以换行结尾），
+ * 因此生成端必须走同一格式化路径，重新生成才能与冻结基线逐字节一致。
+ */
+async function writeJson(file, data) {
+  const config = (await prettier.resolveConfig(file)) ?? {};
+  const text = await prettier.format(JSON.stringify(data, null, 2), {
+    ...config,
+    filepath: file,
+    parser: "json",
+  });
+  fs.writeFileSync(file, text);
+}
+
+async function main() {
+  for (const version of GRAPH_VERSIONS) {
+    const { nodes, edges, regionStationMap } = generateGraphVersion(version);
+    const versionDir = path.join(OUT_ROOT, version);
+    fs.mkdirSync(versionDir, { recursive: true });
+    await writeJson(path.join(versionDir, "station_nodes.json"), nodes);
+    await writeJson(path.join(versionDir, "route_edges.json"), edges);
+    await writeJson(path.join(versionDir, "region_station_map.json"), regionStationMap);
+    const { connected, isolated } = connectivityCheck(nodes, edges);
+    console.log(
+      `nodes=${nodes.length} edges=${edges.length} version=${version} ` +
+        `connected=${connected}/${nodes.length} isolated=${isolated}`
+    );
+  }
+
+  // 图版本注册表：versions 为稳定顺序，defaultVersion = 新信件默认图版本
+  await writeJson(path.join(OUT_ROOT, "registry.json"), {
+    versions: GRAPH_VERSIONS,
+    defaultVersion: DEFAULT_GRAPH_VERSION,
+  });
+
+  // 生成并写出校验报告（MEDIUM-3：报告与数据永不漂移）；仓库外输出不写报告
+  const { run: validateAndReport } = require("./validate_graph.cjs");
+  if (!validateAndReport({ graphsDir: OUT_ROOT, reportPath: IS_REPO_OUTPUT ? undefined : null })) {
+    throw new Error("graph validation FAILED after regeneration");
   }
 }
 
-// 映射自动校验（Phase 4 Final Gate HIGH-1）：
-// 1) 同一 city 不得出现多个节点（防止后写覆盖 canonical station）
-const cityCount = {};
-for (const r of RAW) cityCount[r[3]] = (cityCount[r[3]] ?? 0) + 1;
-const dupCities = Object.keys(cityCount).filter((c) => cityCount[c] > 1);
-if (dupCities.length > 0) {
-  throw new Error(`region map 存在重复 city（会导致映射覆盖）: ${dupCities.join(", ")}`);
-}
-// 2) 每个 city / province 映射必须指向有效节点
-const nodeIds = new Set(RAW.map((r) => r[0]));
-for (const [k, v] of Object.entries(regionStationMap.cities)) {
-  if (!nodeIds.has(v)) throw new Error(`cities.${k} -> 无效节点 ${v}`);
-}
-for (const [k, v] of Object.entries(regionStationMap.provinces)) {
-  if (!nodeIds.has(v)) throw new Error(`provinces.${k} -> 无效节点 ${v}`);
-}
-// 3) 省级覆盖：每个出现的 province 必须有省级映射
-const nodeProvinces = new Set(RAW.map((r) => r[2]));
-for (const p of nodeProvinces) {
-  if (!regionStationMap.provinces[p]) throw new Error(`province 无省级映射: ${p}`);
-}
-
-// 版本化输出（BLOCKER-1：按版本索引的数据目录）
-const GRAPH_VERSION = "china-v1";
-const versionDir = path.join(__dirname, "graphs", GRAPH_VERSION);
-fs.mkdirSync(versionDir, { recursive: true });
-fs.writeFileSync(path.join(versionDir, "station_nodes.json"), JSON.stringify(nodes, null, 2));
-fs.writeFileSync(path.join(versionDir, "route_edges.json"), JSON.stringify(edges, null, 2));
-fs.writeFileSync(
-  path.join(versionDir, "region_station_map.json"),
-  JSON.stringify(regionStationMap, null, 2)
-);
-// 图版本注册表（未知版本将被明确拒绝）
-fs.writeFileSync(
-  path.join(__dirname, "graphs", "registry.json"),
-  JSON.stringify({ versions: [GRAPH_VERSION], defaultVersion: GRAPH_VERSION }, null, 2) + "\n"
-);
-
-console.log(`nodes=${nodes.length} edges=${edges.length} version=${GRAPH_VERSION}`);
-
-// 生成并写出校验报告（MEDIUM-3：报告与数据永不漂移）
-const { run: validateAndReport } = require("./validate_graph.cjs");
-if (!validateAndReport()) {
-  throw new Error("graph validation FAILED after regeneration");
-}
-
-// 连通性快速自检（BFS）
-const adj = {};
-for (const e of edges) {
-  (adj[e.from] ??= []).push(e.to);
-  (adj[e.to] ??= []).push(e.from);
-}
-const visited = new Set();
-const stack = [nodes[0].id];
-while (stack.length) {
-  const c = stack.pop();
-  if (visited.has(c)) continue;
-  visited.add(c);
-  for (const n of adj[c] ?? []) if (!visited.has(n)) stack.push(n);
-}
-const isolated = nodes.filter((n) => !visited.has(n.id)).length;
-console.log(`connected=${visited.size}/${nodes.length} isolated=${isolated}`);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -11,6 +11,7 @@ import { userRoutes } from "./routes/users.js";
 import { letterRoutes } from "./routes/letters.js";
 import { journeyRoutes } from "./routes/journeys.js";
 import { timelineRoutes } from "./routes/timelines.js";
+import { mapRoutes } from "./routes/maps.js";
 
 /**
  * buildApp 所需依赖（便于测试注入）。
@@ -107,6 +108,7 @@ export function buildApp(
   void app.register(letterRoutes, { prefix: API_PREFIX });
   void app.register(journeyRoutes, { prefix: API_PREFIX });
   void app.register(timelineRoutes, { prefix: API_PREFIX });
+  void app.register(mapRoutes, { prefix: API_PREFIX });
 
   return app;
 }

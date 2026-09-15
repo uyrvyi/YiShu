@@ -136,6 +136,24 @@ export function resetStationGraphCache(): void {
   registryCache = null;
 }
 
+/** `data/` 目录绝对路径（运行时唯一数据根；与图数据同源，供同级静态数据加载）。 */
+export function getDataDir(): string {
+  return dataDir();
+}
+
+/**
+ * 注册表登记的默认图版本（新信件默认图版本；source of truth = `data/graphs/registry.json`）。
+ * 常量必须从注册表读取，禁止在业务代码里硬编码版本号（Phase 8：china-v1 → china-v2）。
+ */
+export function getDefaultGraphVersion(): string {
+  return loadRegistry().defaultVersion;
+}
+
+/** 注册表登记的全部图版本（source of truth = `data/graphs/registry.json`；返回副本）。 */
+export function getGraphVersions(): readonly string[] {
+  return [...loadRegistry().versions];
+}
+
 /** 解析 region（省/市/区县）→ 最近 station node id（按指定图版本）。
  * 策略（Phase 4 Prompt §19）：
  *  1. exact city station

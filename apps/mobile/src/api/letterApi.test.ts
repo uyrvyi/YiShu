@@ -87,4 +87,83 @@ describe("letterApi", () => {
     const api = makeApi(fetchMock as typeof fetch);
     await expect(api.searchRecipient("nobody")).rejects.toThrow("user_not_found");
   });
+
+  function mockMapFetch(body: unknown) {
+    return vi.fn(
+      async () => ({ ok: true, status: 200, json: async () => body }) as unknown as Response
+    );
+  }
+
+  const ROUTE_MAP = {
+    status: "IN_TRANSIT",
+    origin: { name: "上海站", province: "上海市", city: "上海市", x: 812.4, y: 231.2 },
+    destination: { name: "北京站", province: "北京市", city: "北京市", x: 823.4, y: 192.6 },
+    completedPath: [
+      { x: 812.4, y: 231.2 },
+      { x: 815.1, y: 224.7 },
+    ],
+    remainingPath: [{ x: 815.1, y: 224.7 }],
+    approximatePosition: { x: 813.2, y: 228.1 },
+    lastKnownPosition: { x: 812.4, y: 231.2 },
+    facts: [
+      {
+        type: "DISPATCHED",
+        title: "已寄出",
+        description: "信件已从上海站寄出",
+        location: { province: "上海市", city: "上海市" },
+        happenedAt: "2026-09-01T00:00:00.000Z",
+        x: 812.4,
+        y: 231.2,
+      },
+    ],
+  };
+
+  it("getRouteMap 发起 GET /letters/:trackingNo/map 并解析契约", async () => {
+    const fetchMock = mockMapFetch(ROUTE_MAP);
+    const api = makeApi(fetchMock as typeof fetch);
+    const map = await api.getRouteMap("YS-20260821-K7P2M");
+
+    const calledUrl = (fetchMock.mock.calls[0] as unknown[])[0];
+    expect(String(calledUrl)).toBe(`${BASE}/api/v1/letters/YS-20260821-K7P2M/map`);
+    expect(map.status).toBe("IN_TRANSIT");
+    expect(map.approximatePosition).toEqual({ x: 813.2, y: 228.1 });
+    expect(map.facts.length).toBe(1);
+  });
+
+  it("getRouteMap 剥离服务端意外多出的内部字段（dropArea / ETA / 掉落原因）", async () => {
+    const fetchMock = mockMapFetch({
+      ...ROUTE_MAP,
+      letterId: "12345",
+      dropArea: { radiusKm: 20, center: { x: 1, y: 2 } },
+      dropReason: "LETTER_DROPPED",
+      etaSeconds: 3600,
+      internalStatus: "LETTER_DROPPED",
+    });
+    const api = makeApi(fetchMock as typeof fetch);
+    const map = await api.getRouteMap("YS-20260821-K7P2M");
+
+    for (const forbidden of [
+      "dropArea",
+      "dropReason",
+      "etaSeconds",
+      "letterId",
+      "internalStatus",
+    ]) {
+      expect(Object.prototype.hasOwnProperty.call(map, forbidden)).toBe(false);
+    }
+  });
+
+  it("getRouteMap 拒绝内部 HIDDEN 状态（LETTER_DROPPED 不得作为 status 流出）", async () => {
+    const fetchMock = mockMapFetch({ ...ROUTE_MAP, status: "LETTER_DROPPED" });
+    const api = makeApi(fetchMock as typeof fetch);
+    await expect(api.getRouteMap("YS-20260821-K7P2M")).rejects.toThrow();
+  });
+
+  it("getRouteMap 结构不符时抛错（不静默降级）", async () => {
+    const withoutFacts: Record<string, unknown> = { ...ROUTE_MAP };
+    delete withoutFacts.facts;
+    const fetchMock = mockMapFetch(withoutFacts);
+    const api = makeApi(fetchMock as typeof fetch);
+    await expect(api.getRouteMap("YS-20260821-K7P2M")).rejects.toThrow();
+  });
 });

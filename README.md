@@ -3,8 +3,9 @@
 「现代世界 + 古代通信方式」的点对点通信 App。
 
 > 当前基线：**Phase 7 Final Gate PASS · Phase 7 COMPLETE（Timeline + 用户可见运输事实）**
-> 下一阶段：**Phase 8 — Local Map + Journey Visualization**（尚未开始）
-> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进、Phase 6 WorldEvent 世界真相 + 固定概率随机事件 + Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED，以及 Phase 7：TimelineEvent 用户可见运输事实（WorldEvent ≠ TimelineEvent；visibility 冻结映射：直接可见 / 后台原因 HIDDEN / 终态确认结果）。地图（Phase 8）/ Push（Phase 9）/ 完整 Mobile UI（Phase 10）等后续业务仍未实现。
+> Phase 8：**implementation complete · Final Gate pending review**（Local Map + Journey Visualization；尚未 Commit、尚未通过独立 Final Gate）
+> 下一阶段：**Phase 9 — Worker Scheduling + Push + Refresh（NOT STARTED）**
+> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进、Phase 6 WorldEvent 世界真相 + 固定概率随机事件 + Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED、Phase 7 TimelineEvent 用户可见运输事实（WorldEvent ≠ TimelineEvent；visibility 冻结映射：直接可见 / 后台原因 HIDDEN / 终态确认结果），以及 Phase 8：完全离线的本地地图资产 + `GET /letters/:trackingNo/map` 安全投影 + Mobile RouteMap（已走实线 / 未走虚线 / 大概位置 / 最后确报 / 事实节点，无 ETA、无精确 GPS、无掉落范围）。Push 与后台调度（Phase 9）/ 完整 Mobile UI（Phase 10）等后续业务仍未实现。
 
 当前进度、验收结果与已知限制见 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
 
@@ -34,9 +35,9 @@ yishu/
 │  ├─ simulation/      # SimulationClock + DeterministicRandom（Phase 5 实现）
 │  ├─ routing/         # 本地静态 Graph + Dijkstra + PIGEON 直连（Phase 4 实现）
 │  └─ config/          # Zod 环境配置加载 + 根 .env
-├─ data/               # 本地静态数据（station_nodes/route_edges/region_station_map 等）
+├─ data/               # 本地静态数据（station_nodes/route_edges/region_station_map + Phase 8 地图资产 maps/）
 ├─ prisma/
-│  ├─ schema.prisma    # 模型：User/Block/RefreshToken/Letter/RecipientState/SenderState/Journey/TransportLeg（含 enum）
+│  ├─ schema.prisma    # 模型：User/Block/RefreshToken/Letter/RecipientState/SenderState/Journey/TransportLeg/WorldEvent/TimelineEvent（含 enum）
 │  └─ migrations/
 ├─ prisma.config.ts    # Prisma 7 配置文件
 ├─ docker-compose.yml  # PostgreSQL 17 + Redis
@@ -152,6 +153,7 @@ pnpm prisma:validate   # Prisma schema 校验
 pnpm prisma:generate   # 生成 Prisma Client 到 generated/prisma
 pnpm prisma:studio     # Prisma Studio
 pnpm graph:validate    # 校验 data/graphs/<version>/ 并写出 GRAPH_VALIDATION_REPORT.json
+pnpm map:generate      # 由本地站数据离线生成 data/maps/* 与 apps/mobile/src/map/chinaMapData.ts（幂等）
 ```
 
 ### Build 语义说明
@@ -328,9 +330,22 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 - **Phase 7 测试**：`timeline.integration.test.ts` 36 项（IMMEDIATE 四种 / HIDDEN（ROBBERY/REROUTED/LETTER_DROPPED/SERIOUS_ACCIDENT）/ 仅独立 DELAYED 生成延误 / LOST_PATH 双事件（LOST_PATH + canonical COURIER_MISSING）唯一性 / **random cursor golden（PIGEON LOST_PATH cursor 恰为 5 次真实决策）** / **derived 事件不消费随机游标（PERMANENTLY_LOST / TRANSPORT_CHANGED）** / **双事件 fault-injection rollback（all-or-nothing）** / **district province+city 双校验（同名城市/省级 fallback 不误套）** / DISPATCHED 不可变时间戳 / late vs many GET 完整 matrix（NORMAL/DELAY/direct missing/LOST_PATH/RECOVERED+TRANSPORT_CHANGED/PERMANENTLY_LOST/DESTROYED）/ drop 异常期间 GET vs 恢复后首 GET / canonicalTimelineSnapshot / 100 次刷新幂等 / 并发 / Sender-Recipient 一致 / 第三方 404 / 正文边界 / read privacy / 递归+文本级泄漏扫描 / Phase 6 World Truth 不变 / P2002 单来源精确判断 / **WorldEvent 编号连续无空洞（NORMAL 不占号）** / **legacy 预留编号兼容（升级后复用预留编号、canonical 从其后分配）** / **legacy reservation 在回滚后保留** / DESTROYED happenedAt=实际损毁时刻）+ `letter-visibility.integration.test.ts` 5 项（LETTER_DROPPED→public IN_TRANSIT、Sender/Recipient list+detail+Timeline 全 API 攻击、ROBBERY missing/dead 旁路、**Letter refresh-frequency 双端 5 场景对照（含 deliveredAt）**、enum 结构无 LETTER_DROPPED），固定 seed 连续 3 轮无 flaky
 - **门禁（Final Gate PASS）**：Phase 7 定向 **41/41 PASS × 3 轮**、Phase 5/6 回归 **50/50 PASS**、全 workspace **274 passed / 0 failed**（api 185 = Phase 6 的 144 + Phase 7 的 41）；typecheck / lint / format:check / build / prisma:validate / prisma:generate 全 PASS；dev / test 两库由 canonical 磁盘 history **从 0 重建**（各 **15 个** migration、逐条 checksum **0 drift**、无 rolled-back 残留），schema diff 为空（corrective：`20260908120000` 删 `LETTER_DROPPED` 枚举值、`20260908130000` district 改 `String?`、`20260913120000` 解耦 `nextRandomDrawIndex` / `nextWorldEventIndex`、`20260913130000` 校准事件编号下界含旧预留）；全新空库一次性跑通 15 migrations（fresh DB Gate PASS）；PostgreSQL 17.11 / Redis 7.4.11 healthy；**本地 production-mode smoke** `GET /api/v1/health` = HTTP 200（本地 smoke，不是线上 deployment acceptance）
 
+### 已完成（Phase 8：Local Map + Journey Visualization）
+
+- **状态**：**implementation complete · Final Gate pending review**（未 Commit；Phase 9 NOT STARTED）。实现细节与门禁结果见本节与 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
+- **完全离线地图资产（vendored static boundary source + repository-local station anchors）**：`pnpm map:generate`（`data/gen_map.cjs`）读取**两类职责独立的数据源** —— ① vendored 行政边界源 `data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`（geoBoundaries `gbOpen / CHN / ADM1`，冻结 revision、SHA-256 校验；provider / dataset / boundaryID / 年份 / 许可 **只在 [`data/maps/README.md`](data/maps/README.md) 记录**）与 ② 站点锚点 `data/graphs/china-v1/station_nodes.json` —— 确定性生成 `data/maps/china-map.svg`（国家轮廓 + 34 个 ADM1 边界）、`data/maps/china-districts.json`、`apps/mobile/src/map/chinaMapData.ts`；生成器**不写当前时间 / 随机值 / 环境相关值**，重复执行零新增 diff（幂等）。**station 点云不再是行政边界来源**（无凸包 / 外扩 / 六边形）；边界几何只做 canonical projection + 定点序列化；运行时与构建期**均不访问互联网**（无在线瓦片 / geocoder / 商业地图 SDK）。该数据为开源静态行政边界数据，用于 V1 本地可视化，**非官方测绘成果、非法律边界认定文件**；面向中国大陆公开发布的合规检查属 Phase 12 Release Gate。
+- **固定 viewBox + uniform scaling**：`MAP_VIEWBOX = 0 0 1000 800`；`MAP_DATA_BOUNDS` = 行政边界底图 ∪ 站点锚点的 `mapX/mapY` 范围，`MAP_FIT` 由其等比推导（**Y 为限制维度**，`MAP_FIT_MARGIN = 60`；X 因等比居中留白更大），**禁止 X/Y 独立拉伸**；全部 34 个 ADM1 形状、国家轮廓（union，非凸包）与 294 个站点锚点映射后均落在 viewBox 内。
+- **Map API**：`GET /api/v1/letters/:trackingNo/map`（规范 §74）—— Sender / Recipient 同图（完整 `toEqual`）、第三方 404、匿名 401；纯投影函数（`apps/api/src/lib/map-view.ts`）只读「已物化且用户可见」的 Timeline 事实 + 冻结规划 + SimulationClock，**不读 WorldEvent.payload / Journey.anomalyType / internal `Letter.status`**；GET 前后 World Truth（Letter / Journey / TransportLeg / WorldEvent 与两个游标）完全不变。
+- **safe DTO**：`status`（`PublicLetterStatus`）/ `origin` / `destination` / `completedPath` / `remainingPath` / `approximatePosition` / `lastKnownPosition` / `facts`（≤ 5，来源 = 用户可见 Timeline 事实，按 §21 冻结优先级 + 时间 + 确定性 tie-break）；**不含** id / letterId / journeyId / worldEventId / eventIndex / sourceKey / sequence / seed / rulesVersion / graphVersion / payload / anomalyType / primaryEvent\* / next\*Cursor / lat / lng / ETA / remainingSeconds / `dropArea` / `LETTER_DROPPED`，也不含 Recipient `readState` / `openedAt`。
+- **路线与位置语义**：completed = 用户可见事实确认过的节点（reroute 后**永不重写**）；remaining = 冻结规划几何（虚线）；`approximatePosition` = 由「已确认出发时刻 → now」在计划区间内线性插值（clamp 到 `MAP_APPROXIMATE_MAX_RATIO`；确定性、不用 `Math.random`、不消费随机游标、与 GET 次数无关）；**无 ETA / 无倒计时 / 无精确 GPS**。
+- **异常与终态**：`COURIER_MISSING` → `approximatePosition = null` + 只保留 last-known（未走路线仍为虚线，不暴露 cause）；隐藏掉落（internal `LETTER_DROPPED`，含 LOST_PATH / ROBBERY / SERIOUS_ACCIDENT 等 HIDDEN cause）**全局 HIDDEN**：用户可见状态仍 `IN_TRANSIT`、DTO 与「相同可见事实」的正常世界**完全一致**，无掉落范围 / 掉落坐标 / 掉落原因；`PERMANENTLY_LOST` / `DELIVERED` / `DESTROYED` 只表达终态确认结果并保持最后确报（不推测遗失点、不显示事故点）。
+- **Mobile**：`apps/mobile/src/map/RouteMap.tsx` + `layers.tsx` 七层（ChinaOutline / ProvinceBoundary / CompletedRoute 实线 / RemainingRoute 虚线 / ApproximatePosition / LastKnownPosition / FactNode），**无 `DropAreaLayer`**；Letter Detail 只新增「查看旅程地图」入口，未引入 polling / push / foreground refresh（Phase 9 范围）或 Letter Detail redesign（Phase 10 范围）。
+- **Phase 8 测试**：`apps/api/src/routes/maps.integration.test.ts` + `apps/api/src/lib/map-view.test.ts`（Map API 契约 / 安全投影 / 隐藏等价 / 终态 / reroute / 重复节点 / 多次改道 / 恢复锚点 / **真实响应禁止字段扫描** / 纯度 / 刷新无关）；`apps/mobile/src/map/geometry.test.ts`（几何与 viewBox 契约、294 站点覆盖、31 route province 无遗漏）；`apps/mobile/src/map/boundary.test.ts`（源 SHA-256 / 34 个 ADM1 / 31-31 映射 / MultiPolygon 保留 / union 轮廓包含 / **站点空间归属（0 跨省）** / 生成器幂等）；`RouteMap.test.ts`（图层渲染树）；`presentation.test.ts`（Asia/Shanghai 时区）。固定 seed 连续 3 轮无 flaky。
+- **Phase 8 工程门禁（2026-09-14 M5 边界修复后复验；未 Commit）**：`pnpm typecheck` / `pnpm lint` / `pnpm format:check` / `pnpm test`（**341 passed / 0 failed / 0 skipped**，35 个测试文件）/ `pnpm build`（含 Mobile Expo export，Android Bundled **1375 modules**）/ `pnpm prisma:validate` / `pnpm prisma:generate` 全 PASS；**Phase 8 定向 63/63 PASS × 3 轮**、**Phase 5–7 重点回归 91/91 PASS**；`pnpm map:generate` **可复现性通过**（连续两次执行字节一致；source 与三产物 SHA-256 记录在 [`data/maps/README.md`](data/maps/README.md)）；站点空间归属实测 **283/294 落在本省 ADM1 内、0 个跨省**（11 个容差用例已列明）；运行时实测：PostgreSQL 17.11 / Redis PONG、dev 与 test 各 **15 migrations 0 drift / schema diff 空 / 0 悬挂事务 / 0 未授权锁**、本地 production-mode smoke `GET /api/v1/health` = HTTP 200（验证后进程已停止、端口已释放）；本轮**无 Prisma schema / migration 改动**（磁盘仍 15 个 migration）。
+
 ### 未完成（后续 Phase）
 
-以下业务**尚未实现**：地图可视化 / 本地离线中国地图 / 近似位置与最后确报（Phase 8；`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`）、Push 与 BullMQ Worker 正式接入（Phase 9）、完整 Mobile V1 流程与 Letter Detail Timeline UI（Phase 10）。Phase 7 已完成 WorldEvent→TimelineEvent 的可见性转换与 API/domain contract（按阶段规划，完整 Mobile timeline 属 Phase 10）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。
+以下业务**尚未实现**：Phase 8 地图的独立 Final Gate 复审（实现已完成，等待负责人评审；含完整 Mobile Timeline UI 与地图交互打磨属 Phase 10）、Push 与 BullMQ Worker 正式接入 / 轮询刷新（Phase 9）、完整 Mobile V1 流程与 Letter Detail Timeline UI（Phase 10）。Phase 7 已完成 WorldEvent→TimelineEvent 的可见性转换与 API/domain contract（按阶段规划，完整 Mobile timeline 属 Phase 10）；生产环境由谁按模拟时钟调度推进（后台 worker）属 Phase 9。**`LETTER_DROPPED` = HIDDEN 是全局用户可见性规则**（V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图与任何用户 projection 都不得暴露掉落原因）。
 
 ## 已知限制与维护事项
 
