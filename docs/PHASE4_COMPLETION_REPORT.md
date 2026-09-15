@@ -1,5 +1,7 @@
 # 驿书 V1 — Phase 4 完成报告（Journey + Routing + TransportLeg）
 
+> **归档说明（2026-09-15）**：本文保留 Phase 4 当时的实施与复评记录，以下“等待复核 / 未 commit / 未进入 Phase 5”均为历史状态，不代表当前项目进度。Phase 1–8 已通过 Final Gate，Phase 8 实现 baseline 为 `10963fb`；Phase 9 准入通过但尚未启动。当前状态以 [PROJECT_STATUS.md](PROJECT_STATUS.md) 与根目录阶段规划为准。
+>
 > 生成时间：2026-08-24
 > 角色：Phase 4 实操 Coding Agent（非 Review Agent）
 > 结论：**Phase 4 实现完成 · Final Gate 三次评审：第一次 FAIL → 已修复；第二次 PASS WITH FIXES（MEDIUM×2 + LOW×1）→ 已修复；等待最终封板复核**

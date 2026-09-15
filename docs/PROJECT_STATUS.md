@@ -1,9 +1,9 @@
 # 驿书 V1 项目状态
 
 > 更新时间：2026-09-15
-> 当前基线：Phase 7 Final Gate PASS · Phase 7 COMPLETE（Timeline + 用户可见运输事实）
-> Phase 8 — Local Map + Journey Visualization：**implementation complete · 独立 Final Gate re-review = FAIL（2026-09-15：BLOCKER 0 / HIGH 0 / MEDIUM 2，均已在工作区修复、待再次复审）· 尚未 Commit**
-> 下一阶段：Phase 9 — Worker Scheduling + Push + Refresh（**NOT STARTED**；`MAY START PHASE 9: NO`）
+> 当前基线：**Phase 8 Final Gate PASS · Phase 8 COMPLETE（Local Map + Journey Visualization）**
+> Phase 8：**独立 Final Gate PASS（2026-09-15）**；BLOCKER / HIGH / MEDIUM / LOW 均为 NONE；实现 baseline commit `10963fb`。
+> 下一阶段：**Phase 9 — Worker Scheduling + Push + Refresh（NOT STARTED）**；`MAY START PHASE 9: YES` 表示准入通过，实施仍等待项目负责人明确指示。
 
 ## Phase 完成情况
 
@@ -17,7 +17,7 @@
 | Phase 6：World Truth | COMPLETE                    | WorldEvent 模型、(journeyId,eventIndex) 唯一、冻结概率表（§28–§36）、每 Leg 一次 primary event 持久化（primaryEventIndex/outcome/delaySeconds，DELAY 冻结延长）、可重复 progression loop（一次大跳跃与分段推进完全一致）、reroute 后继续消费剩余模拟时间、Recovery + 自动运输变更（按新 transport 重建路线，PIGEON↔ground 语义）、WorldEvent 稳定位置（nodeId/transportLegSequence）、7 日 PERMANENTLY_LOST、PIGEON 严重事故 DESTROYED、completedPath 不变量、totalDistanceKm 同步、并发/幂等/回滚无半个事件                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Phase 7：Timeline    | COMPLETE（Final Gate PASS） | TimelineEvent 模型（规范 §57，TimelineEventType 无 LETTER_DROPPED，corrective migration）、(letterId,sourceKey) 幂等唯一、World Truth→User Fact 单向投影（绝不复制 payload、不反向修改世界真相）、visibility 冻结表（IMMEDIATE：DELAYED/COURIER_MISSING/RECOVERED/TRANSPORT_CHANGED；HIDDEN：ROBBERY/REROUTED/LOST_PATH/LETTER_DROPPED/SERIOUS_ACCIDENT）、canonical missing 双事件（LOST_PATH HIDDEN cause + 唯一 canonical COURIER_MISSING）、**随机游标与 WorldEvent 编号解耦**（`nextRandomDrawIndex` / `nextWorldEventIndex`，记录派生事实不消费随机数；新 Journey **仅在实际创建 WorldEvent 时分配编号**，等待期不占号；旧 Journey 的 `primaryEventIndex` 预留编号被尊重 → 升级后不碰撞）、Timeline district 可空（`String?`，仅区域锚点且 **province+city 双匹配**才写真实 district）、统一 PublicLetterStatus（LETTER_DROPPED→IN_TRANSIT，全 API 无泄漏）、normal transport facts 只取不可变来源（**一个用户可确认事实 → 一条 Timeline 事实**）、refresh-frequency independence、GET /letters/:trackingNo/timeline、safe DTO、Sender/Recipient 完全一致；**WorldEvent.eventIndex 不变量 = 唯一 + 单调 + 不碰撞**（新 Journey 等待期不占号，旧 Journey 允许继承历史 gap） |
 
-| Phase 8：本地地图 | implementation complete · Final Gate **FAIL**（re-review 2 MEDIUM 已修复、待复审） | `data/gen_map.cjs`（`pnpm map:generate`，读 **vendored 行政边界源** `data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`（pinned revision + SHA-256 校验）+ `data/graphs/china-v1/station_nodes.json` 站点锚点，确定性生成 `data/maps/china-map.svg` + `data/maps/china-districts.json` + `apps/mobile/src/map/chinaMapData.ts`，幂等、无时间戳/随机值、完全离线）、固定 viewBox `0 0 1000 800` 与 `MAP_FIT` 等比映射（Y 为限制维度、禁 X/Y 独立拉伸）、`GET /api/v1/letters/:trackingNo/map` 安全投影（`apps/api/src/lib/map-view.ts`：只读用户可见 Timeline 事实 + 冻结规划 + SimulationClock；sender/recipient 同图、第三方 404、无 ETA/无 GPS/无掉落范围、`LETTER_DROPPED` 全局 HIDDEN 与正常世界 DTO 完全等价）、completedPath 永不重写 + remainingPath 虚线 + approximatePosition 确定性插值 + last-known（COURIER_MISSING）/ 终态只表达确认结果、Mobile `RouteMap` 七层（无 `DropAreaLayer`）、Letter Detail 仅新增「查看旅程地图」入口（无 polling / push / foreground refresh） |
+| Phase 8：本地地图 | FINAL GATE PASS · COMPLETE（baseline `10963fb`） | `data/gen_map.cjs`（`pnpm map:generate`，读 **vendored 行政边界源** `data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`（pinned revision + SHA-256 校验）+ `data/graphs/china-v1/station_nodes.json` 站点锚点，确定性生成 `data/maps/china-map.svg` + `data/maps/china-districts.json` + `apps/mobile/src/map/chinaMapData.ts`，幂等、无时间戳/随机值、完全离线）、固定 viewBox `0 0 1000 800` 与 `MAP_FIT` 等比映射（Y 为限制维度、禁 X/Y 独立拉伸）、`GET /api/v1/letters/:trackingNo/map` 安全投影（`apps/api/src/lib/map-view.ts`：只读用户可见 Timeline 事实 + 冻结规划 + SimulationClock；sender/recipient 同图、第三方 404、无 ETA/无 GPS/无掉落范围、`LETTER_DROPPED` 全局 HIDDEN 与正常世界 DTO 完全等价）、completedPath 永不重写 + remainingPath 虚线 + approximatePosition 确定性插值 + last-known（COURIER_MISSING）/ 终态只表达确认结果、Mobile `RouteMap` 七层（无 `DropAreaLayer`）、Letter Detail 仅新增「查看旅程地图」入口（无 polling / push / foreground refresh） |
 
 ## 当前质量基线
 
@@ -32,7 +32,7 @@
 - Runtime：Node 24.14.0 / pnpm 11.22.0 / PostgreSQL 17.11 / Redis 7.4.11 healthy（本轮 Gate 由 `docker compose up -d` 启动 `postgres:17` 与 `redis:7.4-alpine`，端口仅绑定 localhost；dev=`yishu` / test=`yishu_test` 严格分离）
 - Production API：production 构建可启动，**本地 production-mode smoke** `GET /api/v1/health` 返回 HTTP 200（本地 smoke，不是线上 deployment acceptance）
 - 测试隔离：破坏性集成测试只允许 `*_test` 数据库，开发库不被清理（Phase 7 Gate 探针：test 库 0 悬挂事务 / 0 未授权锁，dev 库 10 表 0 残留）
-- Git 工程闭环：Phase 1–4 baseline `bcba2e5`、Phase 5 `e755cb2`、Phase 6 `141a66c`、Phase 6 Gate maintenance `1e3a8be`、**Phase 7 baseline `6488e8e`**（`feat: complete phase 7 timeline and visibility`；已 push，`origin/main` 即此提交）、**Phase 8 spec-alignment commit `9a4fe8a`**（`docs: align phase 8 map visibility rules`；仅文档改动，本地 ahead 1、未 push）。**Phase 8 实现仍未 commit**（在工作区，等待独立 Final Gate 复审）；全程未 amend / rebase / force push / squash 任何历史 commit
+- Git 工程闭环：Phase 1–4 baseline `bcba2e5`、Phase 5 `e755cb2`、Phase 6 `141a66c`、Phase 6 Gate maintenance `1e3a8be`、**Phase 7 baseline `6488e8e`**（`feat: complete phase 7 timeline and visibility`）、**Phase 8 spec-alignment commit `9a4fe8a`**（`docs: align phase 8 map visibility rules`）、**Phase 8 实现 commit `10963fb`**（`feat: complete phase 8 local map and journey visualization`；含 Phase 8 代码 / 资产 / 测试 / 文档）。Phase 8 已于 2026-09-15 通过独立 Final Gate；后续文档同步另立 commit，不改写 baseline。远程同步以实际 `git push` / 远程 ref 查询结果为准，不将易变的 `origin/main` 指针写成固定基线。
 
 ## 安全基线
 
@@ -52,7 +52,7 @@
 - ~~TimelineEvent 与用户可见运输事实 / visibility~~ → **Phase 7 已完成**（TimelineEvent + IMMEDIATE/DELAYED/HIDDEN 映射 + `GET /letters/:trackingNo/timeline`）；WorldEvent 仍为服务器世界真相，绝不直接暴露给用户
 - Mobile 上的完整 Timeline UI / Letter Detail 时间线展示（Phase 10；Phase 7 只提供 API / domain contract）
 - BullMQ Simulation Worker（Phase 9；Phase 5/6 已提供确定性推进 service `advanceJourneyToNow` 与 WorldEvent 事件内核，生产环境由 worker 按模拟时钟调度消费）
-- ~~离线地图、轨迹、近似位置与最后确报~~ → **Phase 8 实现已完成（Final Gate pending review）**：完全离线的本地地图资产 + `GET /letters/:trackingNo/map` 安全投影 + Mobile RouteMap；**`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则**，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图不得暴露掉落原因。地图交互打磨与 Mobile 端完整展示属 Phase 10
+- ~~离线地图、轨迹、近似位置与最后确报~~ → **Phase 8 已完成并通过独立 Final Gate（2026-09-15）**：完全离线的本地地图资产 + `GET /letters/:trackingNo/map` 安全投影 + Mobile RouteMap；**`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则**，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图不得暴露掉落原因。地图交互打磨与 Mobile 端完整展示属 Phase 10
 - Polling、Push 与开发调试面板（Phase 9）
 
 ## 已知限制与外部风险
@@ -69,16 +69,16 @@
 - **随机游标与事件编号已解耦（2026-09-13 Gate 修复）**：`Journey.nextRandomDrawIndex`（随机决策游标）与 `Journey.nextWorldEventIndex`（WorldEvent 编号分配器）分离；记录派生事实（canonical COURIER_MISSING / TRANSPORT_CHANGED / PERMANENTLY_LOST）不再消费随机数。**该修复改变了 LOST_PATH / 恢复 / 终态路径的随机序列**（此前多消费的错误行为已消除）。事件编号在**实际创建 WorldEvent 时**才分配：新 Journey 等待期不占号（`primaryEventIndex = null`）、编号连续；由旧版本升级的 Journey 允许继承历史 gap（`primaryEventIndex` 预留编号被保留并优先使用）。**正式不变量 = eventIndex 唯一 + 单调 + 不碰撞**（不强制历史 Journey 满足 `nextWorldEventIndex === 事件数`）。升级兼容由 `20260913130000` 校准与迁移 13→14→15 真实临时库 fixture 验证（无 P2002、frozen outcome 未重抽、随机游标保留）。
 - **dev 库 migration checksum 漂移已消除（BLOCKER）**：dev 曾有一条 `20260908130000` 成功记录保存了修正前的 checksum（历史 `resolve --rolled-back` 后重部署未刷新该书签）。处置方式为**从 canonical 磁盘 history 重建 dev（及 test）数据库**（业务表当时全 0，无数据损失），未使用 `UPDATE _prisma_migrations`、未手工改 checksum、未修改任何 migration 文件；重建后逐条 checksum 与磁盘一致（0 drift）。
 - **Mobile public DTO 类型契约**：`apps/mobile` 的 `LetterView.status` 使用 `PublicLetterStatus`（不含 `LETTER_DROPPED`），与 `@yishu/shared` 的 `toPublicLetterStatus` 对齐；客户端不存在 `LETTER_DROPPED` UI 分支。
-- **Phase 8 地图可见性规范对齐 + 实现（2026-09-13）**：`LETTER_DROPPED` = HIDDEN 为**全局**用户可见性规则（不限于 Timeline）；禁止经 Letter API / Timeline / Journey projection / Mobile / Map 或任何其他用户 projection 暴露 `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因。规范与阶段规划中旧的「掉落范围 / 半透明圆形范围 / `DropAreaLayer` / Map API `dropArea` / 既定事实节点优先级中的信件掉落」已按项目负责人最新决定移除或改写；共享常量中残留的 §21 事实优先级注释已同步为「信件掉落不参与优先级表」。**实现已完成（implementation complete · Final Gate pending review）**：无 Prisma schema / migration 改动（磁盘仍 15 个 migration），地图几何完全由仓库内站数据生成、无第三方地图来源。
+- **Phase 8 地图可见性规范对齐 + 实现（2026-09-13）**：`LETTER_DROPPED` = HIDDEN 为**全局**用户可见性规则（不限于 Timeline）；禁止经 Letter API / Timeline / Journey projection / Mobile / Map 或任何其他用户 projection 暴露 `LETTER_DROPPED` / 信件掉落 / 掉落范围 / 掉落原因。规范与阶段规划中旧的「掉落范围 / 半透明圆形范围 / `DropAreaLayer` / Map API `dropArea` / 既定事实节点优先级中的信件掉落」已按项目负责人最新决定移除或改写；共享常量中残留的 §21 事实优先级注释已同步为「信件掉落不参与优先级表」。**实现已完成（独立 Final Gate PASS，2026-09-15）**：无 Prisma schema / migration 改动（磁盘仍 15 个 migration），初期几何方案随后由 vendored 静态行政边界源替代（见 2026-09-14 记录）；当前站点只作路线锚点，数据来源与许可见 `data/maps/README.md`。
 - **行尾策略**：仓库已加入 `.gitattributes`（`* text=auto eol=lf`，`*.bat`/`*.cmd` 为 CRLF）并随 Phase 7 baseline commit 提交；**未执行 `git add --renormalize .`**（避免把全仓大规模 EOL 变更混入 Phase 7 baseline commit）。受控 renormalize 仍保持独立决策，需项目负责人单独指示。
-- **Phase 8 Gate Repair（2026-09-14，未 commit）**：H1 剩余 / 已走路线改为**有序 Leg progression** 构造（禁止 `nodeId` 反查与「找不到就回退整条路线」；DELIVERED / PERMANENTLY_LOST / DESTROYED / 无剩余 leg → `remainingPath = []`）、M1 大概位置时间锚点改为**该段起点站最新可见 `DEPARTED_STATION`**（恢复 / 长期停留后重新出发不再沿用旧锚点）、M3 地图事实时间固定 `Asia/Shanghai`（`src/map/presentation.ts`，不随设备时区）、M4 新增**真实 API 响应安全扫描**（递归键 + 原始 JSON 全文）与 RouteMap / 图层 / FactList **渲染树测试**、L1 底图描边改为 `viewBoxStrokeWidth()` scale 补偿、L2 删除未使用 `toViewBoxPoints`。M5（边界语义）仍 **BLOCKED**。
+- **Phase 8 Gate Repair（2026-09-14，已含于 `10963fb`）**：H1 剩余 / 已走路线改为**有序 Leg progression** 构造（禁止 `nodeId` 反查与「找不到就回退整条路线」；DELIVERED / PERMANENTLY_LOST / DESTROYED / 无剩余 leg → `remainingPath = []`）、M1 大概位置时间锚点改为**该段起点站最新可见 `DEPARTED_STATION`**（恢复 / 长期停留后重新出发不再沿用旧锚点）、M3 地图事实时间固定 `Asia/Shanghai`（`src/map/presentation.ts`，不随设备时区）、M4 新增**真实 API 响应安全扫描**（递归键 + 原始 JSON 全文）与 RouteMap / 图层 / FactList **渲染树测试**、L1 底图描边改为 `viewBoxStrokeWidth()` scale 补偿、L2 删除未使用 `toViewBoxPoints`。M5（边界语义）当时仍 **BLOCKED**，随后于 2026-09-14 修复（见下条）。
 - **✅ Phase 8 地图边界语义（Gate M5）已修复（2026-09-14，项目负责人正式裁定数据源）**：`ProvinceBoundaryLayer` / `CHINA_MAP_OUTLINE_D` 改为 **vendored 静态行政边界源**（geoBoundaries `gbOpen / CHN / ADM1`，pinned revision、SHA-256 校验；provider / dataset / boundaryID / 年份 / 许可 **只在 `data/maps/README.md` 记录**）。station 点云**不再**参与边界生成（凸包 / 外扩 / 六边形逻辑已从生成器删除）。边界几何只做 canonical projection + 定点序列化（不自行简化），国家轮廓 = 34 个 ADM1 geometry 的 **union**（MultiPolygon / 岛屿全保留）。**34 个 ADM1 feature** 与 **31 个 route province** 明确区分（31/31 显式映射，无 fuzzy match；其余 3 个仅作底图，不伪造 station 计数），`MAP_DATA_BOUNDS` 语义改为「行政边界底图 ∪ 站点锚点」范围。站点空间归属实测：**283/294 严格落在本省 feature 内、0 个跨省**（旧方案 249/294 同时落入多个省形的问题消除）；11 个容差用例已在 Gate 报告逐条列明（其中 `yangquan` 系 Phase 4 冻结站点坐标本身为近似值所致，禁止改写冻结坐标）。该数据为开源静态行政边界数据，用于 V1 本地可视化，**非官方测绘成果、非法律边界认定文件**；面向中国大陆公开发布的合规检查属 Phase 12 Release Gate。
-- **✅ Phase 8 Gate 复核修复：Yangquan 跨省显示（2026-09-15，未 commit）**：M5 容差用例 `yangquan` 在用户可见地图上落到**河南省**一侧（根因 = Phase 4 冻结站点坐标为近似值，**冻结版本禁止改写**）。修复分两层：① **数据层**新增图版本 `china-v2`（`data/gen_graph.cjs` 的 `VERSION_OVERRIDES` 承载**唯一获批**的 `yangquan` 坐标修正；生成算法不变、其余站点与 `china-v1` 逐项一致；`registry.json` 登记 `china-v2` 并将其设为 `defaultVersion`，`china-v1` 保持**字节冻结**）；② **显示层**新增人工批准、可追溯的 `data/maps/station-display-corrections.json`（每条含 `lat` / `lng` / `source` / `reason`），由 `apps/api/src/lib/map-station-point.ts` **在加载时**完整校验后缓存，**只影响用户可见地图的渲染坐标**，不改路由 / 距离 / `World Truth` / Timeline 事实。校验规则与失败语义（**任一不满足即抛 `station_display_corrections_invalid`，绝不静默回退到冻结坐标**）：顶层 / 版本 / 条目必须是普通对象；版本 key 必须在 `data/graphs/registry.json` 登记；`nodeId` 必须属于该版本；每条必须带非空字符串 `source` / `reason` 且**不得含未知字段**；`lat` / `lng` 必须为有限数且在合法经纬度范围内、投影后必须落在 `MAP_DATA_BOUNDS` 内；版本对象不得为空（顶层 `{}` = 明确「当前无需显示修正」）。文件缺失或解析失败 → `station_display_corrections_unreadable`。地图生成产物不随 display-only 修正漂移（`data/gen_map.cjs` 路线锚点仍固定 `china-v1`）。证据：新增 `apps/api/src/lib/graph-data.test.ts`（`china-v1` 三资产 SHA-256 冻结 + 重生成逐字节一致 + `china-v1`↔`china-v2` 差异清单仅 `yangquan`）、`apps/api/src/lib/map-station-point.test.ts`（修正生效 / 越界拒绝 / 版本缺失 / 冻结数据只读）、mobile `boundary.test.ts` 增补「显示坐标 0 跨省 + `yangquan` 不再落入他省」。**仍未 Commit**。
-- **⛔ Phase 8 独立 Final Gate re-review 结论（2026-09-15）：FAIL**（`BLOCKER: NONE` / `HIGH: NONE` / **2 项 MEDIUM**）：
+- **✅ Phase 8 Gate 复核修复：Yangquan 跨省显示（2026-09-15，已含于 `10963fb`）**：M5 容差用例 `yangquan` 在用户可见地图上落到**河南省**一侧（根因 = Phase 4 冻结站点坐标为近似值，**冻结版本禁止改写**）。修复分两层：① **数据层**新增图版本 `china-v2`（`data/gen_graph.cjs` 的 `VERSION_OVERRIDES` 承载**唯一获批**的 `yangquan` 坐标修正；生成算法不变、其余站点与 `china-v1` 逐项一致；`registry.json` 登记 `china-v2` 并将其设为 `defaultVersion`，`china-v1` 保持**字节冻结**）；② **显示层**新增人工批准、可追溯的 `data/maps/station-display-corrections.json`（每条含 `lat` / `lng` / `source` / `reason`），由 `apps/api/src/lib/map-station-point.ts` **在加载时**完整校验后缓存，**只影响用户可见地图的渲染坐标**，不改路由 / 距离 / `World Truth` / Timeline 事实。校验规则与失败语义（**任一不满足即抛 `station_display_corrections_invalid`，绝不静默回退到冻结坐标**）：顶层 / 版本 / 条目必须是普通对象；版本 key 必须在 `data/graphs/registry.json` 登记；`nodeId` 必须属于该版本；每条必须带非空字符串 `source` / `reason` 且**不得含未知字段**；`lat` / `lng` 必须为有限数且在合法经纬度范围内、投影后必须落在 `MAP_DATA_BOUNDS` 内；版本对象不得为空（顶层 `{}` = 明确「当前无需显示修正」）。文件缺失或解析失败 → `station_display_corrections_unreadable`。地图生成产物不随 display-only 修正漂移（`data/gen_map.cjs` 路线锚点仍固定 `china-v1`）。证据：新增 `apps/api/src/lib/graph-data.test.ts`（`china-v1` 三资产 SHA-256 冻结 + 重生成逐字节一致 + `china-v1`↔`china-v2` 差异清单仅 `yangquan`）、`apps/api/src/lib/map-station-point.test.ts`（30 项：修正生效 / 范围封闭 / 未知节点与版本 / 冻结数据只读 / **20 例内存故障注入：结构 / 版本 / 站点 / 来源字段 / 未知字段 / 经纬度范围 / 投影边界 / 空版本对象全部必须抛错**）、mobile `boundary.test.ts` 增补「显示坐标 0 跨省 + `yangquan` 不再落入他省」。该修复已提交（`10963fb`）。
+- **⛔ Phase 8 前轮独立 Final Gate re-review 历史结论（2026-09-15）：FAIL**（`BLOCKER: NONE` / `HIGH: NONE` / **2 项 MEDIUM**）：
   - **MEDIUM-1（已修复）**：显示修正表未实现完整 fail-fast 校验（原实现只校验 `lat`/`lng` 有限性，`[]` / `null` / 站点拼写错误 / 未知版本 / 缺 `source`/`reason` 均被静默接受 → 可静默恢复跨省显示）。修复：加载时按上述规则完整校验（结构 / 版本 / 站点 / 来源字段 / 未知字段 / 经纬度范围 / 投影边界 / 空版本对象）+ 20 例内存故障注入测试（只注入内存，不写文件）。
   - **MEDIUM-2（已修复）**：阶段规划与状态文档的「当前状态」与实测矛盾（阶段规划仍写「M5 BLOCKED / Final Gate 尚未开始」；状态文档声称非法配置均抛错但当时未实现）。修复：区分**历史记录**与**当前状态**，按真实验证结果更新（含本节与根目录 `驿书_V1_Coding_Agent_阶段规划.md` §10）。
   - 该轮复核未修改任何源码 / 正式资产（184 个文件前后哈希一致），七项质量门禁 PASS（`typecheck` / `lint` / `format:check` / `test` 363 / `build` / `prisma:validate` / `prisma:generate`）。
-  - 修复后复验（本地，待独立复审确认）：`test` **385 passed / 0 failed / 0 skipped**（37 文件）、**Phase 8 定向 107/107 × 3 轮**、**Phase 5–7 回归 91/91**、`typecheck` / `lint` / `format:check` / `build` 全 PASS。
+  - **再次独立复审（2026-09-15）：PASS，两项 MEDIUM 均关闭**。真实文件读取路径故障注入确认非法结构 / 未知版本 / 拼错站点 / 缺来源 / 越界均拒绝，缺文件 / 损坏 JSON 明确报错；文档历史与当前状态已区分。全仓 **385 passed / 0 failed**（37 文件）；Phase 8 **107/107 共三轮通过**（全量中一轮＋额外两轮），Phase 5–7 回归 **91/91**；七项质量门禁全 PASS。dev/test 各 15 migrations、checksum 无漂移，无悬挂事务或异常锁等待；dev 十表为空，PostgreSQL / Redis healthy，production health HTTP 200。184 个仓库文件前后哈希一致，评审未改动正式文件。
 
 ## 封板与进入下一阶段规则
 
@@ -91,13 +91,14 @@ MAY START PHASE 8: YES
 REMAINING BLOCKERS: NONE
 ```
 
-Phase 8（Local Map + Journey Visualization）**implementation complete**，独立 Final Gate re-review 结论为 **FAIL**（2026-09-15）：
+Phase 8（Local Map + Journey Visualization）已通过最终独立复审（2026-09-15），实现 baseline commit 为 `10963fb`：
 
 ```text
-FINAL GATE: FAIL
-PHASE 8 COMPLETE: NO
-MAY START PHASE 9: NO
-BLOCKER: NONE / HIGH: NONE / MEDIUM: 2（均已在工作区修复，待再次独立复审）
+FINAL GATE: PASS
+PHASE 8 COMPLETE: YES
+MAY START PHASE 9: YES
+BLOCKER: NONE / HIGH: NONE / MEDIUM: NONE / LOW: NONE
+REMAINING BLOCKERS: NONE
 ```
 
-按《阶段规划》§10 的实施与自测已完成，**尚未 Commit、尚未通过独立 Final Gate**；在 Final Gate PASS 之前不得声明 `Phase 8 COMPLETE` / `MAY START PHASE 9`，也不得进入 Phase 9。阶段编号与功能归属唯一以根目录 `驿书_V1_Coding_Agent_阶段规划.md` 为准。
+Phase 8 实施、修复与独立 Final Gate 均已完成，baseline commit `10963fb` 已建立。**Phase 9 准入通过，但尚未启动**；本次文档同步与推送不构成启动授权，须等待项目负责人明确指示。阶段编号与功能归属唯一以根目录 `驿书_V1_Coding_Agent_阶段规划.md` 为准。
