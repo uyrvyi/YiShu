@@ -39,6 +39,7 @@ const EnvSchema = z
     // 测试数据库（集成测试专用），须为独立 *_test 库。
     TEST_DATABASE_URL: z.string().default(DEFAULT_TEST_DATABASE_URL),
     REDIS_URL: z.string().default(DEFAULT_REDIS_URL),
+    EXPO_PUSH_ACCESS_TOKEN: z.string().min(1).optional(),
     // Access Token（JWT）签名密钥；production 必须显式提供。
     JWT_SECRET: z.string().min(16).default(DEFAULT_JWT_SECRET),
     // Access Token 有效期（秒），默认 15 分钟。

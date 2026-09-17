@@ -28,6 +28,8 @@ export type {
   WorldEventType,
   TimelineEvent,
   TimelineEventType,
+  PushDevice,
+  PushDispatch,
 } from "../../../generated/prisma/client.js";
 
 /**

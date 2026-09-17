@@ -1,20 +1,47 @@
 import { loadConfig } from "@yishu/config";
-import { WORKER_NAME } from "./constants.js";
+import { createPrismaClient } from "@yishu/db";
+import { SystemSimulationClock } from "@yishu/simulation";
+import { pino } from "pino";
+import { ExpoPushProvider } from "./push-provider.js";
+import { startWorkerRuntime } from "./runtime.js";
 
-/**
- * 驿书 V1 Simulation Worker。
- *
- * Phase 1 仅提供可启动骨架。BullMQ / Redis 消费者将在 Phase 9（Worker Scheduling + Push + Refresh）实现。
- *
- * 日志安全：不得输出任何含用户名/密码/token 的完整连接串（如 REDIS_URL / DATABASE_URL）。
- */
-
-function main(): void {
+const log = pino();
+async function main(): Promise<void> {
   const config = loadConfig();
-  const hasRedis = config.REDIS_URL.length > 0;
-  process.stdout.write(
-    `[worker] ${WORKER_NAME} 已启动 (env=${config.NODE_ENV}, redis=${hasRedis ? "configured" : "missing"})\n`
-  );
+  const db = createPrismaClient(config.DATABASE_URL);
+  try {
+    const runtime = await startWorkerRuntime({
+      db,
+      redisUrl: config.REDIS_URL,
+      clock: new SystemSimulationClock(1),
+      provider: new ExpoPushProvider(config.EXPO_PUSH_ACCESS_TOKEN),
+      onError: (kind) => log.error({ kind }, "worker_failure"),
+    });
+    let stopping = false;
+    const stop = async () => {
+      if (stopping) return;
+      stopping = true;
+      try {
+        await runtime.close();
+      } finally {
+        await db.$disconnect();
+      }
+      log.info("worker_stopped");
+    };
+    process.once("SIGINT", () => {
+      void stop();
+    });
+    process.once("SIGTERM", () => {
+      void stop();
+    });
+    log.info("worker_ready");
+  } catch {
+    await db.$disconnect();
+    log.error("worker_start_failed");
+    process.exitCode = 1;
+  }
 }
-
-main();
+void main().catch(() => {
+  log.error("worker_configuration_failed");
+  process.exitCode = 1;
+});

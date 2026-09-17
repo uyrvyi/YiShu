@@ -86,6 +86,30 @@ export function createLetterApi(deps: LetterApiDeps) {
   }
 
   return {
+    async registerPush(token: string, platform: "ios" | "android"): Promise<void> {
+      const res = await doFetch(`${deps.baseUrl}/api/v1/push/register`, {
+        method: "POST",
+        headers: await headers(),
+        body: JSON.stringify({ token, platform }),
+      });
+      if (!res.ok) throw new Error(`push_register_failed:${res.status}`);
+    },
+    async unregisterPush(token: string): Promise<void> {
+      const res = await doFetch(`${deps.baseUrl}/api/v1/push/unregister`, {
+        method: "DELETE",
+        headers: await headers(),
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) throw new Error(`push_unregister_failed:${res.status}`);
+    },
+    async getTimeline(trackingNo: string): Promise<unknown> {
+      const res = await doFetch(`${deps.baseUrl}/api/v1/letters/${trackingNo}/timeline`, {
+        method: "GET",
+        headers: await headers(),
+      });
+      if (!res.ok) throw new Error(`get_timeline_failed:${res.status}`);
+      return res.json();
+    },
     /** 我的信件列表（寄出/收到/全部）。 */
     async listLetters(direction?: "sent" | "received"): Promise<LetterView[]> {
       const q = direction ? `?direction=${direction}` : "";

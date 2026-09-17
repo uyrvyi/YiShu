@@ -16,7 +16,7 @@
     "build": "pnpm --if-present -r run build",
     "typecheck": "pnpm build:packages && pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
-    "test": "pnpm build:packages && pnpm -r run test",
+    "test": "pnpm build:packages && pnpm --filter @yishu/worker build && pnpm -r run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma",

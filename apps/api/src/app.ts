@@ -12,6 +12,7 @@ import { letterRoutes } from "./routes/letters.js";
 import { journeyRoutes } from "./routes/journeys.js";
 import { timelineRoutes } from "./routes/timelines.js";
 import { mapRoutes } from "./routes/maps.js";
+import { pushRoutes } from "./routes/push.js";
 
 /**
  * buildApp 所需依赖（便于测试注入）。
@@ -98,7 +99,11 @@ export function buildApp(
     ) {
       return reply.code(400).send({ error: "validation_error" });
     }
-    app.log.error(err);
+    // Driver errors may embed bound tokens / credentials. Never serialize the raw error.
+    app.log.error(
+      { errorClass: err instanceof Error ? err.name : "UnknownError" },
+      "request_failed"
+    );
     return reply.code(500).send({ error: "internal_error" });
   });
 
@@ -109,6 +114,7 @@ export function buildApp(
   void app.register(journeyRoutes, { prefix: API_PREFIX });
   void app.register(timelineRoutes, { prefix: API_PREFIX });
   void app.register(mapRoutes, { prefix: API_PREFIX });
+  void app.register(pushRoutes, { prefix: API_PREFIX });
 
   return app;
 }

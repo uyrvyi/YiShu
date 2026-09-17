@@ -23,6 +23,8 @@ import {
   getApi,
   restoreSession,
   isAuthenticated,
+  getSessionVersion,
+  registerDeviceForSession,
 } from "./index";
 
 const REAL_LOGIN = {
@@ -40,6 +42,50 @@ describe("shared api session", () => {
   beforeEach(() => {
     secureStore.clear();
     vi.restoreAllMocks();
+  });
+
+  it("Phase 9 unregisters before logout and registers the same device under the next account", async () => {
+    const calls: { url: string; authorization?: string }[] = [];
+    globalThis.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      calls.push({
+        url,
+        authorization: new Headers(init?.headers).get("authorization") ?? undefined,
+      });
+      const account = url.endsWith("/login") ? JSON.parse(String(init?.body)).account : "";
+      return new Response(
+        JSON.stringify(
+          url.endsWith("/login")
+            ? {
+                ...REAL_LOGIN,
+                accessToken: `access-${account}`,
+                refreshToken: `refresh-${account}`,
+              }
+            : { ok: true }
+        ),
+        { status: 200 }
+      );
+    });
+    await loginSession("alice", "pass");
+    await registerDeviceForSession("ExpoPushToken[test_device]", "android", getSessionVersion());
+    await logoutSession();
+    const unregisterIndex = calls.findIndex((c) => c.url.endsWith("/push/unregister"));
+    expect(unregisterIndex).toBeGreaterThan(-1);
+    expect(unregisterIndex).toBeLessThan(calls.findIndex((c) => c.url.endsWith("/auth/logout")));
+    expect(calls[unregisterIndex]?.authorization).toBe("Bearer access-alice");
+    await loginSession("bob", "pass");
+    await registerDeviceForSession("ExpoPushToken[test_device]", "android", getSessionVersion());
+    expect(calls[calls.length - 1]?.authorization).toBe("Bearer access-bob");
+  });
+
+  it("Phase 9 discards registration from a previous session generation", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(REAL_LOGIN), { status: 200 }));
+    globalThis.fetch = fetchMock;
+    await loginSession("alice", "pass");
+    const generation = getSessionVersion();
+    await loginSession("bob", "pass");
+    await registerDeviceForSession("ExpoPushToken[test_device]", "android", generation);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("loginSession 调用真实 Auth API 并建立会话（access token 可用于 Letter API）", async () => {

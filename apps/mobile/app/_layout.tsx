@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { PushRegistration } from "../src/push/PushRegistration";
 
 /**
  * 驿书 V1 Mobile 根布局。
@@ -9,6 +10,7 @@ export default function RootLayout(): React.JSX.Element {
   return (
     <>
       <StatusBar style="auto" />
+      <PushRegistration />
       <Stack screenOptions={{ headerShown: false }} />
     </>
   );

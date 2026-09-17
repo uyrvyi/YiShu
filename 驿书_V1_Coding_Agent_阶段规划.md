@@ -64,7 +64,7 @@ MAY START PHASE X+1: YES
 | Phase 6  | Random Events + Recovery + World Truth         | FINAL GATE PASS                                  |
 | Phase 7  | Timeline + 用户可见运输事实                    | FINAL GATE PASS                                  |
 | Phase 8  | Local Map + Journey Visualization              | FINAL GATE PASS · COMPLETE（baseline `10963fb`） |
-| Phase 9  | Worker Scheduling + Push + Refresh             | 未开始                                           |
+| Phase 9  | Worker Scheduling + Push + Refresh             | FINAL GATE PASS · COMPLETE                       |
 | Phase 10 | Mobile V1 Integration + UX Closure             | 未开始                                           |
 | Phase 11 | Security / Reliability / Performance Hardening | 未开始                                           |
 | Phase 12 | Deployment + Release Gate                      | 未开始                                           |
@@ -789,7 +789,7 @@ PHASE 8 FINAL GATE: PASS (2026-09-15 independent re-review)
 REMAINING BLOCKERS: NONE
 PHASE 8 COMPLETE: YES
 MAY START PHASE 9: YES
-PHASE 9 NOT STARTED
+PHASE 9 FINAL GATE PASS · COMPLETE（后续独立 Re-Gate 通过）
 ```
 
 2026-09-13 完成启动前规范对齐（文档级：`LETTER_DROPPED` = HIDDEN 全局用户可见性规则；移除掉落范围 / `DropAreaLayer` / `dropArea` / 事实节点中的「信件掉落」）与 Phase 8 实现：
@@ -807,15 +807,50 @@ PHASE 9 NOT STARTED
 - **工程门禁（2026-09-15 复验）**：`typecheck` / `lint` / `format:check` / `test`（**385 passed / 0 failed / 0 skipped**，37 个测试文件）/ `build` 全 PASS；**Phase 8 定向 107/107 PASS × 3 轮**、**Phase 5–7 重点回归 91/91 PASS**。
 - **独立 Final Gate 历史与最终结论（2026-09-15）**：前轮因 MEDIUM-1（修正表 fail-fast 校验）和 MEDIUM-2（文档当前状态）判为 FAIL。修复后再次独立复审，两项均关闭：**FINAL GATE: PASS / PHASE 8 COMPLETE: YES / MAY START PHASE 9: YES / REMAINING BLOCKERS: NONE**；BLOCKER / HIGH / MEDIUM / LOW 均为 NONE。真实文件读取路径故障注入、七项质量门禁、385 项全量测试、Phase 8 定向 107 项三轮及 Phase 5–7 回归 91 项均通过（详见 `docs/PROJECT_STATUS.md`）。
 
-当前状态（2026-09-15）= **Phase 8 实现与全部 Gate 修复完成、独立 Final Gate PASS、baseline commit `10963fb` 已建立**；Phase 9 准入通过但 **NOT STARTED**。远程同步以实际 Git 推送与 ref 查询为准。
+Phase 8 封板记录（2026-09-15）= **实现与全部 Gate 修复完成、独立 Final Gate PASS、baseline commit `10963fb` 已建立**。随后项目负责人授权 Phase 9，现已通过独立 Re-Gate 并完成封板（见 §11）。
 
 历史记录（**不作为当前状态**）：2026-09-14 Gate Repair 报告中的「M5 边界语义 BLOCKED」与「Final Gate 尚未开始」为当时状态，已被上述进展取代。
 
-允许记录 `PHASE 8 COMPLETE: YES` / `MAY START PHASE 9: YES`；这仅表示准入通过，不代表已经启动。Phase 9 实施须等待项目负责人明确指示，本轮仅同步文档与推送。
+允许保留 `PHASE 8 COMPLETE: YES` / `MAY START PHASE 9: YES`；Phase 9 已另获明确启动授权。Phase 10 未获启动授权，不得越界。
 
 ---
 
 # 11. Phase 9 — Worker Scheduling + Push + Refresh
+
+## 当前状态
+
+**FINAL GATE PASS · COMPLETE**（2026-09-17 Independent Re-Gate）。开发 baseline 为 `fabbec686b08ef393dc83c848149bca21df812a6`。
+
+```text
+FINAL GATE: PASS
+PHASE 9 COMPLETE: YES
+MAY START PHASE 10: YES
+PHASE 10 NOT STARTED
+REMAINING BLOCKERS: NONE
+```
+
+M1 / M2 已由独立探针确认关闭；focused 33/33、targeted 56/56 × 3、Phase 5–7 regression 91/91、full 423/0/0（41 文件）通过，Android export 1441 modules。disk/dev/test migrations 16/16/16，drift/unfinished/rolledback 0/0/0。Re-Gate 重跑九项质量门禁；fresh DB 与 production health 引用前次独立 Gate，不声称本次重跑。
+本轮仅授权文档收口与本地 baseline commit，不 Push；Phase 10 启动须另行授权。
+
+### Historical implementation snapshots — resolved
+
+以下 Remediation / Finalization 记录为独立 Re-Gate 前的历史，不代表当前 blocker 或状态。
+
+Gate Remediation（2026-09-17）：针对独立 Gate 提出的两个 MAJOR correctness blocker 已完成修复，仅限 M1 / M2，未扩展 Phase 9 功能、未进入 Phase 10。
+
+- **M1（跨账号共享 refresh Promise）**：`createAuthenticatedFetch` 的 shared refresh 现按 session generation 作为 key 缓存，旧账号发起的 refresh 结果既不会交给新账号重用，也不会触发新账号的 `invalidate`。
+- **M2（旧 epoch 认证异常停止当前轮询）**：poller 只有「仍为当前 epoch」的失败才允许置 `authFailed` / 停表；上一 focus 或 background 期间的迟到 `AuthExpiredError` 不再杀死当前 timer。
+- 回归测试：新增 3 项（`authenticatedFetch.test.ts` 「never reuses the previous account's refresh for the new account」；`poller.test.ts` 「a stale epoch auth failure cannot stop the current polling」「a stale auth failure while backgrounded cannot block the next foreground」）。三项在修复前的实现上均**实测失败**，修复后通过。
+- 全量测试由 418 → **421 passed / 0 failed / 0 skipped**（mobile 91 → 94，其余不变）；typecheck / lint / format:check 均 PASS。
+
+Gate Remediation Finalization（2026-09-17）：
+
+- **dev 数据**：项目负责人已确认 dev 库中的人工业务数据由本人创建（至少 User=2 / Letter=2 及相应关联业务记录），不属于未知测试污染，不构成 Phase 9 blocker；未删除、未修改任何 dev 业务数据。
+- **门禁实跑**：`prisma:validate` / `prisma:generate` / `graph:validate` / `map:generate` / `typecheck` / `lint` / `format:check` / `test` 全部 exit 0；`prisma:generate` 与 `map:generate` 无 tracked 文件变化，graph validation report 仅刷新 `generatedAt`。
+- **语义覆盖确认**：M1 同 generation 共享 / 跨 generation 隔离 / 迟到 cleanup / 当前 generation 真失败，M2 旧 epoch 成功 / 旧 epoch 普通错误 / 旧 epoch 认证异常 / 当前 epoch 认证异常，均已由正式测试覆盖。
+- **新增 2 项**：`authenticatedFetch.test.ts`「keeps the new account's shared refresh after the previous account's refresh settles」（把 cleanup 临时劣化为无条件清空时实测失败，可捕获迟到 cleanup 误清新条目）、`poller.test.ts`「a stale epoch normal error cannot stop or notify the current epoch」。
+- 全量测试 421 → **423 passed / 0 failed / 0 skipped**（mobile 94 → 96）；误删的 `docs/PHASE4_COMPLETION_REPORT.md` 已从 HEAD 恢复；未 Commit / 未 Push / 未进入 Phase 10。
+- 当时结论：M1 / M2 修复完成，等待独立 Re-Gate；该历史等待状态已被上述 FINAL GATE PASS 取代。
 
 ## 目标
 
@@ -870,6 +905,10 @@ V1 不使用 WebSocket：
 ---
 
 # 12. Phase 10 — Mobile V1 Integration + UX Closure
+
+## 当前状态
+
+**NOT STARTED**。Phase 9 准入已通过，但尚无启动授权。
 
 ## 目标
 

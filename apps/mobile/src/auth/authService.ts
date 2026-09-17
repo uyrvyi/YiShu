@@ -87,6 +87,8 @@ export function createAuthService(api: ApiClient): AuthService {
         return null;
       }
       const result = await api.refresh(token);
+      // A late refresh must not overwrite credentials established by another login/logout.
+      if ((await getRefreshToken()) !== token) return null;
       // 若服务端返回新的 Refresh Token，更新 SecureStore
       if (result.refreshToken) {
         await saveRefreshToken(result.refreshToken);

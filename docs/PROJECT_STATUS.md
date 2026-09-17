@@ -1,9 +1,9 @@
 # 驿书 V1 项目状态
 
-> 更新时间：2026-09-15
-> 当前基线：**Phase 8 Final Gate PASS · Phase 8 COMPLETE（Local Map + Journey Visualization）**
+> 更新时间：2026-09-17
+> 当前基线：**Phase 9 Final Gate PASS · Phase 9 COMPLETE（Worker Scheduling + Push + Refresh）**
 > Phase 8：**独立 Final Gate PASS（2026-09-15）**；BLOCKER / HIGH / MEDIUM / LOW 均为 NONE；实现 baseline commit `10963fb`。
-> 下一阶段：**Phase 9 — Worker Scheduling + Push + Refresh（NOT STARTED）**；`MAY START PHASE 9: YES` 表示准入通过，实施仍等待项目负责人明确指示。
+> 下一阶段：**Phase 10 — Mobile V1 Integration + UX Closure（NOT STARTED）**。准入已通过，启动需另行授权。本轮仅授权本地 baseline commit，不 Push。
 
 ## Phase 完成情况
 
@@ -19,7 +19,24 @@
 
 | Phase 8：本地地图 | FINAL GATE PASS · COMPLETE（baseline `10963fb`） | `data/gen_map.cjs`（`pnpm map:generate`，读 **vendored 行政边界源** `data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`（pinned revision + SHA-256 校验）+ `data/graphs/china-v1/station_nodes.json` 站点锚点，确定性生成 `data/maps/china-map.svg` + `data/maps/china-districts.json` + `apps/mobile/src/map/chinaMapData.ts`，幂等、无时间戳/随机值、完全离线）、固定 viewBox `0 0 1000 800` 与 `MAP_FIT` 等比映射（Y 为限制维度、禁 X/Y 独立拉伸）、`GET /api/v1/letters/:trackingNo/map` 安全投影（`apps/api/src/lib/map-view.ts`：只读用户可见 Timeline 事实 + 冻结规划 + SimulationClock；sender/recipient 同图、第三方 404、无 ETA/无 GPS/无掉落范围、`LETTER_DROPPED` 全局 HIDDEN 与正常世界 DTO 完全等价）、completedPath 永不重写 + remainingPath 虚线 + approximatePosition 确定性插值 + last-known（COURIER_MISSING）/ 终态只表达确认结果、Mobile `RouteMap` 七层（无 `DropAreaLayer`）、Letter Detail 仅新增「查看旅程地图」入口（无 polling / push / foreground refresh） |
 
-## 当前质量基线
+| Phase 9：Worker / Push / Refresh | FINAL GATE PASS · COMPLETE | canonical domain 复用、durable BullMQ scheduling / reconciliation、safe Push、Mobile polling、Auth generation / epoch 防护、migration16 |
+| Phase 10：Mobile V1 Integration + UX Closure | NOT STARTED | 准入通过；须项目负责人另行授权启动 |
+
+## Phase 9 最终质量基线（2026-09-17 Independent Re-Gate PASS）
+
+- Worker：真实 BullMQ delayed scheduling、启动/重连/周期 reconciliation、唯一 canonical progression、幂等与 graceful shutdown。PushDevice / PushDispatch 支持认证注册/注销、ownership/version、safe Timeline allowlist、durable dedupe、Expo provider 与 receipt 处理。
+- Mobile：Detail / Map 约 5 秒、Home 约 30 秒轮询；foreground refetch、background pause、single-flight。原 M1（跨账号 refresh）/ M2（旧 epoch 认证失败停表）均由独立探针与正式测试确认 **closed**。
+- 全量 **423 passed / 0 failed / 0 skipped，41 test files**：API 263 + Mobile 96 + Worker 2 + Shared 11 + Config 19 + DB 2 + Simulation 11 + Routing 19 = 423。
+- Focused M1/M2 **33/33 PASS**；Phase 9 targeted **56/56 PASS × 3**（API 12 + Mobile 42 + Worker 2，Mobile 包含 focused 33 与 api/index 9）；Phase 5–7 regression **91/91 PASS**（world-events 33 + journey-advance 17 + timeline 36 + letter-visibility 5，随全量执行）。
+- Re-Gate 实际串行 typecheck / lint / format:check / test / build / prisma:validate / prisma:generate / graph:validate --json / map:generate 全部 exit 0；Android export **1441 modules**。正式文件哈希不变，地图产物字节不变。
+- Migration16：`20260915120000_phase9_push_delivery`。disk / dev / test = **16 / 16 / 16**；drift / unfinished / rolledback = **0 / 0 / 0**。历史 migration 1–15 未修改。
+- Re-Gate 实测 migration/checksum/locks、test/dev URL 隔离及 dev URL 拒绝保护、API/Worker/Push regression、runtime restart/disconnect recovery、build。**fresh DB 1→16、schema diff 与 production health 200 是前次 Independent Gate 证据；本次 Re-Gate 未重复执行 fresh DB / production health smoke。** Unix 原生信号、真机 Expo delivery 与大规模压测未验收；provider 非 exactly-once。
+- dev 实测 **User=2 / Letter=2 / Journey=1 / TransportLeg=6**，属于负责人确认的人工 dev 测试数据，关联记录保留，未删除或修改；旧 Letter=1 仅为历史快照。dev/test 无 idle transaction / lock waiter。
+- Independent Re-Gate：**BLOCKER NONE / HIGH・MAJOR NONE / MEDIUM NONE / LOW correctness NONE**。非阻塞 documentation statistics cleanup 已在封板文档收口中完成，不是 correctness blocker。
+- Phase 9 开发 baseline：`fabbec686b08ef393dc83c848149bca21df812a6`；本地封板提交使用 `feat: complete phase 9 worker push and refresh`，准确 SHA 以 Git 为准，不在提交内部自引用。本轮不 Push，Phase 10 NOT STARTED。
+- 历史实现快照与 M1/M2 修复过程保留于 [PHASE9_IMPLEMENTATION_REPORT.md](PHASE9_IMPLEMENTATION_REPORT.md)，不作为当前统计。
+
+## 已封板质量基线（Phase 8 历史，不代表 Phase 9 门禁）
 
 - TypeScript strict：PASS
 - ESLint：PASS
@@ -51,14 +68,14 @@
 
 - ~~TimelineEvent 与用户可见运输事实 / visibility~~ → **Phase 7 已完成**（TimelineEvent + IMMEDIATE/DELAYED/HIDDEN 映射 + `GET /letters/:trackingNo/timeline`）；WorldEvent 仍为服务器世界真相，绝不直接暴露给用户
 - Mobile 上的完整 Timeline UI / Letter Detail 时间线展示（Phase 10；Phase 7 只提供 API / domain contract）
-- BullMQ Simulation Worker（Phase 9；Phase 5/6 已提供确定性推进 service `advanceJourneyToNow` 与 WorldEvent 事件内核，生产环境由 worker 按模拟时钟调度消费）
+- Phase 10 完整 Mobile V1 Integration + UX Closure（NOT STARTED）
 - ~~离线地图、轨迹、近似位置与最后确报~~ → **Phase 8 已完成并通过独立 Final Gate（2026-09-15）**：完全离线的本地地图资产 + `GET /letters/:trackingNo/map` 安全投影 + Mobile RouteMap；**`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则**，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图不得暴露掉落原因。地图交互打磨与 Mobile 端完整展示属 Phase 10
-- Polling、Push 与开发调试面板（Phase 9）
+- 开发调试面板（不在本轮冻结实施范围内）
 
 ## 已知限制与外部风险
 
 - Mobile UI 是可运行的基础流程，不是最终产品级交互与视觉实现。
-- Worker 当前只验证独立进程与安全配置加载（Phase 1 骨架）；数据库、Redis/BullMQ 消费逻辑属于 Phase 9（Worker Scheduling + Push + Refresh，见阶段规划 §11）。
+- Phase 9 Worker / Push / Refresh 已通过独立 Re-Gate；真机投递、规模压测与部署验收仍按后续阶段执行。
 - `pnpm audit --prod` 当前报告 3 个 high、1 个 moderate 传递依赖公告：
   - `image-size <=2.0.2`：来自 Expo/Metro 工具链；公告要求 `>=2.0.3`，但审计时 npm registry 最新仍为 `2.0.2`，暂无可安装修复版。
   - `deepmerge-ts <8`：来自 Prisma 7.9.1 的 `@prisma/config`；Prisma 当前锁定 7.9.1，强制跨主版本 override 可能破坏工具链。
@@ -101,4 +118,14 @@ BLOCKER: NONE / HIGH: NONE / MEDIUM: NONE / LOW: NONE
 REMAINING BLOCKERS: NONE
 ```
 
-Phase 8 实施、修复与独立 Final Gate 均已完成，baseline commit `10963fb` 已建立。**Phase 9 准入通过，但尚未启动**；本次文档同步与推送不构成启动授权，须等待项目负责人明确指示。阶段编号与功能归属唯一以根目录 `驿书_V1_Coding_Agent_阶段规划.md` 为准。
+Phase 8 baseline `10963fb` 保留。Phase 9 Independent Re-Gate 已通过，封板结论如下；阶段编号与归属唯一以根目录阶段规划为准。
+
+```text
+FINAL GATE: PASS
+PHASE 9 COMPLETE: YES
+MAY START PHASE 10: YES
+PHASE 10 NOT STARTED
+REMAINING BLOCKERS: NONE
+```
+
+项目负责人本轮只授权本地 Phase 9 baseline commit；Push 与 Phase 10 启动须另行授权。

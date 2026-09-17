@@ -1910,13 +1910,15 @@ Simulation Worker
 
 # 66. Job 幂等
 
-Job ID：
+运输任务 identity 由 Journey 与已持久化推进游标构成：
 
 ```text
-letterId:leg:legIndex
+j-<journeyId>-<lastAdvancedAtSim 毫秒值或 start>
 ```
 
 重复执行不得重复生成 TimelineEvent。
+
+API / Worker 共用 canonical progression。PostgreSQL 是业务真相，Redis 只保存 journeyId / dispatchId 等最小 identity；启动、重连与周期 reconciliation 修复 commit/enqueue 间隙。终态 stale job 不继续推进或调度。
 
 必须使用：
 
@@ -1975,6 +1977,8 @@ Recipient 对 Sender 的 Block 与 Sender→Recipient 创建 Letter 必须竞争
 
 V1 不使用 WebSocket。
 
+Map 与 Letter Detail 使用相同的约 5 秒刷新周期；只在前台且聚焦时轮询，后台暂停。请求 single-flight，旧 epoch 响应（含认证错误）不得影响当前轮询。401 refresh 只在相同 session generation 内共享，每个原请求最多重试一次；旧账号结果与 cleanup 不得影响新账号会话。
+
 Letter Detail：
 
 ```text
@@ -2022,6 +2026,8 @@ Push 只是提醒。
 ```text
 PostgreSQL
 ```
+
+通知只来自 NEW_LETTER 或允许的公开 Timeline 事实，使用固定安全文案与 trackingNo；禁止正文、seed、隐藏原因、read/open 状态或任意 metadata 透传。设备注册/注销需要认证；ownership/version、lease 与 durable dispatch unique constraint 约束投递。Provider delivery 为 best effort，不保证 exactly-once。
 
 ---
 
@@ -2267,15 +2273,16 @@ HTTP 日志必须包含：
 requestId
 ```
 
-Simulation 日志至少包含：
+Simulation 日志可按需包含最小内部关联标识：
 
 ```text
 letterId
 journeyId
 legId
 eventId
-seed
 ```
+
+禁止记录正文、simulationSeed、token、完整数据库连接串、密钥或隐藏事件 payload；驱动/provider 错误进入日志或 failed job reason 前必须净化。
 
 ---
 

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import type { RouteMapViewParsed } from "@yishu/shared";
+import { usePolling } from "../../../src/refresh/usePolling";
+import { DETAIL_POLL_MS } from "../../../src/refresh/poller";
 import { RouteMap } from "../../../src/map/RouteMap";
 import { FactList } from "../../../src/map/FactList";
 import {
@@ -21,20 +22,11 @@ import {
  */
 export default function LetterMapScreen() {
   const { trackingNo } = useLocalSearchParams<{ trackingNo: string }>();
-  const [view, setView] = useState<RouteMapViewParsed | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const { getApi } = await import("../../../src/api/index");
-        setView(await getApi().getRouteMap(trackingNo));
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    }
-    void load();
+  const load = useCallback(async () => {
+    const { getApi } = await import("../../../src/api/index");
+    return getApi().getRouteMap(trackingNo);
   }, [trackingNo]);
+  const { data: view, error } = usePolling(load, DETAIL_POLL_MS);
 
   if (error) {
     return <Text style={styles.error}>{error}</Text>;

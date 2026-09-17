@@ -1,35 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
-import type { LetterView } from "../../src/api/letterApi";
+import { usePolling } from "../../src/refresh/usePolling";
+import { HOME_POLL_MS } from "../../src/refresh/poller";
 
 /**
  * 我的信件列表（Phase 3 最小真实流程）。
  * 展示寄出/收到的信件；正文在 Recipient DELIVERED 前锁定（由服务端控制，此处不展示 content）。
  */
 export default function LettersScreen() {
-  const [letters, setLetters] = useState<LetterView[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
   const load = useCallback(async () => {
-    try {
-      // 通过共享 API 客户端拉取（token 由注入来源提供）
-      const { getApi } = await import("../../src/api/index");
-      const api = getApi();
-      const list = await api.listLetters();
-      setLetters(list);
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+    const { getApi } = await import("../../src/api/index");
+    return getApi().listLetters();
   }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, error } = usePolling(load, HOME_POLL_MS);
+  const letters = data ?? [];
+  const loading = data === null && error === null;
 
   return (
     <View style={styles.container}>

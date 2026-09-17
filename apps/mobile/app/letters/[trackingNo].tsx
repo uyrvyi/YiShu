@@ -1,27 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Link, useLocalSearchParams } from "expo-router";
-import type { LetterView } from "../../src/api/letterApi";
+import { usePolling } from "../../src/refresh/usePolling";
+import { DETAIL_POLL_MS } from "../../src/refresh/poller";
 
 /** 信件详情（Phase 3 最小真实流程）。
  * Recipient 在 DELIVERED 前看到锁定正文（content 由服务端置 null，此处展示锁定状态）。
  */
 export default function LetterDetailScreen() {
   const { trackingNo } = useLocalSearchParams<{ trackingNo: string }>();
-  const [letter, setLetter] = useState<LetterView | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const { getApi } = await import("../../src/api/index");
-        setLetter(await getApi().getLetter(trackingNo));
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    }
-    void load();
+  const load = useCallback(async () => {
+    const { getApi } = await import("../../src/api/index");
+    // Fetch safe facts too; full Timeline UI remains Phase 10.
+    const [letter] = await Promise.all([
+      getApi().getLetter(trackingNo),
+      getApi().getTimeline(trackingNo),
+    ]);
+    return letter;
   }, [trackingNo]);
+  const { data: letter, error } = usePolling(load, DETAIL_POLL_MS);
 
   if (error) {
     return <Text style={styles.error}>{error}</Text>;
