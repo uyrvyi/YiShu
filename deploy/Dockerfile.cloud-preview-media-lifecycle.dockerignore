@@ -1,0 +1,13 @@
+**
+!deploy/
+!deploy/Dockerfile.cloud-preview-media-lifecycle
+!deploy/Dockerfile.cloud-preview-media-lifecycle.dockerignore
+!apps/
+!apps/mobile/
+!apps/mobile/src/
+!apps/mobile/src/media/
+!apps/mobile/src/media/ImagePreview.tsx
+!apps/mobile/src/media/draftMediaLifecycle.ts
+!apps/mobile/app/
+!apps/mobile/app/letters/
+!apps/mobile/app/letters/new.tsx

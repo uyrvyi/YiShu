@@ -58,12 +58,12 @@ describe("map presentation（Asia/Shanghai）", () => {
     };
   }
 
-  it("位置说明只表达大概位置 / 最后确报，不含 ETA / 剩余时间", () => {
+  it("位置说明只表达大概位置 / 最后确认位置，不含 ETA / 剩余时间", () => {
     const moving = positionNoteFor(viewWith());
     const stopped = positionNoteFor(viewWith({ approximatePosition: null }));
     const none = positionNoteFor(viewWith({ approximatePosition: null, lastKnownPosition: null }));
     expect(moving).toContain("大概位置");
-    expect(stopped).toContain("最后确报");
+    expect(stopped).toContain("最后确认");
     expect(none).toBeNull();
 
     for (const text of [
@@ -83,7 +83,7 @@ describe("map presentation（Asia/Shanghai）", () => {
 
   it("未启程时路线标题为占位文案，不显示半截路线", () => {
     expect(routeLabelFor(viewWith({ origin: null }))).toBe("尚未启程");
-    expect(routeLabelFor(viewWith({ destination: null }))).toBe("尚未启程");
+    expect(routeLabelFor(viewWith({ destination: null }))).toBe("北京 · 已确认轨迹");
     expect(routeLabelFor(viewWith())).toBe("北京 → 上海");
   });
 

@@ -1,0 +1,10 @@
+# Explicit IPv6 trial ingress; include only after scope approval and verification.
+services:
+  caddy:
+    environment:
+      TRIAL_IPV6: ${TRIAL_IPV6:?Prepare trial configuration first}
+    ports: !override
+      - "127.0.0.1:19443:443"
+      - "[${TRIAL_IPV6:?IPv6 required}]:19443:443"
+    volumes:
+      - ./deploy/Caddyfile.ip:/etc/caddy/Caddyfile:ro

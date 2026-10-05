@@ -20,9 +20,81 @@ import {
   RECOVERY_HANDLINGS,
   RECOVERY_TRANSPORT_CHANGE,
   selectWeightedOutcome,
+  transportEstimatesSchema,
+  nextStationEstimateSchema,
+  firstMileDurationSeconds,
+  routeMapViewSchema,
 } from "./index.js";
 
 describe("shared", () => {
+  it("adds three-hour collection without changing legacy speeds or random tables", () => {
+    expect(firstMileDurationSeconds("1.0")).toBe(0);
+    expect(firstMileDurationSeconds("1.1")).toBe(10800);
+    expect(() => firstMileDurationSeconds("9.9")).toThrow(UnknownRulesVersionError);
+    for (const type of TRANSPORT_TYPES) {
+      expect(speedKmPerDay("1.1", type)).toBe(speedKmPerDay("1.0", type));
+      expect(transportEventTable("1.1", type)).toEqual(transportEventTable("1.0", type));
+    }
+  });
+  it("strips internal district and connection fields from the public map DTO", () => {
+    const point = {
+      name: "上海市黄浦区",
+      province: "上海市",
+      city: "上海市",
+      district: "黄浦区",
+      x: 837.44,
+      y: 261.25,
+      sourceShapeId: "private",
+      nodeId: "private",
+    };
+    const view = routeMapViewSchema.parse({
+      status: "DISPATCHED",
+      origin: point,
+      destination: null,
+      completedPath: [point],
+      remainingPath: [],
+      lastKnownPosition: point,
+      approximatePosition: null,
+      facts: [],
+      collection: { from: point, to: point, state: "IN_PROGRESS", internalId: "private" },
+      delivery: null,
+      stations: [point],
+      districtLocationsUnavailable: [],
+    });
+    expect(view.origin?.district).toBe("黄浦区");
+    expect(JSON.stringify(view)).not.toContain("private");
+  });
+  it("参考预估契约只保留公开字段", () => {
+    expect(
+      transportEstimatesSchema.parse({
+        estimates: [
+          { transportType: "PIGEON", distanceKm: 0, durationSeconds: 21600, nodeId: "hidden" },
+        ],
+      }).estimates[0]
+    ).toEqual({ transportType: "PIGEON", distanceKm: 0, durationSeconds: 21600 });
+    expect(
+      nextStationEstimateSchema.parse({
+        state: "UNAVAILABLE",
+        remainingSeconds: null,
+        asOf: "2026-09-30T00:00:00.000Z",
+        anomaly: "hidden",
+      })
+    ).toEqual({ state: "UNAVAILABLE", remainingSeconds: null, asOf: "2026-09-30T00:00:00.000Z" });
+  });
+  it("预估拒绝非有限距离、负时长和非正剩余时间", () => {
+    expect(
+      transportEstimatesSchema.safeParse({
+        estimates: [{ transportType: "PIGEON", distanceKm: Infinity, durationSeconds: -1 }],
+      }).success
+    ).toBe(false);
+    expect(
+      nextStationEstimateSchema.safeParse({
+        state: "ON_THE_WAY",
+        remainingSeconds: 0,
+        asOf: "2026-09-30T00:00:00.000Z",
+      }).success
+    ).toBe(false);
+  });
   it("API 前缀为 /api/v1", () => {
     expect(API_PREFIX).toBe("/api/v1");
     expect(TRANSPORT_TYPES).toEqual(["HAND_CARRY", "HORSE_RELAY", "EXPRESS_RELAY", "PIGEON"]);
@@ -32,7 +104,7 @@ describe("shared", () => {
   });
 
   it("规则版本与冻结速度：1.0 默认速度表（Phase 4 Final Gate BLOCKER-1）", () => {
-    expect(RULES_VERSIONS).toEqual(["1.0"]);
+    expect(RULES_VERSIONS).toEqual(["1.0", "1.1"]);
     expect(TRANSPORT_SPEEDS_KM_PER_DAY).toEqual({
       HAND_CARRY: 35,
       HORSE_RELAY: 120,

@@ -28,7 +28,14 @@
  */
 
 import { Prisma } from "@yishu/db";
-import type { PrismaClient, Journey, TimelineEvent, TransportLeg, WorldEvent } from "@yishu/db";
+import type {
+  PrismaClient,
+  Journey,
+  TimelineEvent,
+  TransportLeg,
+  WorldEvent,
+  DestinationChange,
+} from "@yishu/db";
 import {
   TIMELINE_IMPORTANCE,
   WORLD_EVENT_VISIBILITY,
@@ -89,6 +96,7 @@ export interface TimelineProjectionInput {
   journey: Journey | null;
   legs: readonly TransportLeg[];
   worldEvents: readonly WorldEvent[];
+  destinationChanges?: readonly DestinationChange[];
 }
 
 interface StationFact {
@@ -209,7 +217,9 @@ export function projectTimelineFacts(input: TimelineProjectionInput): TimelineFa
       "journey:dispatched",
       "DISPATCHED",
       "已寄出",
-      `信件已从${stationFact(journey.originNodeId, graphVersion)?.name ?? "起点"}寄出`,
+      journey.originStationReadyAtSim
+        ? `信件已从${input.letterOriginCity}${input.letterOriginDistrict}寄出，运往本市驿站`
+        : `信件已从${stationFact(journey.originNodeId, graphVersion)?.name ?? "起点"}寄出`,
       journey.originNodeId,
       at,
       at,
@@ -219,6 +229,19 @@ export function projectTimelineFacts(input: TimelineProjectionInput): TimelineFa
         city: input.letterOriginCity,
         district: input.letterOriginDistrict,
       }
+    );
+  }
+
+  if (journey.originStationReadyAtSim) {
+    const at = journey.originStationReadyAtSim.getTime();
+    push(
+      "pickup:arrived",
+      "ARRIVED_STATION",
+      "已到达始发驿站",
+      `已到达${stationFact(journey.originNodeId, graphVersion)?.name ?? "本市驿站"}`,
+      journey.originNodeId,
+      at,
+      at
     );
   }
 
@@ -257,10 +280,36 @@ export function projectTimelineFacts(input: TimelineProjectionInput): TimelineFa
   }
 
   // 派送中（规范 §43：到达目标驿站 ≠ Delivered）
+  const deliveryKey = (revision: number) =>
+    revision === 0 ? "journey:out_for_delivery" : `journey:out_for_delivery:${revision}`;
+  for (const change of input.destinationChanges ?? []) {
+    if (
+      change.status !== "APPLIED" ||
+      change.previousLastMileReadyAtSim === null ||
+      change.fromRevision === null
+    )
+      continue;
+    const at = change.previousLastMileReadyAtSim.getTime();
+    push(
+      deliveryKey(change.fromRevision),
+      "OUT_FOR_DELIVERY",
+      "派送中",
+      "已进入最后投递",
+      change.previousDestinationNodeId,
+      at,
+      at,
+      null,
+      {
+        province: change.previousTargetProvince,
+        city: change.previousTargetCity,
+        district: change.previousTargetDistrict,
+      }
+    );
+  }
   if (journey.lastMileReadyAtSim !== null) {
     const at = journey.lastMileReadyAtSim.getTime();
     push(
-      "journey:out_for_delivery",
+      deliveryKey(journey.destinationRevision ?? 0),
       "OUT_FOR_DELIVERY",
       "派送中",
       "已进入最后投递",
@@ -542,7 +591,7 @@ export async function projectFactsForLetter(
 ): Promise<TimelineFactDraft[]> {
   const letter = await prisma.letter.findUnique({
     where: { id: letterId },
-    include: { journey: { include: { legs: true, worldEvents: true } } },
+    include: { journey: { include: { legs: true, worldEvents: true, destinationChanges: true } } },
   });
   if (!letter) return [];
 
@@ -562,6 +611,7 @@ export async function projectFactsForLetter(
     journey,
     legs: journey?.legs ?? [],
     worldEvents: journey?.worldEvents ?? [],
+    destinationChanges: journey?.destinationChanges ?? [],
   });
 }
 

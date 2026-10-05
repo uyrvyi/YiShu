@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
   cleanups: [] as (() => void)[],
@@ -13,6 +13,9 @@ const mock = vi.hoisted(() => ({
   tapped: null as null | ((response: unknown) => void),
   received: null as null | (() => void),
   cold: null as unknown,
+  constants: { executionEnvironment: "standalone", easConfig: { projectId: "test-project" } },
+  channel: vi.fn(),
+  active: null as null | ((state: string) => void),
 }));
 vi.mock("react", () => ({
   useEffect: (effect: () => () => void) => {
@@ -21,8 +24,16 @@ vi.mock("react", () => ({
   useRef: (value: unknown) => ({ current: value }),
   useSyncExternalStore: () => 1,
 }));
-vi.mock("react-native", () => ({ Platform: { OS: "android" } }));
-vi.mock("expo-constants", () => ({ default: { easConfig: { projectId: "test-project" } } }));
+vi.mock("react-native", () => ({
+  Platform: { OS: "android" },
+  AppState: {
+    addEventListener: (_: string, fn: (state: string) => void) => {
+      mock.active = fn;
+      return { remove: vi.fn() };
+    },
+  },
+}));
+vi.mock("expo-constants", () => ({ default: mock.constants }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("../api", () => ({
   getSessionVersion: () => 1,
@@ -33,8 +44,8 @@ vi.mock("../api", () => ({
 vi.mock("./tokenStorage", () => ({ readPushToken: async () => mock.retained }));
 vi.mock("../refresh/usePolling", () => ({ refetchVisibleScreens: mock.refetch }));
 vi.mock("expo-notifications", () => ({
-  AndroidImportance: { DEFAULT: 3 },
-  setNotificationChannelAsync: async () => {},
+  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+  setNotificationChannelAsync: mock.channel,
   requestPermissionsAsync: async () => ({ granted: mock.granted }),
   getExpoPushTokenAsync: mock.token,
   addPushTokenListener: () => ({ remove: mock.remove }),
@@ -50,6 +61,7 @@ vi.mock("expo-notifications", () => ({
   clearLastNotificationResponseAsync: async () => {},
 }));
 import { PushRegistration } from "./PushRegistration";
+import { getPushStatus, setPushStatus } from "./status";
 
 async function settle() {
   for (let i = 0; i < 12; i++) await Promise.resolve();
@@ -68,7 +80,16 @@ beforeEach(() => {
   mock.granted = true;
   mock.retained = null;
   mock.cold = null;
+  mock.constants.executionEnvironment = "standalone";
+  mock.constants.easConfig.projectId = "test-project";
+  mock.register.mockReset().mockResolvedValue(undefined);
+  mock.channel.mockReset().mockResolvedValue(undefined);
+  setPushStatus("signed_out");
   mock.token.mockReset().mockResolvedValue({ data: "ExpoPushToken[fake]" });
+});
+afterEach(() => {
+  mock.cleanups.splice(0).forEach((cleanup) => cleanup());
+  vi.useRealTimers();
 });
 
 describe("Phase 9 native notification lifecycle", () => {
@@ -120,5 +141,58 @@ describe("Phase 9 native notification lifecycle", () => {
     await settle();
     expect(mock.register).not.toHaveBeenCalled();
     expect(mock.push).not.toHaveBeenCalled();
+  });
+  it("explicitly reports Expo Go without falsely registering remote push", async () => {
+    mock.constants.executionEnvironment = "storeClient";
+    PushRegistration();
+    await settle();
+    expect(getPushStatus()).toBe("expo_go");
+    expect(mock.token).not.toHaveBeenCalled();
+    expect(mock.register).not.toHaveBeenCalled();
+  });
+  it("uses a new audible high-importance channel and reports binding, not delivery", async () => {
+    PushRegistration();
+    await settle();
+    expect(mock.channel).toHaveBeenCalledWith("letters-v2", {
+      name: "驿书",
+      importance: 4,
+      sound: "default",
+    });
+    expect(getPushStatus()).toBe("ready");
+  });
+  it("reports missing project configuration instead of swallowing it", async () => {
+    mock.constants.easConfig.projectId = "";
+    PushRegistration();
+    await settle();
+    expect(getPushStatus()).toBe("project_missing");
+    expect(mock.token).not.toHaveBeenCalled();
+  });
+  it("retries a failed server binding when the app returns to the foreground", async () => {
+    mock.register.mockRejectedValueOnce(new Error("offline"));
+    PushRegistration();
+    await settle();
+    expect(getPushStatus()).toBe("server_failed");
+    mock.active?.("active");
+    await settle();
+    expect(getPushStatus()).toBe("ready");
+    expect(mock.register).toHaveBeenCalledTimes(2);
+  });
+  it("times out token acquisition without binding a late response", async () => {
+    vi.useFakeTimers();
+    let resolve!: (value: { data: string }) => void;
+    mock.token.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    PushRegistration();
+    await settle();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(getPushStatus()).toBe("token_failed");
+    resolve({ data: "ExpoPushToken[late]" });
+    await settle();
+    expect(mock.register).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

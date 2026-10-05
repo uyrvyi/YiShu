@@ -13,21 +13,25 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@yishu/domain": "workspace:*",
     "@fastify/jwt": "^10.2.2",
+    "@fastify/multipart": "^10.1.2",
+    "@fastify/rate-limit": "^11.2.0",
     "@yishu/config": "workspace:*",
     "@yishu/db": "workspace:*",
+    "@yishu/domain": "workspace:*",
     "@yishu/routing": "workspace:*",
     "@yishu/shared": "workspace:*",
     "@yishu/simulation": "workspace:*",
     "argon2": "^0.45.1",
-    "fastify": "^5.0.0",
+    "fastify": "5.12.5",
+    "ioredis": "^6.0.0",
     "pino": "^9.0.0",
+    "sharp": "^0.35.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@yishu/worker": "workspace:*",
     "@types/node": "^24.0.0",
+    "@yishu/worker": "workspace:*",
     "pino-pretty": "^11.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",

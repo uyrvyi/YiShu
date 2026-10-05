@@ -1,0 +1,55 @@
+{
+    admin off
+    auto_https disable_redirects
+    skip_install_trust
+    default_sni {$CLOUD_PUBLIC_IP}
+    servers {
+        protocols h1 h2
+    }
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+            }
+        }
+    }
+}
+(cloud_api) {
+    header Alt-Svc clear
+    handle /maps/national-20261003-v2/* {
+        reverse_proxy map-tiles:4180 {
+            header_up -Cookie
+            header_up -Authorization
+        }
+    }
+    handle /api/v1/ready {
+        respond 404
+    }
+    handle /api/v1/* {
+        reverse_proxy api:4000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up -Forwarded
+            header_up -X-Real-IP
+        }
+    }
+    handle {
+        respond 404
+    }
+}
+
+https://localhost {
+    tls internal
+    import cloud_api
+}
+
+https://{$CLOUD_PUBLIC_IP} {
+    tls force_automate {
+        issuer acme {
+            dir https://acme-v02.api.letsencrypt.org/directory
+            profile shortlived
+            disable_http_challenge
+        }
+    }
+    import cloud_api
+}

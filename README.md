@@ -2,12 +2,15 @@
 
 「现代世界 + 古代通信方式」的点对点通信 App。
 
-> 当前基线：**Phase 9 Final Gate PASS · Phase 9 COMPLETE（Worker Scheduling + Push + Refresh）**
+> Phase 10 历史验收：**Final Gate PASS · COMPLETE（Mobile V1 Integration + UX Closure）**；新版 iPhone 核心流程与本地通知已通过，真实远程推送留 Phase 12 验收。
 > Phase 8：**独立 Final Gate PASS（2026-09-15）**；BLOCKER / HIGH / MEDIUM / LOW 均为 NONE；实现 baseline commit `10963fb`。
-> 下一阶段：**Phase 10 — Mobile V1 Integration + UX Closure（NOT STARTED）**。MAY START PHASE 10: YES 仅表示准入通过，启动仍需负责人单独授权；本轮仅授权建立本地 Phase 9 baseline commit，不 Push。
-> 已完成项目骨架、账号/身份、Letter 核心、Phase 4 本地 Graph + Dijkstra 路线规划、Phase 5 SimulationClock / DeterministicRandom 与确定性推进、Phase 6 WorldEvent 世界真相 + 固定概率随机事件 + Recovery + 自动运输变更 + PERMANENTLY_LOST/DESTROYED、Phase 7 TimelineEvent 用户可见运输事实（WorldEvent ≠ TimelineEvent；visibility 冻结映射：直接可见 / 后台原因 HIDDEN / 终态确认结果），以及 Phase 8：完全离线的本地地图资产 + `GET /letters/:trackingNo/map` 安全投影 + Mobile RouteMap（已走实线 / 未走虚线 / 大概位置 / 最后确报 / 事实节点，无 ETA、无精确 GPS、无掉落范围）。Phase 9 Worker / Push / Refresh 已通过 Independent Re-Gate 并完成封板；完整 Mobile UI 属 Phase 10，未启动。
+> 最近封板：**Phase 11 Security / Reliability / Performance Hardening · 独立 FINAL GATE PASS · COMPLETE（2026-09-30）**。最终全量 503 项、独立 302 项测试通过，Worker 两项 Gate 发现均关闭，多小时耐久由负责人确认完成。
+> 当前阶段：**Phase 12 Deployment + Release Gate · IN PROGRESS**。按负责人确认先做隔离的本机 Docker 演练；本轮回归 515 项通过，HTTPS API `https://localhost:8443`（本机 CA）、HTTP `18080`。开发 `4000/8081` 保持不变。详见 [部署手册](docs/PHASE12_DEPLOYMENT.md) 和 [实施记录](docs/PHASE12_IMPLEMENTATION_REPORT.md)；真实推送与正式发布仍待验。
+> Phase 1–11 已完成；封板证据见 [`docs/PHASE11_FINAL_GATE.md`](docs/PHASE11_FINAL_GATE.md)，实施与风险边界见 [`docs/PHASE11_IMPLEMENTATION_REPORT.md`](docs/PHASE11_IMPLEMENTATION_REPORT.md)。源码尚未提交，V1 Release Gate 未通过。Phase 10 验收记录见 [`docs/PHASE10_IMPLEMENTATION_REPORT.md`](docs/PHASE10_IMPLEMENTATION_REPORT.md)。
 
 当前进度、验收结果与已知限制见 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)。
+
+依赖兼容补丁后，在线 audit 仍为 **4 HIGH / 3 Moderate（exit 1）**，Expo 推荐版本检查亦 exit 1；独立审查在当前受控使用边界下不列为 Phase 11 blocker，不代表零漏洞或发布通过。处置与限制见 [`docs/PHASE11_DEPENDENCY_AUDIT.md`](docs/PHASE11_DEPENDENCY_AUDIT.md)，发布前必须复核。
 
 ## 技术栈（规划）
 
@@ -41,16 +44,49 @@ yishu/
 │  ├─ schema.prisma    # 身份、Letter、Journey、WorldEvent、TimelineEvent、PushDevice / PushDispatch
 │  └─ migrations/
 ├─ prisma.config.ts    # Prisma 7 配置文件
-├─ docker-compose.yml  # PostgreSQL 17 + Redis
+├─ docker-compose.yml  # PostgreSQL 17 + Redis + Node/Expo 开发容器
 ├─ pnpm-workspace.yaml
 └─ package.json
 ```
 
 ## 环境要求
 
+### Docker 全容器开发（推荐）
+
+Mac 只需 Docker Desktop。Node 24、pnpm 11.22.0、PostgreSQL 17、Redis 7.4、API、Worker 和 Expo Metro 均在容器中运行：
+
+```bash
+sh scripts/dev.sh
+sh scripts/dev.sh logs -f dev
+```
+
+首次启动会构建开发镜像、生成带随机密钥的本地 `.env`、安装锁定依赖、创建独立 `yishu_test` 数据库，并给开发库和测试库执行迁移。已有 `.env` 保留；API / Worker 的数据库与 Redis 地址在 Compose 中使用服务名覆盖。源码绑定到容器，支持现有 watch 热更新；依赖存储和数据库使用 Docker volumes。
+
+- API 健康检查：`http://localhost:4000/api/v1/health`
+- Expo Metro：`http://localhost:8081`；手机与 Mac 在同一局域网，Expo 客户端连接 `exp://<Mac局域网IP>:8081`。
+- 首次启动自动读取 Mac `en0` 地址。其他网卡可用 `DEV_HOST_IP=<IP> sh scripts/dev.sh`；IP 变化后更新 `.env` 的 `EXPO_PUBLIC_API_BASE_URL` 和 `REACT_NATIVE_PACKAGER_HOSTNAME`，再执行 `sh scripts/dev.sh up -d --force-recreate dev`。
+- API / Metro 默认开放局域网端口以支持真机；数据库和 Redis 仅映射到 localhost。
+- Expo 开发服务器在 Docker 中；iOS 模拟器、手机客户端和原生签名工具运行在相应设备上。
+- 交互地图使用百度地图 JSAPI 4.0：在本地 `.env` 配置浏览器端 `EXPO_PUBLIC_BAIDU_MAP_AK`，再重建 `dev` 容器。未配置 AK、加载失败或网络不可用时自动显示原有本地静态地图。客户端 AK 会包含在应用资源中，生产发布前需按百度地图平台要求限制来源与配额；地图坐标来自站点展示坐标，仅表示近似路线，不是实时 GPS。
+- 仅开发环境可在 `.env` 设置 `SIMULATION_CLOCK_OFFSET_MS` 快进 API / Worker 的模拟时间（例如 `864000000` 为 10 天），修改后运行 `sh scripts/dev.sh up -d --force-recreate --no-deps --wait dev`。恢复正常时间设为 `0` 并重建；已推进到未来的信件不会倒退，未来事件在正常时钟追上前可能暂不可见。生产环境禁止非零偏移。
+
+```bash
+sh scripts/dev.sh ps
+sh scripts/dev.sh exec dev pnpm typecheck
+sh scripts/dev.sh exec dev pnpm test
+sh scripts/dev.sh exec dev pnpm migrations:check # 只读核对 dev/test 迁移历史与 checksum
+sh scripts/dev.sh exec -T dev pnpm phase11:benchmark # 临时库性能基线，含 60 秒轮询探针
+sh scripts/dev.sh exec dev sh
+sh scripts/dev.sh down             # 停止服务，保留数据库和依赖卷
+```
+
+依赖清单变化后重启 `dev` 会重新安装依赖并执行待应用迁移。不要使用 `down -v`，除非明确需要删除本地数据库与依赖卷。后面的宿主机 pnpm 命令也可以通过 `sh scripts/dev.sh exec dev` 在容器中执行。
+
+### 宿主机工具链（可选）
+
 - **Node.js**: `>=24.3.0 <25`（React Native 0.86.2 要求 Node >= 24.3.0；当前使用 24.14.0）
 - **pnpm**: `>=11.0.0 <12`（当前使用 11.22.0，见 `packageManager`）
-- **Docker**: 用于本地 PostgreSQL / Redis
+- **Docker**: 可运行完整开发环境
 
 ### TypeScript 版本策略
 
@@ -101,7 +137,8 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.x.x:4000
 - API / Worker 统一通过 `@yishu/config` 的 `loadConfig()` 读取，不散落读取 `process.env`。
 - 根 `.env` 由 `@yishu/config` 自动加载。
 - **连接串结构校验**（URL 解析）：`DATABASE_URL` 校验 protocol（`postgresql:`/`postgres:`）、hostname、database/path；`REDIS_URL` 校验 protocol（`redis:`/`rediss:`）、hostname。
-- **`NODE_ENV=production` 时，`DATABASE_URL`/`REDIS_URL`/`JWT_SECRET` 必须显式提供**，禁止静默回退到 localhost 默认值，否则配置加载抛错。
+- **`NODE_ENV=production` 时，`DATABASE_URL`/`REDIS_URL`/`JWT_SECRET`/`CONTENT_ENCRYPTION_KEY` 必须显式提供**，禁止默认或占位密钥。JWT 至少 32 字节，正文密钥为 32 字节 hex；两者须独立随机生成，不能复用开发密钥。生产 API 必须接入共享 Redis，不能关闭限流。
+- **代理 IP**：当前 API 显式不信任 `X-Forwarded-For` / `Forwarded`，只按直连 socket IP 限流。Phase 12 部署反向代理时须复核可信代理范围、客户端 IP 提取及直连隔离，不能直接开启 `trustProxy: true`。
 - **测试数据库隔离**：破坏性集成测试只允许在 `TEST_DATABASE_URL` 指向的 `*_test` 库执行清库。`requireTestDatabaseUrl()` 强制保护——未提供 `TEST_DATABASE_URL` 或数据库名不含 `_test` 时直接拒绝，**禁止 fallback 到开发库**。
 - **日志安全**：Worker/API 不输出完整连接串（`DATABASE_URL` / `REDIS_URL`），避免泄露用户名、密码、token。
 
@@ -123,7 +160,7 @@ Redis 连接              PASS（redis-cli ping → PONG）
 Prisma SELECT 1         PASS（@yishu/db 实际连接）
 ```
 
-> `docker-compose.yml` 仅运行 PostgreSQL 17 与 Redis（**不容器化** Mobile/API/Worker），端口仅绑定 localhost。
+> 当前 `docker-compose.yml` 默认启动完整 Docker 开发环境。仅使用数据库和缓存时运行 `docker compose up -d postgres redis`。
 
 ## 开发启动（三端 + 内部包 watch）
 
@@ -336,7 +373,7 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 - **状态**：**Phase 8 Final Gate PASS · PHASE 8 COMPLETE: YES**（2026-09-15 独立复审；BLOCKER / HIGH / MEDIUM / LOW 均为 NONE）。实现 baseline commit `10963fb`；此为 Phase 8 封板记录；Phase 9 后续亦已通过独立 Re-Gate。
 - **完全离线地图资产（vendored static boundary source + repository-local station anchors）**：`pnpm map:generate`（`data/gen_map.cjs`）读取**两类职责独立的数据源** —— ① vendored 行政边界源 `data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`（geoBoundaries `gbOpen / CHN / ADM1`，冻结 revision、SHA-256 校验；provider / dataset / boundaryID / 年份 / 许可 **只在 [`data/maps/README.md`](data/maps/README.md) 记录**）与 ② 站点锚点 `data/graphs/china-v1/station_nodes.json` —— 确定性生成 `data/maps/china-map.svg`（国家轮廓 + 34 个 ADM1 边界）、`data/maps/china-districts.json`、`apps/mobile/src/map/chinaMapData.ts`；生成器**不写当前时间 / 随机值 / 环境相关值**，重复执行零新增 diff（幂等）。**station 点云不再是行政边界来源**（无凸包 / 外扩 / 六边形）；边界几何只做 canonical projection + 定点序列化；运行时与构建期**均不访问互联网**（无在线瓦片 / geocoder / 商业地图 SDK）。该数据为开源静态行政边界数据，用于 V1 本地可视化，**非官方测绘成果、非法律边界认定文件**；面向中国大陆公开发布的合规检查属 Phase 12 Release Gate。
 - **固定 viewBox + uniform scaling**：`MAP_VIEWBOX = 0 0 1000 800`；`MAP_DATA_BOUNDS` = 行政边界底图 ∪ 站点锚点的 `mapX/mapY` 范围，`MAP_FIT` 由其等比推导（**Y 为限制维度**，`MAP_FIT_MARGIN = 60`；X 因等比居中留白更大），**禁止 X/Y 独立拉伸**；全部 34 个 ADM1 形状、国家轮廓（union，非凸包）与 294 个站点锚点映射后均落在 viewBox 内。
-- **Map API**：`GET /api/v1/letters/:trackingNo/map`（规范 §74）—— Sender / Recipient 同图（完整 `toEqual`）、第三方 404、匿名 401；纯投影函数（`apps/api/src/lib/map-view.ts`）只读「已物化且用户可见」的 Timeline 事实 + 冻结规划 + SimulationClock，**不读 WorldEvent.payload / Journey.anomalyType / internal `Letter.status`**；GET 前后 World Truth（Letter / Journey / TransportLeg / WorldEvent 与两个游标）完全不变。
+- **Map API**：`GET /api/v1/letters/:trackingNo/map`（规范 §74）—— 寄件人可看计划路线；收件人只看已确认轨迹与事实，不返回目的站、未走路段或推算位置；第三方 404、匿名 401。纯投影函数（`apps/api/src/lib/map-view.ts`）只读「已物化且用户可见」的 Timeline 事实 + 冻结规划 + SimulationClock，**不读 WorldEvent.payload / Journey.anomalyType / internal `Letter.status`**；GET 前后 World Truth（Letter / Journey / TransportLeg / WorldEvent 与两个游标）完全不变。
 - **safe DTO**：`status`（`PublicLetterStatus`）/ `origin` / `destination` / `completedPath` / `remainingPath` / `approximatePosition` / `lastKnownPosition` / `facts`（≤ 5，来源 = 用户可见 Timeline 事实，按 §21 冻结优先级 + 时间 + 确定性 tie-break）；**不含** id / letterId / journeyId / worldEventId / eventIndex / sourceKey / sequence / seed / rulesVersion / graphVersion / payload / anomalyType / primaryEvent\* / next\*Cursor / lat / lng / ETA / remainingSeconds / `dropArea` / `LETTER_DROPPED`，也不含 Recipient `readState` / `openedAt`。
 - **路线与位置语义**：completed = 用户可见事实确认过的节点（reroute 后**永不重写**）；remaining = 冻结规划几何（虚线）；`approximatePosition` = 由「已确认出发时刻 → now」在计划区间内线性插值（clamp 到 `MAP_APPROXIMATE_MAX_RATIO`；确定性、不用 `Math.random`、不消费随机游标、与 GET 次数无关）；**无 ETA / 无倒计时 / 无精确 GPS**。
 - **异常与终态**：`COURIER_MISSING` → `approximatePosition = null` + 只保留 last-known（未走路线仍为虚线，不暴露 cause）；隐藏掉落（internal `LETTER_DROPPED`，含 LOST_PATH / ROBBERY / SERIOUS_ACCIDENT 等 HIDDEN cause）**全局 HIDDEN**：用户可见状态仍 `IN_TRANSIT`、DTO 与「相同可见事实」的正常世界**完全一致**，无掉落范围 / 掉落坐标 / 掉落原因；`PERMANENTLY_LOST` / `DELIVERED` / `DESTROYED` 只表达终态确认结果并保持最后确报（不推测遗失点、不显示事故点）。
@@ -358,15 +395,15 @@ Schema 当前包含业务模型：**User**、**Block**、**RefreshToken**、**Le
 - Mobile Detail / Map 约 5 秒、列表约 30 秒刷新；前台且聚焦才轮询，回前台立即 refetch，单请求飞行、卸载清理、401 单次共享 refresh。Push 点击（含冷启动）只导航并重新请求安全 API，不使用通知内容更新业务真相。
 - 真机推送需要有效 EAS projectId（EAS 配置或 `EXPO_PUBLIC_EAS_PROJECT_ID`）、平台推送凭据与 notification permission；服务端可选 `EXPO_PUSH_ACCESS_TOKEN` 不得使用 public 前缀。权限拒绝不阻断发信收信。离线注销无法撤回 provider 已接收的通知，后续登录重绑与 lease 负责纠正服务器注册。
 - Auth refresh 只在相同 session generation 内 single-flight，旧 Promise cleanup 不清除新账号条目；旧 epoch 的 AuthExpiredError 不停止当前轮询。Worker 幂等推进复用 canonical domain，不复制第二套状态机。
-- **Independent Re-Gate PASS（2026-09-17）**：M1/M2 已关闭；focused 33/33、targeted 56/56 × 3、Phase 5–7 回归 91/91、全量 423 passed / 0 failed / 0 skipped（41 文件）；详细证据与限制见 [Phase 9 归档报告](docs/PHASE9_IMPLEMENTATION_REPORT.md)。Phase 10 尚未启动。
+- **Independent Re-Gate PASS（2026-09-17）**：M1/M2 已关闭；focused 33/33、targeted 56/56 × 3、Phase 5–7 回归 91/91、全量 423 passed / 0 failed / 0 skipped（41 文件）；这是 Phase 9 历史验收记录，详细证据与限制见 [Phase 9 归档报告](docs/PHASE9_IMPLEMENTATION_REPORT.md)。
 
-### 未完成（后续 Phase）
+### Phase 10：Mobile V1 Integration + UX Closure
 
-Phase 9 Worker / Push / Refresh **Final Gate PASS · COMPLETE**。完整 Mobile V1 流程与 Letter Detail Timeline UI（Phase 10）尚未实现。Phase 7 已完成 WorldEvent→TimelineEvent 的可见性转换与 API/domain contract（按阶段规划，完整 Mobile timeline 属 Phase 10）；Phase 9 已由 Worker 使用同一 canonical progression 按模拟时钟推进。**`LETTER_DROPPED` = HIDDEN 是全局用户可见性规则**（V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图与任何用户 projection 都不得暴露掉落原因）。
+已实现注册/登录/会话恢复/退出、查件列表与状态摘要、精准搜索收件人、写信最终确认、幂等寄信后初始化旅程、路线失败重试、信件详情的绿色物流入口、物流详情内的运输地图与可展开动态、居中加号写信入口、我的设置页及终态隐藏。网络中断时保留 Refresh Token，并提供重试。Sender 的详情始终不显示 `readState`；Recipient 送达前正文锁定，且无法通过详情、Journey API 或 Map API 查看未发生的路线计划；**`LETTER_DROPPED` = HIDDEN**。自动化结果和真机待验事项见 [Phase 10 报告](docs/PHASE10_IMPLEMENTATION_REPORT.md)。
 
 ## 已知限制与维护事项
 
 - `generated/`、`dist/`、`.expo/` 均为可再生成产物并已忽略；`.env` 与本地 Agent 数据不进入 Git。
-- Mobile 已有最小登录/注册认证入口与 Letter 列表/写信/详情页面；正式产品级 UI 打磨属后续。
+- Phase 10 Final Gate PASS：新版核心流程与本地通知获用户 iPhone 人工复验通过。Expo Go 本地通知不代表真实远程推送；后者须在 Phase 12 Release Gate 用具备 iOS 推送凭据的构建验证，未通过前不可宣称 V1 Release Ready。
 - `pnpm audit --prod` 当前报告来自 Expo/Metro 与 Prisma 工具链的传递依赖公告；上游尚无兼容的完整修复组合，详见项目状态文档，升级时需重新审计。
-- Docker 容器（PostgreSQL/Redis）由 `docker compose up -d` 启动；停止可执行 `docker compose down`。
+- Docker 开发环境由 `sh scripts/dev.sh` 启动；停止可执行 `sh scripts/dev.sh down`。

@@ -18,17 +18,22 @@ export interface SimulationClock {
 export class SystemSimulationClock implements SimulationClock {
   private readonly speed: number;
   private readonly epochMs: number;
+  private readonly offsetMs: number;
 
-  constructor(speed = 1, epochMs = Date.now()) {
+  constructor(speed = 1, epochMs = Date.now(), offsetMs = 0) {
     if (!Number.isFinite(speed) || speed <= 0) {
       throw new Error("SystemSimulationClock speed must be a positive finite number");
     }
+    if (!Number.isSafeInteger(offsetMs) || offsetMs < 0) {
+      throw new Error("SystemSimulationClock offset must be a nonnegative safe integer");
+    }
     this.speed = speed;
     this.epochMs = epochMs;
+    this.offsetMs = offsetMs;
   }
 
   now(): number {
-    return this.epochMs + Math.round((Date.now() - this.epochMs) * this.speed);
+    return this.epochMs + Math.round((Date.now() - this.epochMs) * this.speed) + this.offsetMs;
   }
 }
 

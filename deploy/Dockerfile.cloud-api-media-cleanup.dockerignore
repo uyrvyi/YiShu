@@ -1,0 +1,12 @@
+**
+!deploy/
+!deploy/Dockerfile.cloud-api-media-cleanup
+!deploy/Dockerfile.cloud-api-media-cleanup.dockerignore
+!apps/
+!apps/api/
+!apps/api/dist/
+!apps/api/dist/server.js
+!apps/api/dist/routes/
+!apps/api/dist/routes/media.js
+!apps/api/dist/lib/
+!apps/api/dist/lib/media-cleanup.js

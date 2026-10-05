@@ -1,9 +1,13 @@
 # 驿书 V1 项目状态
 
-> 更新时间：2026-09-17
-> 当前基线：**Phase 9 Final Gate PASS · Phase 9 COMPLETE（Worker Scheduling + Push + Refresh）**
+> 更新时间：2026-10-03
+> 当前验收状态：**Phase 11 独立 Final Gate PASS · COMPLETE（Security / Reliability / Performance Hardening）**；封板提交尚未创建，真实远程推送设备验证经负责人批准移交 Phase 12 Release Gate。
 > Phase 8：**独立 Final Gate PASS（2026-09-15）**；BLOCKER / HIGH / MEDIUM / LOW 均为 NONE；实现 baseline commit `10963fb`。
-> 下一阶段：**Phase 10 — Mobile V1 Integration + UX Closure（NOT STARTED）**。准入已通过，启动需另行授权。本轮仅授权本地 baseline commit，不 Push。
+> 当前阶段：**Phase 12 Deployment + Release Gate（IN PROGRESS）**。本机指定 IPv6 HTTPS 后端已限定试运行切流，开发源库保留且停止源 API/Worker；最新回归 586/0。iPhone Wi-Fi 证书信任、登录、迁移信件、新增寄信及物流地图加载/按钮缩放通过，真实时钟下 Worker 推进已核对。关闭手机 VPN 后，蜂窝访问仍失败；光猫 IPv6 转发防火墙开启，普通账号没有可用修改入口，待核对运营商入站规则，不能确定单一根因。完整镜像扫描和 V1 Release Gate 未通过。
+
+## 下一版本需求
+
+负责人于 2026-10-03 提出信件图片、定位预选省市区、资料编辑、头像、通知修复、地图北向上和写信时间戳，现已开展代码实现及隔离自动化验证。图片和时间戳沿用正文权限；在途信件到原定下一驿站后改道，末端派送则从最后驿站立即重算，已送达不变，历史事实保留。清单见 [下一版本 TODO](NEXT_VERSION_TODO.md)，证据与待验项见 [实施报告](NEXT_VERSION_IMPLEMENTATION_REPORT.md)。云端尚未部署本批改动，真实推送平台凭据及两端真机复验待办，不代表新版发布验收通过。
 
 ## Phase 完成情况
 
@@ -20,7 +24,35 @@
 | Phase 8：本地地图 | FINAL GATE PASS · COMPLETE（baseline `10963fb`） | `data/gen_map.cjs`（`pnpm map:generate`，读 **vendored 行政边界源** `data/maps/source/geoBoundaries-CHN-ADM1-2019-simplified.geojson`（pinned revision + SHA-256 校验）+ `data/graphs/china-v1/station_nodes.json` 站点锚点，确定性生成 `data/maps/china-map.svg` + `data/maps/china-districts.json` + `apps/mobile/src/map/chinaMapData.ts`，幂等、无时间戳/随机值、完全离线）、固定 viewBox `0 0 1000 800` 与 `MAP_FIT` 等比映射（Y 为限制维度、禁 X/Y 独立拉伸）、`GET /api/v1/letters/:trackingNo/map` 安全投影（`apps/api/src/lib/map-view.ts`：只读用户可见 Timeline 事实 + 冻结规划 + SimulationClock；sender/recipient 同图、第三方 404、无 ETA/无 GPS/无掉落范围、`LETTER_DROPPED` 全局 HIDDEN 与正常世界 DTO 完全等价）、completedPath 永不重写 + remainingPath 虚线 + approximatePosition 确定性插值 + last-known（COURIER_MISSING）/ 终态只表达确认结果、Mobile `RouteMap` 七层（无 `DropAreaLayer`）、Letter Detail 仅新增「查看旅程地图」入口（无 polling / push / foreground refresh） |
 
 | Phase 9：Worker / Push / Refresh | FINAL GATE PASS · COMPLETE | canonical domain 复用、durable BullMQ scheduling / reconciliation、safe Push、Mobile polling、Auth generation / epoch 防护、migration16 |
-| Phase 10：Mobile V1 Integration + UX Closure | NOT STARTED | 准入通过；须项目负责人另行授权启动 |
+| Phase 10：Mobile V1 Integration + UX Closure | FINAL GATE PASS · COMPLETE | Auth、查件、寄信、物流详情、Timeline、地图、我的、终态操作；新版核心流程与本地通知获用户 iPhone 人工复验通过；真实推送移交 Phase 12 |
+| Phase 11：安全/可靠性/性能加固 | FINAL GATE PASS · COMPLETE | 安全/权限/字段审计、迁移和一年 replay、V1 本地性能基线、Worker 重试耗尽与失败原因竞态修复；全量 503/0、独立 302/0、人工耐久完成，无剩余阶段阻塞；发布风险见下文 |
+| Phase 12：Deployment + Release Gate | IN PROGRESS | 独立 Docker/Caddy HTTPS 演练、API/Worker 健康/故障恢复、16 条迁移校验、备份恢复比对；服务器/域名、版本回滚、依赖/Expo与真实远程 iOS 推送仍待验 |
+
+## Phase 12 当前进展（2026-10-02）
+
+负责人确认仅验收本机 IPv6 后端、现有 Expo Go 和 iPhone 真机试运行，不含 App Store / 真实远程推送。已迁移开发账号和信件、原样保留未来运输记录，目标时钟恢复真实时间；停写后 13 表核对一致、最终源/目标备份完成，仅目标 1 个旧会话撤销。试运行 API/Worker/Caddy/PostgreSQL/Redis 健康，严格 CA HTTPS 后端冒烟通过，独立 Metro 仅开放 LAN。手机已实际验证 CA 完全信任、Wi-Fi 业务 health、原账号登录、迁移信件和百度地图加载/按钮缩放；新增真机寄信成功、密文与输入一致、Worker 在真实时钟下继续推进。已观察到 5G 状态，蜂窝业务请求仍待核对。实际 npm 运行包审计通过，但四种镜像仍有 22 个独立 Critical/High 告警，完整扫描及正式 Release Gate 保持未通过。最新完整回归 586/0，详见实施记录中的实际切流章节。
+
+### 本机演练历史（2026-09-30）
+
+负责人确认先做本机 Docker 生产演练。HTTPS API `https://localhost:8443` 使用内置 CA，HTTP `18080` 重定向；原开发 API `4000` / Metro `8081` 不变。本轮全量 515/0、typecheck/lint、干净镜像构建、真实 TLS 业务冒烟、Redis 故障恢复、迁移 16/16 校验、13 表恢复比对与 2 封正文解密通过；最小权限运行账号、真实代理伪造头限流和实际日志检查通过。**本机演练范围 PASS，Phase 12 未封板、Release Gate 未通过**。详见 [实施记录](PHASE12_IMPLEMENTATION_REPORT.md) 与 [部署手册](PHASE12_DEPLOYMENT.md)。
+
+## Phase 11 封板（2026-09-30）
+
+- 认证与搜索限流、缺失账号密码校验、Redis 跨实例共享/重建/断连恢复验证通过；异常请求分别返回安全 400/413/415，移动端有明确限流提示。
+- 并发拆信首次时间只写一次，双方隐藏不覆盖已读状态；加密字段严格校验与篡改安全错误通过。
+- 列表在 limit 前过滤隐藏信；日志不输出原始 URL/查询参数/凭据/错误原文，资源 API 字段与三方权限审计通过。一年随机 replay 覆盖两个图版本和四种运输方式。
+- 全 workspace **503 项测试通过**，独立最终 **302 项通过**；typecheck、lint、format、workspace build（含 Android export 3321 modules / 5.5 MB）、Prisma/graph 验证、API/Metro 健康检查通过。dev/test 迁移历史各 16 条、checksum 一致；fresh DB 1→16 与 fresh/dev/test schema diff 实测通过。
+- 首轮 HIGH（重试耗尽后永久停滞）及复审 MEDIUM（旧失败原因快照误重试 domain 错误）均由独立真实队列故障/交错探针确认关闭；production 配置与真实 TCP smoke 通过，默认不信任转发 IP。
+- [本地性能基线](PHASE11_PERFORMANCE_BASELINE.md)：100 用户/10,000 封信/20 并发，最终寄件列表 P95 167.01ms；60.39 秒读探针 1872 次请求、World Truth 不变，Worker handler 86.24/秒。读探针 P99 665.00ms、最大 1795.68ms，不宣称全部请求低于 500ms。临时资源已清理，不代表生产 SLA；多小时耐久由负责人另外确认，未虚构时长/GC 指标。
+- **独立 FINAL GATE PASS · COMPLETE（历史封板）**。详见 [Final Gate 报告](PHASE11_FINAL_GATE.md) 与 [实施记录](PHASE11_IMPLEMENTATION_REPORT.md)。源码未自动提交，Phase 12 已开始本机演练，V1 Release Gate 未通过。
+
+## Phase 10 当前进展（2026-09-29）
+
+- 完整 Mobile V1 流程和真实 API 已接通；寄信后调用幂等 Journey 初始化，失败可从写信页或详情重试。
+- Recipient 送达前和送达后未拆阅时正文保持锁定；Sender 不显示已读状态。收件人详情不返回 Journey，Journey GET 只允许寄件人，地图只返回已确认轨迹与事实；无 ETA 或隐藏原因。
+- 独立测试数据库的集成场景覆盖注册、登录、精准搜索、寄信、创建旅程、送达前锁定、确定性推进至送达、拆信、双方 Timeline 一致、地图状态一致及双方独立隐藏。
+- 全 workspace **437 passed / 0 failed / 0 skipped**；typecheck、lint、format:check、Android export 和新版 iOS export 已通过。设备复验状态见 [Phase 10 报告](PHASE10_IMPLEMENTATION_REPORT.md)。
+- 新版核心流程与本地通知已由用户确认通过。**Phase 10 Final Gate PASS**；当前 Expo Go 不支持远程推送，开发环境未配置 EAS project ID，真实推送的设备验收已获批准移交 Phase 12，绝不宣称已验证。当前 Phase 11 进展见上一节。
 
 ## Phase 9 最终质量基线（2026-09-17 Independent Re-Gate PASS）
 
@@ -33,7 +65,7 @@
 - Re-Gate 实测 migration/checksum/locks、test/dev URL 隔离及 dev URL 拒绝保护、API/Worker/Push regression、runtime restart/disconnect recovery、build。**fresh DB 1→16、schema diff 与 production health 200 是前次 Independent Gate 证据；本次 Re-Gate 未重复执行 fresh DB / production health smoke。** Unix 原生信号、真机 Expo delivery 与大规模压测未验收；provider 非 exactly-once。
 - dev 实测 **User=2 / Letter=2 / Journey=1 / TransportLeg=6**，属于负责人确认的人工 dev 测试数据，关联记录保留，未删除或修改；旧 Letter=1 仅为历史快照。dev/test 无 idle transaction / lock waiter。
 - Independent Re-Gate：**BLOCKER NONE / HIGH・MAJOR NONE / MEDIUM NONE / LOW correctness NONE**。非阻塞 documentation statistics cleanup 已在封板文档收口中完成，不是 correctness blocker。
-- Phase 9 开发 baseline：`fabbec686b08ef393dc83c848149bca21df812a6`；本地封板提交使用 `feat: complete phase 9 worker push and refresh`，准确 SHA 以 Git 为准，不在提交内部自引用。本轮不 Push，Phase 10 NOT STARTED。
+- Phase 9 开发 baseline：`fabbec686b08ef393dc83c848149bca21df812a6`；本地封板提交使用 `feat: complete phase 9 worker push and refresh`。上述为 Phase 9 历史封板记录；Phase 10 已于 2026-09-29 启动。
 - 历史实现快照与 M1/M2 修复过程保留于 [PHASE9_IMPLEMENTATION_REPORT.md](PHASE9_IMPLEMENTATION_REPORT.md)，不作为当前统计。
 
 ## 已封板质量基线（Phase 8 历史，不代表 Phase 9 门禁）
@@ -64,11 +96,11 @@
 
 ## 有意保留的后续范围
 
-以下能力尚未实现，不能把当前骨架或字段误认为正式业务：
+以下列表区分已完成能力与后续范围，不能把未验收能力误认为已通过：
 
 - ~~TimelineEvent 与用户可见运输事实 / visibility~~ → **Phase 7 已完成**（TimelineEvent + IMMEDIATE/DELAYED/HIDDEN 映射 + `GET /letters/:trackingNo/timeline`）；WorldEvent 仍为服务器世界真相，绝不直接暴露给用户
-- Mobile 上的完整 Timeline UI / Letter Detail 时间线展示（Phase 10；Phase 7 只提供 API / domain contract）
-- Phase 10 完整 Mobile V1 Integration + UX Closure（NOT STARTED）
+- ~~Mobile 上的完整 Timeline UI / Letter Detail 时间线展示~~ → Phase 10 已实现
+- ~~Phase 10 真机交互验收~~ → **已完成**：新版 iPhone 核心流程与本地通知获负责人确认；仅真实远程 iOS 推送留 Phase 12 Release Gate。
 - ~~离线地图、轨迹、近似位置与最后确报~~ → **Phase 8 已完成并通过独立 Final Gate（2026-09-15）**：完全离线的本地地图资产 + `GET /letters/:trackingNo/map` 安全投影 + Mobile RouteMap；**`LETTER_DROPPED` = HIDDEN 为全局用户可见性规则**，V1 不做掉落范围 / `dropArea` / `DropAreaLayer`，地图不得暴露掉落原因。地图交互打磨与 Mobile 端完整展示属 Phase 10
 - 开发调试面板（不在本轮冻结实施范围内）
 
@@ -76,12 +108,9 @@
 
 - Mobile UI 是可运行的基础流程，不是最终产品级交互与视觉实现。
 - Phase 9 Worker / Push / Refresh 已通过独立 Re-Gate；真机投递、规模压测与部署验收仍按后续阶段执行。
-- `pnpm audit --prod` 当前报告 3 个 high、1 个 moderate 传递依赖公告：
-  - `image-size <=2.0.2`：来自 Expo/Metro 工具链；公告要求 `>=2.0.3`，但审计时 npm registry 最新仍为 `2.0.2`，暂无可安装修复版。
-  - `deepmerge-ts <8`：来自 Prisma 7.9.1 的 `@prisma/config`；Prisma 当前锁定 7.9.1，强制跨主版本 override 可能破坏工具链。
-  - `uuid <11.1.1`：来自 Mobile 工具链的 moderate 公告。
-- `pnpm peers check` 会报告 Expo / React Native 工具链内部的 3 组传递 peer 版本差异（React DOM、worklets、Metro config）；`expo install --check` 当前为 PASS，Android bundle 也通过，因此不强制覆盖 Expo SDK 57 的受支持版本矩阵。
-- 上述依赖主要位于构建/CLI 链，不构成当前 Phase 1–6 基线的业务正确性阻塞；在 Expo/Prisma 上游发布兼容升级后应优先更新并重跑完整 Gate。不要向 Metro/Prisma CLI 输入不可信的递归对象或恶意图片资产。
+- [本轮依赖审计](PHASE11_DEPENDENCY_AUDIT.md)：兼容修补 fast-uri、xmldom、js-yaml 后，公告从 30 HIGH / 7 Moderate 降为 **4 HIGH / 3 Moderate / 0 Critical**，审计仍 **退出 1**，不是 audit PASS。剩余 deepmerge-ts、mysql2、image-size、uuid、decode-uri-component 公告由独立 Reviewer 在当前信任边界下接受，不能视为已修复或发布批准。
+- `image-size` 2.0.4 已可安装，但跨主版本 API 兼容性尚未验收；仅可构建可信图片，Metro 不得公开部署。Prisma 仅使用可信仓库配置与 PostgreSQL，不得未经修复启用 MySQL。`decode-uri-component` 包含客户端链路，不能归为纯 CLI 风险，恶意 Deep Link 真机构建复验留给 Phase 12。
+- `expo install --check` 本轮 **退出 1**，提示 SDK 57 推荐补丁更新；Android export 和测试通过不能替代版本检查。Phase 12 须完成版本对齐或有证据的冻结例外，并复验签名构建、真机核心流程、Deep Link、SecureStore 与通知。既有 Expo / React Native 传递 peer 差异也须按最终版本矩阵重查。
 - **Timeline district 为可空语义（by design）**：`StationNode` 冻结数据只到 province/city（规范 §16 未定义 district），因此途中驿站事件 `district = NULL`；只有区域锚点事件（DISPATCHED 用 Letter origin、OUT_FOR_DELIVERY/DELIVERED 用 Letter target）在**驿站 province+city 与冻结区域双匹配**时才写真实区县。**禁止用空串伪装、禁止按 city 猜测区县、禁止外部 geocoder**；API DTO 不暴露 district。
 - **随机游标与事件编号已解耦（2026-09-13 Gate 修复）**：`Journey.nextRandomDrawIndex`（随机决策游标）与 `Journey.nextWorldEventIndex`（WorldEvent 编号分配器）分离；记录派生事实（canonical COURIER_MISSING / TRANSPORT_CHANGED / PERMANENTLY_LOST）不再消费随机数。**该修复改变了 LOST_PATH / 恢复 / 终态路径的随机序列**（此前多消费的错误行为已消除）。事件编号在**实际创建 WorldEvent 时**才分配：新 Journey 等待期不占号（`primaryEventIndex = null`）、编号连续；由旧版本升级的 Journey 允许继承历史 gap（`primaryEventIndex` 预留编号被保留并优先使用）。**正式不变量 = eventIndex 唯一 + 单调 + 不碰撞**（不强制历史 Journey 满足 `nextWorldEventIndex === 事件数`）。升级兼容由 `20260913130000` 校准与迁移 13→14→15 真实临时库 fixture 验证（无 P2002、frozen outcome 未重抽、随机游标保留）。
 - **dev 库 migration checksum 漂移已消除（BLOCKER）**：dev 曾有一条 `20260908130000` 成功记录保存了修正前的 checksum（历史 `resolve --rolled-back` 后重部署未刷新该书签）。处置方式为**从 canonical 磁盘 history 重建 dev（及 test）数据库**（业务表当时全 0，无数据损失），未使用 `UPDATE _prisma_migrations`、未手工改 checksum、未修改任何 migration 文件；重建后逐条 checksum 与磁盘一致（0 drift）。
@@ -128,4 +157,4 @@ PHASE 10 NOT STARTED
 REMAINING BLOCKERS: NONE
 ```
 
-项目负责人本轮只授权本地 Phase 9 baseline commit；Push 与 Phase 10 启动须另行授权。
+上面的代码块是 2026-09-17 的 Phase 9 历史门禁结论。Phase 10 已于 2026-09-29 获授权启动，当前状态以文首为准。

@@ -1,17 +1,44 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { Link } from "expo-router";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { Redirect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ArrowRight, LogIn, Mail } from "lucide-react-native";
+import {
+  isAuthenticated,
+  loginSession,
+  registerSession,
+  restoreSession,
+  subscribeSession,
+} from "../src/api";
+import { ActionButton, FormInput } from "../src/ui/controls";
+import { problemMessage } from "../src/ui/presentation";
+import { C, UI } from "../src/ui/theme";
+import { RegionSelector } from "../src/regions/RegionSelector";
 
-/**
- * 驿书首页：最小真实认证入口。
- * - 启动时 restoreSession（读取 SecureStore refresh token → /auth/refresh）。
- * - 未认证 → 显示 Login / Register 最小表单。
- * - 认证成功 → 可进入信件列表。
- * 不要求产品级 UI，仅建立可运行的真实 Session。
- */
+function authMessage(error: unknown): string {
+  if (error instanceof Error) {
+    if (/login_failed:401|login_failed:404/.test(error.message)) return "账号或密码不正确";
+    if (/register_failed:409/.test(error.message)) return "账号已被使用";
+    if (/^(login|register)_failed:429$/.test(error.message)) return "尝试过于频繁，请稍后再试";
+    if (/failed:400/.test(error.message)) return "请检查账号、密码和地区信息";
+  }
+  return problemMessage(error);
+}
+
 export default function HomeScreen() {
+  const authed = useSyncExternalStore(subscribeSession, isAuthenticated, isAuthenticated);
   const [loading, setLoading] = useState(true);
-  const [authed, setAuthed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
@@ -20,155 +47,249 @@ export default function HomeScreen() {
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [error, setError] = useState<string | null>(null);
+  function showError(message: string) {
+    setError(message);
+    Alert.alert("未能完成", message);
+  }
 
   useEffect(() => {
-    async function init() {
-      try {
-        const { restoreSession } = await import("../src/api/index");
-        setAuthed(await restoreSession());
-      } finally {
-        setLoading(false);
-      }
-    }
-    void init();
+    let mounted = true;
+    void restoreSession()
+      .catch((failure: unknown) => {
+        if (mounted) showError(authMessage(failure));
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function submit() {
+    if (busy) return;
+    const normalized = account.trim();
+    if (!/^[a-zA-Z0-9_]{4,24}$/.test(normalized) || /^\d{8}$/.test(normalized)) {
+      showError("账号需为 4–24 位字母、数字或下划线，不能是 8 位纯数字");
+      return;
+    }
+    if (password.length < 8 || password.length > 72) {
+      showError("密码需为 8–72 位");
+      return;
+    }
+    if (
+      mode === "register" &&
+      (!nickname.trim() || !province.trim() || !city.trim() || !district.trim())
+    ) {
+      showError("请填写昵称和所在省、市、区县");
+      return;
+    }
+    setBusy(true);
+    setError(null);
     try {
-      setError(null);
-      const { loginSession, registerSession } = await import("../src/api/index");
       if (mode === "login") {
-        await loginSession(account.trim(), password);
+        await loginSession(normalized, password);
       } else {
-        // 注册需提供真实区域（省/市/区县），禁止伪造
-        if (!province.trim() || !city.trim() || !district.trim()) {
-          setError("请填写省、市、区县");
-          return;
-        }
         await registerSession({
-          account: account.trim(),
+          account: normalized,
           password,
-          nickname: nickname.trim() || "用户",
+          nickname: nickname.trim(),
           province: province.trim(),
           city: city.trim(),
           district: district.trim(),
         });
       }
-      setAuthed(true);
-    } catch (e) {
-      setError((e as Error).message);
+    } catch (failure) {
+      showError(authMessage(failure));
+    } finally {
+      setBusy(false);
     }
   }
 
-  if (loading) {
-    return <Text style={styles.center}>加载中...</Text>;
+  async function retryRestore() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await restoreSession();
+    } catch (failure) {
+      showError(authMessage(failure));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (authed) {
+  if (authed) return <Redirect href="/letters" />;
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>驿书</Text>
-        <Text style={styles.subtitle}>已登录</Text>
-        <Link href="/letters" style={styles.link}>
-          <Text>进入我的信件</Text>
-        </Link>
-        <Pressable
-          style={styles.button}
-          onPress={async () => {
-            const { logoutSession } = await import("../src/api/index");
-            try {
-              await logoutSession();
-            } finally {
-              // logout 即使抛错也必须退出登录态（避免 UI 残留"已登录"）
-              setAuthed(false);
-            }
-          }}
-        >
-          <Text style={styles.buttonText}>退出</Text>
-        </Pressable>
-      </View>
+      <SafeAreaView style={styles.loading}>
+        <ActivityIndicator color={C.green} />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>驿书</Text>
-      <Text style={styles.subtitle}>{mode === "login" ? "登录" : "注册"}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="账号"
-        value={account}
-        onChangeText={setAccount}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="密码"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      {mode === "register" ? (
-        <>
-          <TextInput
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={styles.page}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <View style={styles.brand}>
+            <View style={styles.brandMark}>
+              <Mail size={27} strokeWidth={1.5} color={C.green} />
+            </View>
+            <Text accessibilityRole="header" style={styles.wordmark}>
+              驿书
+            </Text>
+            <Text style={styles.brandLine}>有一句话，正在向你走来。</Text>
+          </View>
+          <View style={styles.tabs}>
+            {(["login", "register"] as const).map((next) => (
+              <Pressable
+                key={next}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: mode === next }}
+                disabled={busy}
+                onPress={() => {
+                  setMode(next);
+                  setError(null);
+                }}
+                style={({ pressed }) => [
+                  styles.tab,
+                  mode === next && styles.tabActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.tabText, mode === next && styles.tabTextActive]}>
+                  {next === "login" ? "登录" : "注册"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.label}>账号</Text>
+          <FormInput
             style={styles.input}
-            placeholder="昵称"
-            value={nickname}
-            onChangeText={setNickname}
+            placeholder="字母、数字或下划线"
+            placeholderTextColor={C.muted}
+            value={account}
+            onChangeText={setAccount}
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="账号"
           />
-          <TextInput
+          <Text style={styles.label}>密码</Text>
+          <FormInput
             style={styles.input}
-            placeholder="省（如 上海市）"
-            value={province}
-            onChangeText={setProvince}
+            placeholder="至少 8 位"
+            placeholderTextColor={C.muted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            accessibilityLabel="密码"
           />
-          <TextInput
-            style={styles.input}
-            placeholder="市（如 上海市）"
-            value={city}
-            onChangeText={setCity}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="区县（如 徐汇区）"
-            value={district}
-            onChangeText={setDistrict}
-          />
-        </>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={styles.button} onPress={() => void submit()}>
-        <Text style={styles.buttonText}>{mode === "login" ? "登录" : "注册"}</Text>
-      </Pressable>
-      <Pressable onPress={() => setMode(mode === "login" ? "register" : "login")}>
-        <Text style={styles.linkText}>
-          {mode === "login" ? "没有账号？注册" : "已有账号？登录"}
-        </Text>
-      </Pressable>
-    </View>
+          {mode === "register" ? (
+            <>
+              <Text style={styles.label}>昵称</Text>
+              <FormInput
+                style={styles.input}
+                placeholder="收件人看到的名字"
+                placeholderTextColor={C.muted}
+                value={nickname}
+                onChangeText={setNickname}
+                accessibilityLabel="昵称"
+              />
+              <Text style={styles.label}>所在地区</Text>
+              <RegionSelector
+                value={{ province, city, district }}
+                autoLocate
+                disabled={busy}
+                onChange={(region) => {
+                  setProvince(region.province);
+                  setCity(region.city);
+                  setDistrict(region.district);
+                }}
+              />
+            </>
+          ) : null}
+          {error?.includes("网络") || error?.includes("服务暂时") ? (
+            <View style={styles.retry}>
+              <ActionButton
+                title="重试连接"
+                quiet
+                onPress={() => void retryRestore()}
+                disabled={busy}
+              />
+            </View>
+          ) : null}
+          <View style={styles.submit}>
+            <ActionButton
+              title={busy ? "请稍候…" : mode === "login" ? "进入驿书" : "创建账号"}
+              onPress={() => void submit()}
+              icon={mode === "login" ? LogIn : ArrowRight}
+              disabled={busy}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 24, justifyContent: "center" },
-  center: { flex: 1, textAlign: "center", textAlignVertical: "center" },
-  title: { fontSize: 28, fontWeight: "700", textAlign: "center", marginBottom: 8 },
-  subtitle: { fontSize: 16, color: "#666", textAlign: "center", marginBottom: 24 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  safe: { flex: 1, backgroundColor: C.surface },
+  keyboard: { flex: 1 },
+  loading: { flex: 1, backgroundColor: C.surface, justifyContent: "center" },
+  page: {
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+    paddingHorizontal: UI.gutter,
+    paddingBottom: 34,
   },
-  button: {
-    backgroundColor: "#1a73e8",
-    padding: 14,
-    borderRadius: 8,
+  brand: { paddingTop: 40, paddingBottom: 36 },
+  brandMark: {
+    width: 54,
+    height: 54,
+    backgroundColor: C.greenSoft,
+    borderRadius: UI.radius,
+    marginBottom: 20,
     alignItems: "center",
-    marginTop: 8,
+    justifyContent: "center",
   },
-  buttonText: { color: "#fff", fontWeight: "600" },
-  link: { marginTop: 16, textAlign: "center", color: "#1a73e8" },
-  linkText: { marginTop: 16, textAlign: "center", color: "#1a73e8" },
-  error: { color: "red", marginBottom: 8, textAlign: "center" },
+  wordmark: { color: C.ink, fontSize: 34, fontWeight: "600" },
+  brandLine: { color: C.muted, fontSize: 14, lineHeight: 22, marginTop: 10 },
+  tabs: {
+    flexDirection: "row",
+    backgroundColor: C.canvas,
+    padding: 4,
+    gap: 4,
+    borderRadius: UI.radius,
+    marginBottom: 28,
+  },
+  tab: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingVertical: 10,
+    borderRadius: UI.segmentRadius,
+  },
+  tabActive: { backgroundColor: C.surface },
+  tabText: { color: C.muted, fontSize: 14, fontWeight: "500" },
+  tabTextActive: { color: C.ink, fontWeight: "600" },
+  pressed: { opacity: UI.pressedOpacity },
+  label: { color: C.ink, fontSize: 13, fontWeight: "500", marginBottom: 9 },
+  input: {
+    marginBottom: 18,
+  },
+  regionRow: { flexDirection: "row", gap: 10 },
+  regionInput: { flex: 1, minWidth: 0 },
+  submit: { marginTop: 14 },
+  retry: { marginTop: 10 },
 });

@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.expo
+generated
+.git
+.env
+.env.*
+!.env.example
+.local
+coverage

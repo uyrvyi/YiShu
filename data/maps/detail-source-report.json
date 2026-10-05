@@ -1,0 +1,1987 @@
+{
+  "releaseApproval": "pending",
+  "coordinateSystem": "WGS84",
+  "sourceCoordinateSystem": "GCJ-02",
+  "encoding": "TopoJSON (quantization 1e6), deflateRaw, base64; lazy province packs",
+  "administrativeSource": {
+    "provider": "GaryBikini/ChinaAdminDivisonSHP",
+    "revision": "ae72417fee2a63f453e6b2717e40655e87e26887",
+    "edition": "v24.02.06",
+    "repositoryLicense": "MIT",
+    "upstream": "AMap administrative boundaries; redistribution review pending"
+  },
+  "waterSource": {
+    "provider": "Natural Earth",
+    "revision": "ca96624a56bd078437bca8184e78163e5039ad19",
+    "scale": "1:10m",
+    "license": "public domain",
+    "purpose": "generalized physical reference, not district-level hydrology"
+  },
+  "sources": {
+    ".local/map-detail-source/city.shp": "36b600a70199f72b27cc613277aa58d955642e347304d57e1458a3d53bd7b63a",
+    ".local/map-detail-source/city.dbf": "6521c29811c55dac560c1bec3bb006cfa6af0bd9b90af9a268288a8730af482e",
+    ".local/map-detail-source/district.shp": "237f4900919417e041e081efa2dd8828a0e2ede7ddb1ebb277e34a86919c27d4",
+    ".local/map-detail-source/district.dbf": "2ec907c0b7774ac3debeb8fa8cbaf20137326d3c2f28c3d8dc6961cfea198f10",
+    ".local/china-rivers-source.geojson": "bb854a900ecbd3b408df46d5e16e3e0f974ba55993f9d8b5c26e855273c0905a",
+    ".local/china-lakes-source.geojson": "2d036f53dedec578001c5c30c2959ee7d4eebc1306900fa4367c49929ec8f2d9"
+  },
+  "provinces": [
+    {
+      "code": "11",
+      "name": "北京市",
+      "bbox": [
+        115.41691,
+        39.44145,
+        117.50807,
+        41.05922
+      ],
+      "cities": 0,
+      "districts": 16
+    },
+    {
+      "code": "12",
+      "name": "天津市",
+      "bbox": [
+        113.73205,
+        36.57145,
+        118.05923,
+        40.25177
+      ],
+      "cities": 0,
+      "districts": 16
+    },
+    {
+      "code": "13",
+      "name": "河北省",
+      "bbox": [
+        113.4587,
+        36.04864,
+        119.8669,
+        42.61762
+      ],
+      "cities": 11,
+      "districts": 167
+    },
+    {
+      "code": "14",
+      "name": "山西省",
+      "bbox": [
+        110.22432,
+        34.58325,
+        114.56293,
+        40.73836
+      ],
+      "cities": 11,
+      "districts": 117
+    },
+    {
+      "code": "15",
+      "name": "内蒙古自治区",
+      "bbox": [
+        97.17197,
+        37.40624,
+        126.06793,
+        53.33535
+      ],
+      "cities": 12,
+      "districts": 103
+    },
+    {
+      "code": "21",
+      "name": "辽宁省",
+      "bbox": [
+        118.83941,
+        38.64041,
+        125.78561,
+        43.48856
+      ],
+      "cities": 14,
+      "districts": 100
+    },
+    {
+      "code": "22",
+      "name": "吉林省",
+      "bbox": [
+        121.63833,
+        40.86461,
+        131.31421,
+        46.30193
+      ],
+      "cities": 9,
+      "districts": 60
+    },
+    {
+      "code": "23",
+      "name": "黑龙江省",
+      "bbox": [
+        121.17473,
+        43.423,
+        135.08739,
+        53.56167
+      ],
+      "cities": 13,
+      "districts": 121
+    },
+    {
+      "code": "31",
+      "name": "上海市",
+      "bbox": [
+        120.85261,
+        30.6778,
+        122.24292,
+        31.87463
+      ],
+      "cities": 0,
+      "districts": 16
+    },
+    {
+      "code": "32",
+      "name": "江苏省",
+      "bbox": [
+        116.35712,
+        30.76013,
+        121.97095,
+        35.12501
+      ],
+      "cities": 13,
+      "districts": 95
+    },
+    {
+      "code": "33",
+      "name": "浙江省",
+      "bbox": [
+        118.02313,
+        27.04496,
+        122.94531,
+        31.18086
+      ],
+      "cities": 11,
+      "districts": 90
+    },
+    {
+      "code": "34",
+      "name": "安徽省",
+      "bbox": [
+        114.87755,
+        29.39561,
+        119.64427,
+        34.65169
+      ],
+      "cities": 16,
+      "districts": 104
+    },
+    {
+      "code": "35",
+      "name": "福建省",
+      "bbox": [
+        115.84762,
+        23.53117,
+        120.7233,
+        28.31605
+      ],
+      "cities": 9,
+      "districts": 84
+    },
+    {
+      "code": "36",
+      "name": "江西省",
+      "bbox": [
+        113.57277,
+        24.48894,
+        118.48212,
+        30.07977
+      ],
+      "cities": 11,
+      "districts": 100
+    },
+    {
+      "code": "37",
+      "name": "山东省",
+      "bbox": [
+        114.81366,
+        34.37852,
+        122.71097,
+        38.40167
+      ],
+      "cities": 16,
+      "districts": 136
+    },
+    {
+      "code": "41",
+      "name": "河南省",
+      "bbox": [
+        110.35504,
+        31.38438,
+        116.64642,
+        36.36651
+      ],
+      "cities": 18,
+      "districts": 157
+    },
+    {
+      "code": "42",
+      "name": "湖北省",
+      "bbox": [
+        108.36249,
+        29.03262,
+        116.12995,
+        33.27755
+      ],
+      "cities": 17,
+      "districts": 103
+    },
+    {
+      "code": "43",
+      "name": "湖南省",
+      "bbox": [
+        108.78664,
+        24.63948,
+        114.25603,
+        30.12908
+      ],
+      "cities": 14,
+      "districts": 122
+    },
+    {
+      "code": "44",
+      "name": "广东省",
+      "bbox": [
+        109.6508,
+        20.21419,
+        117.31362,
+        25.51962
+      ],
+      "cities": 21,
+      "districts": 122
+    },
+    {
+      "code": "45",
+      "name": "广西壮族自治区",
+      "bbox": [
+        104.44775,
+        20.90097,
+        112.05641,
+        26.38906
+      ],
+      "cities": 14,
+      "districts": 111
+    },
+    {
+      "code": "46",
+      "name": "海南省",
+      "bbox": [
+        108.58347,
+        3.8395,
+        117.84185,
+        20.16604
+      ],
+      "cities": 19,
+      "districts": 23
+    },
+    {
+      "code": "50",
+      "name": "重庆市",
+      "bbox": [
+        105.28649,
+        28.16375,
+        110.19485,
+        32.20343
+      ],
+      "cities": 0,
+      "districts": 38
+    },
+    {
+      "code": "51",
+      "name": "四川省",
+      "bbox": [
+        97.34745,
+        26.04927,
+        108.5424,
+        34.31465
+      ],
+      "cities": 21,
+      "districts": 183
+    },
+    {
+      "code": "52",
+      "name": "贵州省",
+      "bbox": [
+        103.59958,
+        24.6212,
+        109.59335,
+        29.22431
+      ],
+      "cities": 9,
+      "districts": 88
+    },
+    {
+      "code": "53",
+      "name": "云南省",
+      "bbox": [
+        97.52747,
+        21.14435,
+        106.19422,
+        29.22598
+      ],
+      "cities": 16,
+      "districts": 129
+    },
+    {
+      "code": "54",
+      "name": "西藏自治区",
+      "bbox": [
+        78.3933,
+        26.85827,
+        99.11514,
+        36.48355
+      ],
+      "cities": 7,
+      "districts": 72
+    },
+    {
+      "code": "61",
+      "name": "陕西省",
+      "bbox": [
+        105.48821,
+        31.70705,
+        111.24145,
+        39.58578
+      ],
+      "cities": 10,
+      "districts": 107
+    },
+    {
+      "code": "62",
+      "name": "甘肃省",
+      "bbox": [
+        92.33783,
+        32.59618,
+        108.70751,
+        42.79343
+      ],
+      "cities": 14,
+      "districts": 86
+    },
+    {
+      "code": "63",
+      "name": "青海省",
+      "bbox": [
+        89.40183,
+        31.60093,
+        103.06864,
+        39.2077
+      ],
+      "cities": 8,
+      "districts": 44
+    },
+    {
+      "code": "64",
+      "name": "宁夏回族自治区",
+      "bbox": [
+        104.2843,
+        35.23877,
+        107.65432,
+        39.38068
+      ],
+      "cities": 5,
+      "districts": 22
+    },
+    {
+      "code": "65",
+      "name": "新疆维吾尔自治区",
+      "bbox": [
+        73.499,
+        34.33632,
+        96.38533,
+        49.18141
+      ],
+      "cities": 25,
+      "districts": 107
+    }
+  ],
+  "rejected": [
+    {
+      "level": "city",
+      "code": "110100",
+      "name": "北京城区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "120100",
+      "name": "天津城区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "310100",
+      "name": "上海城区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "500100",
+      "name": "重庆城区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "500200",
+      "name": "重庆郊县",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "710000",
+      "name": "台湾省",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "810000",
+      "name": "香港特别行政区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "city",
+      "code": "820000",
+      "name": "澳门特别行政区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "232718",
+      "name": "加格达奇区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "440499",
+      "name": "澳门大学横琴校区(由澳门实施管辖)",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "441900",
+      "name": "东莞市",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "442000",
+      "name": "中山市",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "460301",
+      "name": "西沙区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "460302",
+      "name": "南沙区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "460400",
+      "name": "儋州市",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "540422",
+      "name": "米林市",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "540530",
+      "name": "错那市",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "620200",
+      "name": "嘉峪关市",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "632825",
+      "name": "海西蒙古族藏族自治州直辖",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "710000",
+      "name": "台湾省",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810001",
+      "name": "中西区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810002",
+      "name": "湾仔区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810003",
+      "name": "东区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810004",
+      "name": "南区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810005",
+      "name": "油尖旺区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810006",
+      "name": "深水埗区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810007",
+      "name": "九龙城区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810008",
+      "name": "黄大仙区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810009",
+      "name": "观塘区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810010",
+      "name": "荃湾区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810011",
+      "name": "屯门区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810012",
+      "name": "元朗区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810013",
+      "name": "北区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810014",
+      "name": "大埔区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810015",
+      "name": "西贡区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810016",
+      "name": "沙田区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810017",
+      "name": "葵青区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "810018",
+      "name": "离岛区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820001",
+      "name": "花地玛堂区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820002",
+      "name": "花王堂区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820003",
+      "name": "望德堂区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820004",
+      "name": "大堂区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820005",
+      "name": "风顺堂区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820006",
+      "name": "嘉模堂区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820007",
+      "name": "路氹填海区",
+      "reason": "code_name_or_parent_mismatch"
+    },
+    {
+      "level": "district",
+      "code": "820008",
+      "name": "圣方济各堂区",
+      "reason": "code_name_or_parent_mismatch"
+    }
+  ],
+  "cities": 364,
+  "districts": 2839,
+  "missingDistricts": [
+    {
+      "code": "130171",
+      "name": "石家庄高新技术产业开发区",
+      "province": "河北省",
+      "cityCode": "1301"
+    },
+    {
+      "code": "130172",
+      "name": "石家庄循环化工园区",
+      "province": "河北省",
+      "cityCode": "1301"
+    },
+    {
+      "code": "130271",
+      "name": "河北唐山芦台经济开发区",
+      "province": "河北省",
+      "cityCode": "1302"
+    },
+    {
+      "code": "130272",
+      "name": "唐山市汉沽管理区",
+      "province": "河北省",
+      "cityCode": "1302"
+    },
+    {
+      "code": "130273",
+      "name": "唐山高新技术产业开发区",
+      "province": "河北省",
+      "cityCode": "1302"
+    },
+    {
+      "code": "130274",
+      "name": "河北唐山海港经济开发区",
+      "province": "河北省",
+      "cityCode": "1302"
+    },
+    {
+      "code": "130371",
+      "name": "秦皇岛市经济技术开发区",
+      "province": "河北省",
+      "cityCode": "1303"
+    },
+    {
+      "code": "130372",
+      "name": "北戴河新区",
+      "province": "河北省",
+      "cityCode": "1303"
+    },
+    {
+      "code": "130471",
+      "name": "邯郸经济技术开发区",
+      "province": "河北省",
+      "cityCode": "1304"
+    },
+    {
+      "code": "130473",
+      "name": "邯郸冀南新区",
+      "province": "河北省",
+      "cityCode": "1304"
+    },
+    {
+      "code": "130571",
+      "name": "河北邢台经济开发区",
+      "province": "河北省",
+      "cityCode": "1305"
+    },
+    {
+      "code": "130671",
+      "name": "保定高新技术产业开发区",
+      "province": "河北省",
+      "cityCode": "1306"
+    },
+    {
+      "code": "130672",
+      "name": "保定白沟新城",
+      "province": "河北省",
+      "cityCode": "1306"
+    },
+    {
+      "code": "130771",
+      "name": "张家口经济开发区",
+      "province": "河北省",
+      "cityCode": "1307"
+    },
+    {
+      "code": "130772",
+      "name": "张家口市察北管理区",
+      "province": "河北省",
+      "cityCode": "1307"
+    },
+    {
+      "code": "130773",
+      "name": "张家口市塞北管理区",
+      "province": "河北省",
+      "cityCode": "1307"
+    },
+    {
+      "code": "130871",
+      "name": "承德高新技术产业开发区",
+      "province": "河北省",
+      "cityCode": "1308"
+    },
+    {
+      "code": "130971",
+      "name": "河北沧州经济开发区",
+      "province": "河北省",
+      "cityCode": "1309"
+    },
+    {
+      "code": "130972",
+      "name": "沧州高新技术产业开发区",
+      "province": "河北省",
+      "cityCode": "1309"
+    },
+    {
+      "code": "130973",
+      "name": "沧州渤海新区",
+      "province": "河北省",
+      "cityCode": "1309"
+    },
+    {
+      "code": "131071",
+      "name": "廊坊经济技术开发区",
+      "province": "河北省",
+      "cityCode": "1310"
+    },
+    {
+      "code": "131171",
+      "name": "河北衡水高新技术产业开发区",
+      "province": "河北省",
+      "cityCode": "1311"
+    },
+    {
+      "code": "131172",
+      "name": "衡水滨湖新区",
+      "province": "河北省",
+      "cityCode": "1311"
+    },
+    {
+      "code": "140171",
+      "name": "山西转型综合改革示范区",
+      "province": "山西省",
+      "cityCode": "1401"
+    },
+    {
+      "code": "140271",
+      "name": "山西大同经济开发区",
+      "province": "山西省",
+      "cityCode": "1402"
+    },
+    {
+      "code": "140671",
+      "name": "山西朔州经济开发区",
+      "province": "山西省",
+      "cityCode": "1406"
+    },
+    {
+      "code": "140971",
+      "name": "五台山风景名胜区",
+      "province": "山西省",
+      "cityCode": "1409"
+    },
+    {
+      "code": "150172",
+      "name": "呼和浩特经济技术开发区",
+      "province": "内蒙古自治区",
+      "cityCode": "1501"
+    },
+    {
+      "code": "150271",
+      "name": "包头稀土高新技术产业开发区",
+      "province": "内蒙古自治区",
+      "cityCode": "1502"
+    },
+    {
+      "code": "150571",
+      "name": "通辽经济技术开发区",
+      "province": "内蒙古自治区",
+      "cityCode": "1505"
+    },
+    {
+      "code": "152571",
+      "name": "乌拉盖管理区管委会",
+      "province": "内蒙古自治区",
+      "cityCode": "1525"
+    },
+    {
+      "code": "152971",
+      "name": "内蒙古阿拉善高新技术产业开发区",
+      "province": "内蒙古自治区",
+      "cityCode": "1529"
+    },
+    {
+      "code": "220171",
+      "name": "长春经济技术开发区",
+      "province": "吉林省",
+      "cityCode": "2201"
+    },
+    {
+      "code": "220172",
+      "name": "长春净月高新技术产业开发区",
+      "province": "吉林省",
+      "cityCode": "2201"
+    },
+    {
+      "code": "220173",
+      "name": "长春高新技术产业开发区",
+      "province": "吉林省",
+      "cityCode": "2201"
+    },
+    {
+      "code": "220174",
+      "name": "长春汽车经济技术开发区",
+      "province": "吉林省",
+      "cityCode": "2201"
+    },
+    {
+      "code": "220271",
+      "name": "吉林经济开发区",
+      "province": "吉林省",
+      "cityCode": "2202"
+    },
+    {
+      "code": "220272",
+      "name": "吉林高新技术产业开发区",
+      "province": "吉林省",
+      "cityCode": "2202"
+    },
+    {
+      "code": "220273",
+      "name": "吉林中国新加坡食品区",
+      "province": "吉林省",
+      "cityCode": "2202"
+    },
+    {
+      "code": "220771",
+      "name": "吉林松原经济开发区",
+      "province": "吉林省",
+      "cityCode": "2207"
+    },
+    {
+      "code": "220871",
+      "name": "吉林白城经济开发区",
+      "province": "吉林省",
+      "cityCode": "2208"
+    },
+    {
+      "code": "230671",
+      "name": "大庆高新技术产业开发区",
+      "province": "黑龙江省",
+      "cityCode": "2306"
+    },
+    {
+      "code": "232761",
+      "name": "加格达奇区",
+      "province": "黑龙江省",
+      "cityCode": "2327"
+    },
+    {
+      "code": "232762",
+      "name": "松岭区",
+      "province": "黑龙江省",
+      "cityCode": "2327"
+    },
+    {
+      "code": "232763",
+      "name": "新林区",
+      "province": "黑龙江省",
+      "cityCode": "2327"
+    },
+    {
+      "code": "232764",
+      "name": "呼中区",
+      "province": "黑龙江省",
+      "cityCode": "2327"
+    },
+    {
+      "code": "320371",
+      "name": "徐州经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3203"
+    },
+    {
+      "code": "320576",
+      "name": "苏州工业园区",
+      "province": "江苏省",
+      "cityCode": "3205"
+    },
+    {
+      "code": "320671",
+      "name": "南通经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3206"
+    },
+    {
+      "code": "320771",
+      "name": "连云港经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3207"
+    },
+    {
+      "code": "320871",
+      "name": "淮安经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3208"
+    },
+    {
+      "code": "320971",
+      "name": "盐城经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3209"
+    },
+    {
+      "code": "321071",
+      "name": "扬州经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3210"
+    },
+    {
+      "code": "321171",
+      "name": "镇江新区",
+      "province": "江苏省",
+      "cityCode": "3211"
+    },
+    {
+      "code": "321371",
+      "name": "宿迁经济技术开发区",
+      "province": "江苏省",
+      "cityCode": "3213"
+    },
+    {
+      "code": "340176",
+      "name": "合肥高新技术产业开发区",
+      "province": "安徽省",
+      "cityCode": "3401"
+    },
+    {
+      "code": "340177",
+      "name": "合肥经济技术开发区",
+      "province": "安徽省",
+      "cityCode": "3401"
+    },
+    {
+      "code": "340178",
+      "name": "合肥新站高新技术产业开发区",
+      "province": "安徽省",
+      "cityCode": "3401"
+    },
+    {
+      "code": "340271",
+      "name": "芜湖经济技术开发区",
+      "province": "安徽省",
+      "cityCode": "3402"
+    },
+    {
+      "code": "340272",
+      "name": "安徽芜湖三山经济开发区",
+      "province": "安徽省",
+      "cityCode": "3402"
+    },
+    {
+      "code": "340371",
+      "name": "蚌埠市高新技术开发区",
+      "province": "安徽省",
+      "cityCode": "3403"
+    },
+    {
+      "code": "340372",
+      "name": "蚌埠市经济开发区",
+      "province": "安徽省",
+      "cityCode": "3403"
+    },
+    {
+      "code": "340871",
+      "name": "安徽安庆经济开发区",
+      "province": "安徽省",
+      "cityCode": "3408"
+    },
+    {
+      "code": "341171",
+      "name": "中新苏滁高新技术产业开发区",
+      "province": "安徽省",
+      "cityCode": "3411"
+    },
+    {
+      "code": "341172",
+      "name": "滁州经济技术开发区",
+      "province": "安徽省",
+      "cityCode": "3411"
+    },
+    {
+      "code": "341271",
+      "name": "阜阳合肥现代产业园区",
+      "province": "安徽省",
+      "cityCode": "3412"
+    },
+    {
+      "code": "341272",
+      "name": "阜阳经济技术开发区",
+      "province": "安徽省",
+      "cityCode": "3412"
+    },
+    {
+      "code": "341371",
+      "name": "宿州马鞍山现代产业园区",
+      "province": "安徽省",
+      "cityCode": "3413"
+    },
+    {
+      "code": "341372",
+      "name": "宿州经济技术开发区",
+      "province": "安徽省",
+      "cityCode": "3413"
+    },
+    {
+      "code": "341871",
+      "name": "宣城市经济开发区",
+      "province": "安徽省",
+      "cityCode": "3418"
+    },
+    {
+      "code": "370176",
+      "name": "济南高新技术产业开发区",
+      "province": "山东省",
+      "cityCode": "3701"
+    },
+    {
+      "code": "370571",
+      "name": "东营经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3705"
+    },
+    {
+      "code": "370572",
+      "name": "东营港经济开发区",
+      "province": "山东省",
+      "cityCode": "3705"
+    },
+    {
+      "code": "370671",
+      "name": "烟台高新技术产业开发区",
+      "province": "山东省",
+      "cityCode": "3706"
+    },
+    {
+      "code": "370676",
+      "name": "烟台经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3706"
+    },
+    {
+      "code": "370772",
+      "name": "潍坊滨海经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3707"
+    },
+    {
+      "code": "370871",
+      "name": "济宁高新技术产业开发区",
+      "province": "山东省",
+      "cityCode": "3708"
+    },
+    {
+      "code": "371071",
+      "name": "威海火炬高技术产业开发区",
+      "province": "山东省",
+      "cityCode": "3710"
+    },
+    {
+      "code": "371072",
+      "name": "威海经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3710"
+    },
+    {
+      "code": "371073",
+      "name": "威海临港经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3710"
+    },
+    {
+      "code": "371171",
+      "name": "日照经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3711"
+    },
+    {
+      "code": "371371",
+      "name": "临沂高新技术产业开发区",
+      "province": "山东省",
+      "cityCode": "3713"
+    },
+    {
+      "code": "371471",
+      "name": "德州天衢新区",
+      "province": "山东省",
+      "cityCode": "3714"
+    },
+    {
+      "code": "371771",
+      "name": "菏泽经济技术开发区",
+      "province": "山东省",
+      "cityCode": "3717"
+    },
+    {
+      "code": "371772",
+      "name": "菏泽高新技术开发区",
+      "province": "山东省",
+      "cityCode": "3717"
+    },
+    {
+      "code": "410171",
+      "name": "郑州经济技术开发区",
+      "province": "河南省",
+      "cityCode": "4101"
+    },
+    {
+      "code": "410172",
+      "name": "郑州高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4101"
+    },
+    {
+      "code": "410173",
+      "name": "郑州航空港经济综合实验区",
+      "province": "河南省",
+      "cityCode": "4101"
+    },
+    {
+      "code": "410371",
+      "name": "洛阳高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4103"
+    },
+    {
+      "code": "410471",
+      "name": "平顶山高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4104"
+    },
+    {
+      "code": "410472",
+      "name": "平顶山市城乡一体化示范区",
+      "province": "河南省",
+      "cityCode": "4104"
+    },
+    {
+      "code": "410571",
+      "name": "安阳高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4105"
+    },
+    {
+      "code": "410671",
+      "name": "鹤壁经济技术开发区",
+      "province": "河南省",
+      "cityCode": "4106"
+    },
+    {
+      "code": "410771",
+      "name": "新乡高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4107"
+    },
+    {
+      "code": "410772",
+      "name": "新乡经济技术开发区",
+      "province": "河南省",
+      "cityCode": "4107"
+    },
+    {
+      "code": "410773",
+      "name": "新乡市平原城乡一体化示范区",
+      "province": "河南省",
+      "cityCode": "4107"
+    },
+    {
+      "code": "410871",
+      "name": "焦作城乡一体化示范区",
+      "province": "河南省",
+      "cityCode": "4108"
+    },
+    {
+      "code": "410971",
+      "name": "河南濮阳工业园区",
+      "province": "河南省",
+      "cityCode": "4109"
+    },
+    {
+      "code": "410972",
+      "name": "濮阳经济技术开发区",
+      "province": "河南省",
+      "cityCode": "4109"
+    },
+    {
+      "code": "411071",
+      "name": "许昌经济技术开发区",
+      "province": "河南省",
+      "cityCode": "4110"
+    },
+    {
+      "code": "411171",
+      "name": "漯河经济技术开发区",
+      "province": "河南省",
+      "cityCode": "4111"
+    },
+    {
+      "code": "411271",
+      "name": "河南三门峡经济开发区",
+      "province": "河南省",
+      "cityCode": "4112"
+    },
+    {
+      "code": "411371",
+      "name": "南阳高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4113"
+    },
+    {
+      "code": "411372",
+      "name": "南阳市城乡一体化示范区",
+      "province": "河南省",
+      "cityCode": "4113"
+    },
+    {
+      "code": "411471",
+      "name": "豫东综合物流产业聚集区",
+      "province": "河南省",
+      "cityCode": "4114"
+    },
+    {
+      "code": "411472",
+      "name": "河南商丘经济开发区",
+      "province": "河南省",
+      "cityCode": "4114"
+    },
+    {
+      "code": "411571",
+      "name": "信阳高新技术产业开发区",
+      "province": "河南省",
+      "cityCode": "4115"
+    },
+    {
+      "code": "411671",
+      "name": "周口临港开发区",
+      "province": "河南省",
+      "cityCode": "4116"
+    },
+    {
+      "code": "411771",
+      "name": "河南驻马店经济开发区",
+      "province": "河南省",
+      "cityCode": "4117"
+    },
+    {
+      "code": "421071",
+      "name": "荆州经济技术开发区",
+      "province": "湖北省",
+      "cityCode": "4210"
+    },
+    {
+      "code": "421171",
+      "name": "龙感湖管理区",
+      "province": "湖北省",
+      "cityCode": "4211"
+    },
+    {
+      "code": "430371",
+      "name": "湖南湘潭高新技术产业园区",
+      "province": "湖南省",
+      "cityCode": "4303"
+    },
+    {
+      "code": "430372",
+      "name": "湘潭昭山示范区",
+      "province": "湖南省",
+      "cityCode": "4303"
+    },
+    {
+      "code": "430373",
+      "name": "湘潭九华示范区",
+      "province": "湖南省",
+      "cityCode": "4303"
+    },
+    {
+      "code": "430473",
+      "name": "湖南衡阳松木经济开发区",
+      "province": "湖南省",
+      "cityCode": "4304"
+    },
+    {
+      "code": "430476",
+      "name": "湖南衡阳高新技术产业园区",
+      "province": "湖南省",
+      "cityCode": "4304"
+    },
+    {
+      "code": "430671",
+      "name": "岳阳市屈原管理区",
+      "province": "湖南省",
+      "cityCode": "4306"
+    },
+    {
+      "code": "430771",
+      "name": "常德市西洞庭管理区",
+      "province": "湖南省",
+      "cityCode": "4307"
+    },
+    {
+      "code": "430971",
+      "name": "益阳市大通湖管理区",
+      "province": "湖南省",
+      "cityCode": "4309"
+    },
+    {
+      "code": "430972",
+      "name": "湖南益阳高新技术产业园区",
+      "province": "湖南省",
+      "cityCode": "4309"
+    },
+    {
+      "code": "431171",
+      "name": "永州经济技术开发区",
+      "province": "湖南省",
+      "cityCode": "4311"
+    },
+    {
+      "code": "431173",
+      "name": "永州市回龙圩管理区",
+      "province": "湖南省",
+      "cityCode": "4311"
+    },
+    {
+      "code": "431271",
+      "name": "怀化市洪江管理区",
+      "province": "湖南省",
+      "cityCode": "4312"
+    },
+    {
+      "code": "441900003",
+      "name": "东城街道",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900004",
+      "name": "南城街道",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900005",
+      "name": "万江街道",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900006",
+      "name": "莞城街道",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900101",
+      "name": "石碣镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900102",
+      "name": "石龙镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900103",
+      "name": "茶山镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900104",
+      "name": "石排镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900105",
+      "name": "企石镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900106",
+      "name": "横沥镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900107",
+      "name": "桥头镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900108",
+      "name": "谢岗镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900109",
+      "name": "东坑镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900110",
+      "name": "常平镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900111",
+      "name": "寮步镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900112",
+      "name": "樟木头镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900113",
+      "name": "大朗镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900114",
+      "name": "黄江镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900115",
+      "name": "清溪镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900116",
+      "name": "塘厦镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900117",
+      "name": "凤岗镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900118",
+      "name": "大岭山镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900119",
+      "name": "长安镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900121",
+      "name": "虎门镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900122",
+      "name": "厚街镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900123",
+      "name": "沙田镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900124",
+      "name": "道滘镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900125",
+      "name": "洪梅镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900126",
+      "name": "麻涌镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900127",
+      "name": "望牛墩镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900128",
+      "name": "中堂镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900129",
+      "name": "高埗镇",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900401",
+      "name": "松山湖",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900402",
+      "name": "东莞港",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900403",
+      "name": "东莞生态园",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "441900404",
+      "name": "东莞滨海湾新区",
+      "province": "广东省",
+      "cityCode": "4419"
+    },
+    {
+      "code": "442000001",
+      "name": "石岐街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000002",
+      "name": "东区街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000003",
+      "name": "中山港街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000004",
+      "name": "西区街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000005",
+      "name": "南区街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000006",
+      "name": "五桂山街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000007",
+      "name": "民众街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000008",
+      "name": "南朗街道",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000101",
+      "name": "黄圃镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000103",
+      "name": "东凤镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000105",
+      "name": "古镇镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000106",
+      "name": "沙溪镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000107",
+      "name": "坦洲镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000108",
+      "name": "港口镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000109",
+      "name": "三角镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000110",
+      "name": "横栏镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000111",
+      "name": "南头镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000112",
+      "name": "阜沙镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000114",
+      "name": "三乡镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000115",
+      "name": "板芙镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000116",
+      "name": "大涌镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000117",
+      "name": "神湾镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "442000118",
+      "name": "小榄镇",
+      "province": "广东省",
+      "cityCode": "4420"
+    },
+    {
+      "code": "460321",
+      "name": "西沙群岛",
+      "province": "海南省",
+      "cityCode": "4603"
+    },
+    {
+      "code": "460322",
+      "name": "南沙群岛",
+      "province": "海南省",
+      "cityCode": "4603"
+    },
+    {
+      "code": "460323",
+      "name": "中沙群岛的岛礁及其海域",
+      "province": "海南省",
+      "cityCode": "4603"
+    },
+    {
+      "code": "460400100",
+      "name": "那大镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400101",
+      "name": "和庆镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400102",
+      "name": "南丰镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400103",
+      "name": "大成镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400104",
+      "name": "雅星镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400105",
+      "name": "兰洋镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400106",
+      "name": "光村镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400107",
+      "name": "木棠镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400108",
+      "name": "海头镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400109",
+      "name": "峨蔓镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400111",
+      "name": "王五镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400112",
+      "name": "白马井镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400113",
+      "name": "中和镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400114",
+      "name": "排浦镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400115",
+      "name": "东成镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400116",
+      "name": "新州镇",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400499",
+      "name": "洋浦经济开发区",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "460400500",
+      "name": "华南热作学院",
+      "province": "海南省",
+      "cityCode": "4604"
+    },
+    {
+      "code": "540171",
+      "name": "格尔木藏青工业园区",
+      "province": "西藏自治区",
+      "cityCode": "5401"
+    },
+    {
+      "code": "540172",
+      "name": "拉萨经济技术开发区",
+      "province": "西藏自治区",
+      "cityCode": "5401"
+    },
+    {
+      "code": "540173",
+      "name": "西藏文化旅游创意园区",
+      "province": "西藏自治区",
+      "cityCode": "5401"
+    },
+    {
+      "code": "540174",
+      "name": "达孜工业园区",
+      "province": "西藏自治区",
+      "cityCode": "5401"
+    },
+    {
+      "code": "540481",
+      "name": "米林市",
+      "province": "西藏自治区",
+      "cityCode": "5404"
+    },
+    {
+      "code": "540581",
+      "name": "错那市",
+      "province": "西藏自治区",
+      "cityCode": "5405"
+    },
+    {
+      "code": "620171",
+      "name": "兰州新区",
+      "province": "甘肃省",
+      "cityCode": "6201"
+    },
+    {
+      "code": "620201001",
+      "name": "雄关街道",
+      "province": "甘肃省",
+      "cityCode": "6202"
+    },
+    {
+      "code": "620201002",
+      "name": "钢城街道",
+      "province": "甘肃省",
+      "cityCode": "6202"
+    },
+    {
+      "code": "620201100",
+      "name": "新城镇",
+      "province": "甘肃省",
+      "cityCode": "6202"
+    },
+    {
+      "code": "620201101",
+      "name": "峪泉镇",
+      "province": "甘肃省",
+      "cityCode": "6202"
+    },
+    {
+      "code": "620201102",
+      "name": "文殊镇",
+      "province": "甘肃省",
+      "cityCode": "6202"
+    },
+    {
+      "code": "632857",
+      "name": "大柴旦行政委员会",
+      "province": "青海省",
+      "cityCode": "6328"
+    },
+    {
+      "code": "659012",
+      "name": "白杨市",
+      "province": "新疆维吾尔自治区",
+      "cityCode": "6590"
+    }
+  ],
+  "waters": 258
+}

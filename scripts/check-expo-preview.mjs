@@ -1,0 +1,276 @@
+import assert from "node:assert/strict";
+
+const base = new URL(process.argv[2] ?? "");
+assert.equal(base.protocol, "https:");
+assert.ok(base.hostname.endsWith(".exp.direct"));
+
+const manifestResponse = await fetch(base, {
+  headers: {
+    "expo-platform": "ios",
+    accept: "application/expo+json",
+    "expo-expect-signature": 'keyid="expo-root", alg="rsa-v1_5-sha256"',
+  },
+  signal: AbortSignal.timeout(120000),
+});
+assert.ok(manifestResponse.ok, `manifest HTTP ${manifestResponse.status}`);
+assert.ok(manifestResponse.headers.get("expo-signature"), "signed Expo manifest missing");
+const manifest = await manifestResponse.json();
+assert.equal(manifest.extra?.expoClient?.sdkVersion, "57.0.0");
+assert.equal(manifest.extra?.expoClient?.owner, "uyrvyi");
+const certificateResponse = await fetch(base, {
+  headers: {
+    "expo-platform": "ios",
+    accept: "multipart/mixed",
+    "expo-expect-signature": 'keyid="expo-root", alg="rsa-v1_5-sha256"',
+  },
+  signal: AbortSignal.timeout(120000),
+});
+assert.ok(certificateResponse.ok, `certificate manifest HTTP ${certificateResponse.status}`);
+const certificateType = certificateResponse.headers.get("content-type") ?? "";
+assert.ok(certificateType.startsWith("multipart/mixed"), "certificate multipart missing");
+const certificateParts = await new Response(await certificateResponse.arrayBuffer(), {
+  headers: { "content-type": certificateType.replace("multipart/mixed", "multipart/form-data") },
+}).formData();
+const certificateChain = certificateParts.get("certificate_chain");
+assert.ok(certificateChain instanceof Blob, "certificate chain missing");
+assert.ok((await certificateChain.text()).includes("BEGIN CERTIFICATE"), "certificate PEM missing");
+assert.ok(manifest.launchAsset?.url, "launch asset missing");
+const bundleUrl = new URL(manifest.launchAsset.url);
+assert.equal(bundleUrl.hostname, base.hostname, "bundle must come from the preview server");
+assert.equal(
+  bundleUrl.searchParams.get("dev"),
+  "true",
+  "Expo Go preview must use development mode"
+);
+assert.equal(
+  bundleUrl.searchParams.get("minify") ?? "false",
+  "false",
+  "Expo Go preview must not be minified"
+);
+bundleUrl.protocol = "https:";
+const bundleResponse = await fetch(bundleUrl, { signal: AbortSignal.timeout(180000) });
+assert.ok(bundleResponse.ok, `bundle HTTP ${bundleResponse.status}`);
+const bundle = await bundleResponse.text();
+assert.ok(bundle.length > 100000, "bundle is unexpectedly small");
+assert.ok(bundle.includes("https://8.136.121.71"), "production API configuration missing");
+const checkUploadFeedback = process.argv.includes("--upload-feedback");
+if (checkUploadFeedback) {
+  const contains = (symbol) => {
+    const escaped = symbol.replace(
+      /[^\x00-\x7f]/g,
+      (character) => "\\u" + character.charCodeAt(0).toString(16).padStart(4, "0")
+    );
+    return (
+      bundle.includes(symbol) ||
+      bundle.includes(escaped) ||
+      bundle.includes(escaped.toUpperCase().replaceAll("\\U", "\\u"))
+    );
+  };
+  for (const symbol of ["图片已添加", "头像已更新"])
+    assert.ok(!contains(symbol), `upload success alert still present: ${symbol}`);
+  for (const symbol of ["部分图片未上传", "图片未上传", "头像未更新"])
+    assert.ok(contains(symbol), `upload failure alert missing: ${symbol}`);
+}
+const checkUploadOptimization = process.argv.includes("--upload-optimized");
+if (checkUploadOptimization) {
+  for (const symbol of ["prepareUploadImage", "MAX_UPLOAD_EDGE", "UPLOAD_JPEG_QUALITY"])
+    assert.ok(bundle.includes(symbol), `upload optimization missing: ${symbol}`);
+}
+const checkUploadProgress = process.argv.includes("--upload-progress");
+if (checkUploadProgress) {
+  for (const symbol of [
+    "image-upload-progress",
+    "createUploadTask",
+    "totalBytesExpectedToSend",
+    "imageUploadFetch",
+  ])
+    assert.ok(bundle.includes(symbol), `native upload progress missing: ${symbol}`);
+}
+const checkNativeAbortCompatibility = process.argv.includes("--native-abort-compatible");
+if (checkNativeAbortCompatibility) {
+  assert.ok(
+    bundle.includes("assertImageUploadNotAborted"),
+    "native abort compatibility fix missing"
+  );
+  const uploadStart = bundle.indexOf("function assertImageUploadNotAborted");
+  const uploadEnd = bundle.indexOf("Network upload interrupted", uploadStart);
+  assert.ok(uploadStart >= 0 && uploadEnd > uploadStart, "native upload implementation missing");
+  assert.ok(
+    !/\.throwIfAborted\s*\(/.test(bundle.slice(uploadStart, uploadEnd)),
+    "upload module still calls unsupported throwIfAborted"
+  );
+}
+const checkUploadFlow = process.argv.includes("--upload-flow");
+if (checkUploadFlow) {
+  for (const symbol of ["preparedMimeType", "准备中", "连接中", "等待确认"])
+    assert.ok(bundle.includes(symbol), `upload flow optimization missing: ${symbol}`);
+}
+const checkSmallerPhotos = process.argv.includes("--smaller-photos");
+if (checkSmallerPhotos) {
+  for (const symbol of [
+    "TARGET_JPEG_BYTES",
+    "MIN_JPEG_EDGE",
+    "MAX_JPEG_ENCODINGS",
+    "AVATAR_JPEG_QUALITY",
+    "nextPreparation",
+  ])
+    assert.ok(bundle.includes(symbol), `smaller photo pipeline missing: ${symbol}`);
+  assert.ok(
+    /MAX_UPLOAD_EDGE\s*=\s*(?:exports\.MAX_UPLOAD_EDGE\s*=\s*)?1600\b/.test(bundle),
+    "1600-pixel limit missing"
+  );
+  assert.ok(
+    /UPLOAD_JPEG_QUALITY\s*=\s*(?:exports\.UPLOAD_JPEG_QUALITY\s*=\s*)?0\.75\b/.test(bundle),
+    "75% JPEG setting missing"
+  );
+}
+
+const checkMediaLifecycle = process.argv.includes("--media-lifecycle");
+if (checkMediaLifecycle) {
+  for (const symbol of [
+    "resetPreview",
+    "beginGesture",
+    "requestClose",
+    "onStartShouldSetPanResponderCapture",
+    "onPanResponderTerminationRequest",
+    "createDraftMediaLifecycle",
+    "sameSession",
+  ])
+    assert.ok(bundle.includes(symbol), `media lifecycle fix missing: ${symbol}`);
+}
+
+const checkAnyDirectionPreview = process.argv.includes("--any-direction-preview");
+if (checkAnyDirectionPreview) {
+  for (const symbol of ["dismissX", "dismissY", "dragDistance", "resetDismiss"])
+    assert.ok(bundle.includes(symbol), `any-direction preview missing: ${symbol}`);
+  assert.ok(
+    /dragDistance\s*=\s*Math\.hypot\(dx,\s*dy\)/.test(bundle),
+    "two-axis dismissal distance missing"
+  );
+  assert.ok(!bundle.includes("start.dragDown"), "down-only dismissal still present");
+}
+
+const checkPersistentPreviewPan = process.argv.includes("--persistent-preview-pan");
+if (checkPersistentPreviewPan) {
+  for (const symbol of ["panX", "panY", "multiTouch"])
+    assert.ok(bundle.includes(symbol), `persistent preview pan missing: ${symbol}`);
+  for (const axis of ["x", "y"])
+    assert.ok(
+      new RegExp(`pan${axis.toUpperCase()}\\.setValue\\(bounded\\.${axis}\\)`).test(bundle),
+      `native animated pan axis ${axis} missing`
+    );
+  assert.ok(bundle.includes("!start.multiTouch"), "multi-touch dismiss protection missing");
+  assert.ok(!bundle.includes("translateX: position.x"), "static preview pan still present");
+}
+
+const checkPreviewTouchSession = process.argv.includes("--preview-touch-session");
+if (checkPreviewTouchSession) {
+  for (const symbol of [
+    "touchSession",
+    "observeMultiTouch",
+    "trackTouchStart",
+    "trackTouches",
+    "cancelTouches",
+    "protectedTouch",
+    "tapEpoch",
+  ])
+    assert.ok(bundle.includes(symbol), `preview touch session protection missing: ${symbol}`);
+  assert.ok(
+    bundle.includes("onTouchStart: trackTouchStart"),
+    "physical touch-start tracking missing"
+  );
+  assert.ok(
+    bundle.includes("onTouchCancel: cancelTouches"),
+    "physical touch-cancel tracking missing"
+  );
+}
+
+const checkGeographicMap = process.argv.includes("--geographic-map");
+if (checkGeographicMap) {
+  // JSX labels can be emitted as Unicode escapes in Metro's development bundle.
+  const contains = (symbol) => {
+    const escaped = symbol.replace(
+      /[^\x00-\x7f]/g,
+      (character) => "\\u" + character.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")
+    );
+    return (
+      bundle.includes(symbol) || bundle.includes(escaped) || bundle.includes(escaped.toLowerCase())
+    );
+  };
+  for (const symbol of [
+    "CHINA_GEOGRAPHIC_GEOJSON",
+    "CHINA_GEOGRAPHIC_META",
+    "geographicMapPayload",
+    "toDisplayPoint",
+    "查看全国底图",
+    "window.yishuMapOverview",
+    "crs:L.CRS.EPSG3857",
+    "var base=L.geoJSON(",
+    ...(process.argv.includes("--static-tiles") ? ["staticTileConfig"] : ["connect-src 'none'"]),
+  ])
+    assert.ok(contains(symbol), `geographic map missing: ${symbol}`);
+  assert.ok(!bundle.includes("crs:L.CRS.Simple"), "distorted simple map projection still active");
+  assert.ok(!contains("百度地图加载中"), "old Baidu interactive map still active");
+}
+
+const launchResponse = await fetch(new URL("/_expo/loading?platform=ios", base), {
+  signal: AbortSignal.timeout(30000),
+});
+const checkMapScrollLock = process.argv.includes("--map-scroll-lock");
+if (checkMapScrollLock) {
+  for (const symbol of [
+    "beginMapTouch",
+    "finishMapTouch",
+    "onInteractionChange",
+    "handleMapInteraction",
+    "mapInteracting",
+    "pageScroll.current?.setNativeProps",
+    "nestedScrollEnabled: true",
+    "touch-action:none;overscroll-behavior:none",
+    "{passive:false}",
+  ])
+    assert.ok(bundle.includes(symbol), `map scroll ownership missing: ${symbol}`);
+}
+const checkStaticTiles = process.argv.includes("--static-tiles");
+if (checkStaticTiles) {
+  for (const symbol of [
+    "https://8.136.121.71/maps/national-20261003-v2",
+    "staticTileScript",
+    "L.vectorGrid.protobuf",
+    "rendererFactory:L.canvas.tile",
+    "maxNativeZoom:12",
+    "water,road,coastline,boundary",
+  ])
+    assert.ok(
+      bundle.includes(symbol) || bundle.includes(symbol.replaceAll(",", "','")),
+      `static tiles missing: ${symbol}`
+    );
+}
+assert.ok(launchResponse.ok, `launch page HTTP ${launchResponse.status}`);
+console.log(
+  JSON.stringify({
+    status: "EXPO_PREVIEW_HTTP_PASS",
+    sdk: manifest.extra.expoClient.sdkVersion,
+    host: base.hostname,
+    bundleCharacters: bundle.length,
+    productionApiConfigured: true,
+    signedManifestProvided: true,
+    certificateChainProvided: true,
+    developmentMode: true,
+    uploadOptimizationProvided: checkUploadOptimization ? true : "not_checked",
+    uploadProgressProvided: checkUploadProgress ? true : "not_checked",
+    nativeAbortCompatible: checkNativeAbortCompatibility ? true : "not_checked",
+    uploadFlowOptimized: checkUploadFlow ? true : "not_checked",
+    smallerPhotosProvided: checkSmallerPhotos ? true : "not_checked",
+    mediaLifecycleProvided: checkMediaLifecycle ? true : "not_checked",
+    anyDirectionPreviewProvided: checkAnyDirectionPreview ? true : "not_checked",
+    persistentPreviewPanProvided: checkPersistentPreviewPan ? true : "not_checked",
+    previewTouchSessionProvided: checkPreviewTouchSession ? true : "not_checked",
+    geographicMapProvided: checkGeographicMap ? true : "not_checked",
+    mapScrollLockProvided: checkMapScrollLock ? true : "not_checked",
+    staticTilesProvided: checkStaticTiles ? true : "not_checked",
+    uploadFeedbackProvided: checkUploadFeedback ? true : "not_checked",
+    expoGoAccountVerification: "pending",
+    deviceVerification: "pending",
+  })
+);

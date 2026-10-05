@@ -26,6 +26,7 @@
 import {
   Prisma,
   type Journey,
+  type DestinationChange,
   type JourneyAnomalyType,
   type JourneyStatus,
   type Letter,
@@ -133,6 +134,7 @@ interface AdvanceState {
   journeyCompletedAt: Date | null;
   currentLegSequence: number | null;
   deliveredAtMs: number | null;
+  originStationReadyAtMs: number | null;
   /** 随机决策游标：只有真实随机决策（primary 判定 / 恢复窗口 / 时长 / 拾获处理 / 运输选择）才推进。 */
   randomDrawIndex: number;
   /** WorldEvent 编号分配器：仅分配事件身份/顺序，与随机游标完全无关。 */
@@ -154,6 +156,14 @@ interface AdvanceState {
   nextTempLegId: bigint;
   /** 推进结束后的最终 legs（persist 时用于 totalDistanceKm 重算与新建 legs 落库）。 */
   finalLegs: TransportLeg[];
+  pendingDestination: DestinationChange | null;
+  appliedDestination: {
+    change: DestinationChange;
+    atMs: number;
+    fromRevision: number;
+    previousNodeId: string;
+    previousLastMileReadyAtMs: number | null;
+  } | null;
   anyStateChanged: boolean;
 }
 
@@ -187,8 +197,6 @@ export async function advanceJourneyToNow(
   letterId: bigint,
   clock: SimulationClock
 ): Promise<AdvanceJourneyResult> {
-  const nowMs = clock.now();
-
   // 事务外快速路径：只做存在性检查；终态判断必须在锁后（保证 lastAdvancedAtSim 单调，
   // 调用频率无关 replay 在终态后依然成立）
   const letter = await prisma.letter.findUnique({ where: { id: letterId } });
@@ -196,149 +204,168 @@ export async function advanceJourneyToNow(
   const journey = await prisma.journey.findUnique({ where: { letterId } });
   if (!journey) throw new JourneyNotFoundError(letterId);
 
-  return prisma.$transaction(async (tx) => {
-    // 行锁 + 锁后重读：并发 advance 串行化；时间倒退 / 重复推进在此判定
-    await tx.$queryRaw`SELECT id FROM "Journey" WHERE id = ${journey.id} FOR UPDATE`;
-    const lockedJourney = await tx.journey.findUniqueOrThrow({ where: { id: journey.id } });
-    const lockedLetter = await tx.letter.findUniqueOrThrow({ where: { id: letterId } });
-    const legs = await tx.transportLeg.findMany({
-      where: { journeyId: journey.id },
-      orderBy: { sequence: "asc" },
-    });
+  return prisma.$transaction((tx) => advanceJourneyWithinTransaction(tx, letterId, clock));
+}
 
-    const lastAdvancedMs = lockedJourney.lastAdvancedAtSim?.getTime() ?? null;
-    if (lastAdvancedMs !== null && nowMs <= lastAdvancedMs) {
-      // 契约：时间倒退 / 同一 now 重复推进 → no-op（不重放、不倒退状态）
-      return {
-        changed: false,
-        letterStatus: lockedLetter.status,
-        journeyStatus: lockedJourney.status,
-        currentLegSequence: lockedJourney.currentLegSequence,
-      };
-    }
+/** Profile changes use the same Journey lock and progression in their own atomic transaction. */
+export async function advanceJourneyWithinTransaction(
+  tx: Prisma.TransactionClient,
+  letterId: bigint,
+  clock: SimulationClock,
+  allowDestinationAtSameTime = false
+): Promise<AdvanceJourneyResult> {
+  const nowMs = clock.now();
+  const journey = await tx.journey.findUnique({ where: { letterId } });
+  if (!journey) throw new JourneyNotFoundError(letterId);
+  // 行锁 + 锁后重读：并发 advance 串行化；时间倒退 / 重复推进在此判定
+  await tx.$queryRaw`SELECT id FROM "Journey" WHERE id = ${journey.id} FOR UPDATE`;
+  const lockedJourney = await tx.journey.findUniqueOrThrow({ where: { id: journey.id } });
+  const lockedLetter = await tx.letter.findUniqueOrThrow({ where: { id: letterId } });
+  const legs = await tx.transportLeg.findMany({
+    where: { journeyId: journey.id },
+    orderBy: { sequence: "asc" },
+  });
 
-    if (TERMINAL_LETTER_STATUSES.has(lockedLetter.status)) {
-      // 终态 no-op，但模拟时间仍单调前进：只更新 lastAdvancedAtSim = now，
-      // 不修改业务终态字段 / deliveredAt / Legs / 不新增 WorldEvent。
-      await tx.journey.update({
-        where: { id: journey.id },
-        data: { lastAdvancedAtSim: new Date(nowMs) },
-      });
-      return {
-        changed: false,
-        letterStatus: lockedLetter.status,
-        journeyStatus: lockedJourney.status,
-        currentLegSequence: lockedJourney.currentLegSequence,
-      };
-    }
-
-    // 冻结规则权威：Journey.rulesVersion（不是 Letter）。未知版本明确失败（不静默 fallback）。
-    // 抛错发生在任何写库之前 → 整个事务回滚，无部分状态 / 无半个事件历史写入。
-    const rulesVersion = lockedJourney.rulesVersion;
-    for (const leg of legs) {
-      speedKmPerDay(rulesVersion, leg.transportType);
-      transportEventTable(rulesVersion, leg.transportType);
-    }
-    if (legs.length === 0) {
-      speedKmPerDay(rulesVersion, "PIGEON");
-      transportEventTable(rulesVersion, "PIGEON");
-    }
-
-    // 当前稳定节点：最后 COMPLETED leg 的 toNodeId；无则 originNodeId
-    let currentNodeId = lockedJourney.originNodeId;
-    for (let i = legs.length - 1; i >= 0; i -= 1) {
-      const l = legs[i];
-      if (l && l.status === LEG_COMPLETED) {
-        currentNodeId = l.toNodeId;
-        break;
-      }
-    }
-
-    const state: AdvanceState = {
-      journeyId: journey.id,
+  const lastAdvancedMs = lockedJourney.lastAdvancedAtSim?.getTime() ?? null;
+  if (
+    lastAdvancedMs !== null &&
+    (nowMs < lastAdvancedMs || (nowMs === lastAdvancedMs && !allowDestinationAtSameTime))
+  ) {
+    // 契约：时间倒退 / 同一 now 重复推进 → no-op（不重放、不倒退状态）
+    return {
+      changed: false,
       letterStatus: lockedLetter.status,
       journeyStatus: lockedJourney.status,
-      letterTransport: lockedLetter.currentTransport,
-      journeyStartedAt: lockedJourney.startedAtSim,
-      journeyCompletedAt: lockedJourney.completedAtSim,
       currentLegSequence: lockedJourney.currentLegSequence,
-      deliveredAtMs: null,
-      randomDrawIndex: lockedJourney.nextRandomDrawIndex,
-      worldEventIndex: lockedJourney.nextWorldEventIndex,
-      anomalyType: lockedJourney.anomalyType,
-      anomalyStartedAtMs: lockedJourney.anomalyStartedAtSim?.getTime() ?? null,
-      anomalyResolvedAtMs: lockedJourney.anomalyResolvedAtSim?.getTime() ?? null,
-      currentNodeId,
-      recoveryResumeMs: lockedJourney.resumeAtSim?.getTime() ?? null,
-      lastMileReadyAtMs: lockedJourney.lastMileReadyAtSim?.getTime() ?? null,
-      changes: [],
-      worldEvents: [],
-      earliestRebuiltFromSequence: null,
-      nextTempLegId: BigInt(-1),
-      finalLegs: legs,
-      anyStateChanged: false,
     };
+  }
 
-    // 确定性随机源：只有真实随机决策才推进 random cursor（持久化后 replay 一致；retry/rollback 不重复消费）
-    const draw: DrawFn = () => {
-      const index = state.randomDrawIndex;
-      state.randomDrawIndex += 1;
-      return { value: deterministicDraw(lockedJourney.simulationSeed, index), index };
+  if (TERMINAL_LETTER_STATUSES.has(lockedLetter.status)) {
+    // 终态 no-op，但模拟时间仍单调前进：只更新 lastAdvancedAtSim = now，
+    // 不修改业务终态字段 / deliveredAt / Legs / 不新增 WorldEvent。
+    await tx.journey.update({
+      where: { id: journey.id },
+      data: { lastAdvancedAtSim: new Date(nowMs) },
+    });
+    return {
+      changed: false,
+      letterStatus: lockedLetter.status,
+      journeyStatus: lockedJourney.status,
+      currentLegSequence: lockedJourney.currentLegSequence,
     };
-    // 事件编号分配器：与随机游标完全独立（记录派生事实不会改变未来随机决策）
-    const allocateWorldEventIndex = (): number => {
-      const index = state.worldEventIndex;
-      state.worldEventIndex += 1;
-      return index;
-    };
-    const record: RecordFn = (
-      type,
+  }
+
+  // 冻结规则权威：Journey.rulesVersion（不是 Letter）。未知版本明确失败（不静默 fallback）。
+  // 抛错发生在任何写库之前 → 整个事务回滚，无部分状态 / 无半个事件历史写入。
+  const rulesVersion = lockedJourney.rulesVersion;
+  for (const leg of legs) {
+    speedKmPerDay(rulesVersion, leg.transportType);
+    transportEventTable(rulesVersion, leg.transportType);
+  }
+  if (legs.length === 0) {
+    speedKmPerDay(rulesVersion, "PIGEON");
+    transportEventTable(rulesVersion, "PIGEON");
+  }
+
+  // 当前稳定节点：最后 COMPLETED leg 的 toNodeId；无则 originNodeId
+  let currentNodeId = lockedJourney.originNodeId;
+  for (let i = legs.length - 1; i >= 0; i -= 1) {
+    const l = legs[i];
+    if (l && l.status === LEG_COMPLETED) {
+      currentNodeId = l.toNodeId;
+      break;
+    }
+  }
+
+  const state: AdvanceState = {
+    journeyId: journey.id,
+    letterStatus: lockedLetter.status,
+    journeyStatus: lockedJourney.status,
+    letterTransport: lockedLetter.currentTransport,
+    journeyStartedAt: lockedJourney.startedAtSim,
+    journeyCompletedAt: lockedJourney.completedAtSim,
+    currentLegSequence: lockedJourney.currentLegSequence,
+    deliveredAtMs: null,
+    originStationReadyAtMs: lockedJourney.originStationReadyAtSim?.getTime() ?? null,
+    randomDrawIndex: lockedJourney.nextRandomDrawIndex,
+    worldEventIndex: lockedJourney.nextWorldEventIndex,
+    anomalyType: lockedJourney.anomalyType,
+    anomalyStartedAtMs: lockedJourney.anomalyStartedAtSim?.getTime() ?? null,
+    anomalyResolvedAtMs: lockedJourney.anomalyResolvedAtSim?.getTime() ?? null,
+    currentNodeId,
+    recoveryResumeMs: lockedJourney.resumeAtSim?.getTime() ?? null,
+    lastMileReadyAtMs: lockedJourney.lastMileReadyAtSim?.getTime() ?? null,
+    changes: [],
+    worldEvents: [],
+    earliestRebuiltFromSequence: null,
+    nextTempLegId: BigInt(-1),
+    finalLegs: legs,
+    pendingDestination: await tx.destinationChange.findFirst({
+      where: { journeyId: journey.id, status: "PENDING" },
+      orderBy: [{ requestedAtSim: "desc" }, { id: "desc" }],
+    }),
+    appliedDestination: null,
+    anyStateChanged: false,
+  };
+
+  // 确定性随机源：只有真实随机决策才推进 random cursor（持久化后 replay 一致；retry/rollback 不重复消费）
+  const draw: DrawFn = () => {
+    const index = state.randomDrawIndex;
+    state.randomDrawIndex += 1;
+    return { value: deterministicDraw(lockedJourney.simulationSeed, index), index };
+  };
+  // 事件编号分配器：与随机游标完全独立（记录派生事实不会改变未来随机决策）
+  const allocateWorldEventIndex = (): number => {
+    const index = state.worldEventIndex;
+    state.worldEventIndex += 1;
+    return index;
+  };
+  const record: RecordFn = (
+    type,
+    occurredAtMs,
+    nodeId,
+    transportLegSequence,
+    payload,
+    explicitIndex
+  ) => {
+    const eventIndex = explicitIndex ?? allocateWorldEventIndex();
+    state.worldEvents.push({
+      eventIndex,
+      eventType: type,
       occurredAtMs,
       nodeId,
       transportLegSequence,
       payload,
-      explicitIndex
-    ) => {
-      const eventIndex = explicitIndex ?? allocateWorldEventIndex();
-      state.worldEvents.push({
-        eventIndex,
-        eventType: type,
-        occurredAtMs,
-        nodeId,
-        transportLegSequence,
-        payload,
-      });
-      state.anyStateChanged = true;
-      return eventIndex;
-    };
+    });
+    state.anyStateChanged = true;
+    return eventIndex;
+  };
 
-    // 可重复 progression loop：以理论事件时间为游标，直到 now 不足以推进或到达终态。
-    // 一次大跳跃与多次分段推进必须产生完全一致的结果。
-    runProgression(state, legs, lockedJourney, rulesVersion, nowMs, draw, record);
+  // 可重复 progression loop：以理论事件时间为游标，直到 now 不足以推进或到达终态。
+  // 一次大跳跃与多次分段推进必须产生完全一致的结果。
+  runProgression(state, legs, lockedJourney, rulesVersion, nowMs, draw, record);
 
-    const changed =
-      state.anyStateChanged ||
-      state.randomDrawIndex !== lockedJourney.nextRandomDrawIndex ||
-      state.worldEventIndex !== lockedJourney.nextWorldEventIndex ||
-      state.anomalyType !== lockedJourney.anomalyType ||
-      (state.anomalyStartedAtMs ?? null) !==
-        (lockedJourney.anomalyStartedAtSim?.getTime() ?? null) ||
-      (state.anomalyResolvedAtMs ?? null) !==
-        (lockedJourney.anomalyResolvedAtSim?.getTime() ?? null) ||
-      state.letterTransport !== lockedLetter.currentTransport ||
-      state.earliestRebuiltFromSequence !== null;
+  const changed =
+    state.anyStateChanged ||
+    state.randomDrawIndex !== lockedJourney.nextRandomDrawIndex ||
+    state.worldEventIndex !== lockedJourney.nextWorldEventIndex ||
+    state.anomalyType !== lockedJourney.anomalyType ||
+    (state.anomalyStartedAtMs ?? null) !== (lockedJourney.anomalyStartedAtSim?.getTime() ?? null) ||
+    (state.anomalyResolvedAtMs ?? null) !==
+      (lockedJourney.anomalyResolvedAtSim?.getTime() ?? null) ||
+    state.letterTransport !== lockedLetter.currentTransport ||
+    state.earliestRebuiltFromSequence !== null;
 
-    // 始终 persist：now > lastAdvanced 已保证（上面 return），任何调用都把模拟时钟
-    // 前进到 now（即使状态无变化 / 异常等待中），保证"一次大跳跃 vs 分段推进"的 lastAdvanced 一致。
-    await persistAdvance(tx, journey, lockedLetter, state, nowMs);
+  // 始终 persist：now > lastAdvanced 已保证（上面 return），任何调用都把模拟时钟
+  // 前进到 now（即使状态无变化 / 异常等待中），保证"一次大跳跃 vs 分段推进"的 lastAdvanced 一致。
+  await persistAdvance(tx, lockedJourney, lockedLetter, state, nowMs);
 
-    return {
-      changed,
-      letterStatus: state.letterStatus,
-      journeyStatus: state.journeyStatus,
-      currentLegSequence: state.currentLegSequence,
-    };
-  });
+  return {
+    changed,
+    letterStatus: state.letterStatus,
+    journeyStatus: state.journeyStatus,
+    currentLegSequence: state.currentLegSequence,
+  };
 }
 
 /** 可重复推进主循环。 */
@@ -351,6 +378,8 @@ function runProgression(
   draw: DrawFn,
   record: RecordFn
 ): void {
+  // Collection is deterministic: no city leg or random decision before arrival at the origin station.
+  if (state.originStationReadyAtMs !== null && nowMs < state.originStationReadyAtMs) return;
   for (;;) {
     // 1) 终态
     if (TERMINAL_LETTER_STATUSES.has(state.letterStatus)) return;
@@ -369,11 +398,26 @@ function runProgression(
       return;
     }
 
+    if (
+      !legs.some((leg) => leg.status === "ACTIVE") &&
+      state.pendingDestination &&
+      state.pendingDestination.requestedAtSim.getTime() <= nowMs
+    ) {
+      const atMs = Math.max(
+        state.pendingDestination.requestedAtSim.getTime(),
+        state.recoveryResumeMs ?? 0,
+        state.journeyCompletedAt?.getTime() ?? 0,
+        state.originStationReadyAtMs ?? 0
+      );
+      applyDestinationChange(state, legs, journey, rulesVersion, atMs);
+    }
+
     // 3) 零 Leg（同站点 PIGEON）或全部完成 → last-mile
     if (legs.length === 0 || allCompleted(legs, state)) {
       if (legs.length === 0 && state.journeyStartedAt === null) {
-        state.journeyStartedAt = new Date(nowMs);
-        state.journeyCompletedAt = new Date(nowMs);
+        const startMs = state.originStationReadyAtMs ?? nowMs;
+        state.journeyStartedAt = new Date(startMs);
+        state.journeyCompletedAt = new Date(startMs);
         state.journeyStatus = "COMPLETED";
         state.anyStateChanged = true;
       }
@@ -416,6 +460,12 @@ function runProgression(
     completeLeg(state, leg, legStartMs, effectiveMs);
     state.currentNodeId = leg.toNodeId;
     state.journeyCompletedAt = new Date(effectiveMs);
+    if (
+      state.pendingDestination &&
+      state.pendingDestination.requestedAtSim.getTime() <= effectiveMs
+    ) {
+      applyDestinationChange(state, legs, journey, rulesVersion, effectiveMs);
+    }
 
     // 8) 应用 primary outcome 的完成点效果（事件在效果发生时刻记录，payload 完整、无跨调用 patch）
     const outcome = leg.primaryEventOutcome ?? "NORMAL";
@@ -632,7 +682,7 @@ function resolveLegStartMs(
     const prevEnd = legs[cursor - 1]?.completedAtSim?.getTime();
     if (prevEnd !== undefined && prevEnd !== null) return prevEnd;
   }
-  return nowMs;
+  return state.originStationReadyAtMs ?? nowMs;
 }
 
 /** 首次激活 Leg：判定并持久化 primary event（细分 outcome / delay；每 Leg 最多一次）。
@@ -984,6 +1034,46 @@ function rebuildRemaining(
   }
 }
 
+function applyDestinationChange(
+  state: AdvanceState,
+  legs: TransportLeg[],
+  journey: Journey,
+  rulesVersion: string,
+  atMs: number
+): void {
+  const change = state.pendingDestination;
+  if (!change) return;
+  const route = planRouteExcluding({
+    graphVersion: journey.graphVersion,
+    originNodeId: state.currentNodeId,
+    destinationNodeId: change.destinationNodeId,
+    transportType: state.letterTransport,
+  });
+  state.appliedDestination = {
+    change,
+    atMs,
+    fromRevision: journey.destinationRevision,
+    previousNodeId: journey.destinationNodeId,
+    previousLastMileReadyAtMs: state.lastMileReadyAtMs,
+  };
+  journey.destinationNodeId = change.destinationNodeId;
+  journey.destinationRevision++;
+  state.pendingDestination = null;
+  if (route.edges.length > 0) {
+    rebuildRemaining(state, legs, journey, completedCount(legs), route, rulesVersion);
+    state.journeyStatus = "IN_PROGRESS";
+    state.letterStatus = "IN_TRANSIT";
+    state.lastMileReadyAtMs = null;
+    state.recoveryResumeMs = Math.max(atMs, state.recoveryResumeMs ?? 0);
+  } else {
+    // A different district at the same station needs a new, not retroactive, last-mile attempt.
+    rebuildRemaining(state, legs, journey, completedCount(legs), route, rulesVersion);
+    state.lastMileReadyAtMs = atMs;
+    state.journeyCompletedAt = new Date(atMs);
+  }
+  state.anyStateChanged = true;
+}
+
 function completedCount(legs: TransportLeg[]): number {
   let n = 0;
   for (const l of legs) {
@@ -1101,6 +1191,8 @@ async function persistAdvance(
     });
   }
   const journeyData: Prisma.JourneyUpdateInput = {
+    destinationNodeId: journey.destinationNodeId,
+    destinationRevision: journey.destinationRevision,
     status: state.journeyStatus,
     startedAtSim: state.journeyStartedAt,
     completedAtSim: state.journeyCompletedAt,
@@ -1121,6 +1213,22 @@ async function persistAdvance(
     journeyData.totalDistanceKm = state.finalLegs.reduce((acc, l) => acc + l.distanceKm, 0);
   }
   await tx.journey.update({ where: { id: journey.id }, data: journeyData });
+  if (state.appliedDestination) {
+    const applied = state.appliedDestination;
+    await tx.destinationChange.update({
+      where: { id: applied.change.id },
+      data: {
+        status: "APPLIED",
+        appliedAtSim: new Date(applied.atMs),
+        fromRevision: applied.fromRevision,
+        previousDestinationNodeId: applied.previousNodeId,
+        previousLastMileReadyAtSim:
+          applied.previousLastMileReadyAtMs === null
+            ? null
+            : new Date(applied.previousLastMileReadyAtMs),
+      },
+    });
+  }
   const letterData: Prisma.LetterUpdateInput = {
     status: state.letterStatus,
     ...(state.letterTransport !== lockedLetter.currentTransport

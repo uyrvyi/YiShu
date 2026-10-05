@@ -1588,7 +1588,7 @@ describe("world events integration", () => {
     const firstRemaining = legsAfter.find((l) => l.sequence === 1);
     expect(firstRemaining?.fromNodeId).toBe(leg0.toNodeId);
     // completedPath（GET）不因 reroute 改变：leg0 完成节点序列前段一致
-    const detail = await getLetterDetail(trackingNo, bob.accessToken);
+    const detail = await getLetterDetail(trackingNo, alice.accessToken);
     const journeySummary = detail.json().letter.journey;
     expect(journeySummary.legs[0]?.status).toBe("COMPLETED");
   });

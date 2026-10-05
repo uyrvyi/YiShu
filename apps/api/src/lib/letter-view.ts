@@ -6,7 +6,8 @@
  * - Recipient 视图在 status != DELIVERED 时 content 为 null（规范 §49）。
  */
 
-import type { Letter, RecipientState, SenderState } from "@yishu/db";
+import type { Letter, MediaAsset, RecipientState, SenderState } from "@yishu/db";
+import { toMediaView, type MediaView } from "./media.js";
 import type {
   LetterStatus,
   PublicLetterStatus,
@@ -37,6 +38,8 @@ export interface LetterView {
   createdAt: string;
   /** 正文（仅 Sender 始终可见；Recipient 需 DELIVERED）。 */
   content: string | null;
+  writtenAt: string | null;
+  images: MediaView[];
   /** 发送者身份快照。 */
   sender: { account: string; uid: string; nickname: string };
   /** 收件人身份快照。 */
@@ -69,7 +72,9 @@ function toTargetRegion(l: Letter): LetterRegion {
   };
 }
 
-function baseView(l: Letter, content: string | null): LetterView {
+type LetterWithImages = Letter & { images?: MediaAsset[] };
+
+function baseView(l: LetterWithImages, content: string | null, canRead: boolean): LetterView {
   return {
     trackingNo: l.trackingNo,
     status: toPublicLetterStatus(l.status as LetterStatus),
@@ -81,6 +86,8 @@ function baseView(l: Letter, content: string | null): LetterView {
     deliveredAt: l.deliveredAt ? l.deliveredAt.toISOString() : null,
     createdAt: l.createdAt.toISOString(),
     content,
+    writtenAt: canRead ? (l.writtenAt ?? l.createdAt).toISOString() : null,
+    images: canRead ? (l.images ?? []).map(toMediaView) : [],
     sender: {
       account: l.senderAccountSnapshot,
       uid: l.senderUidSnapshot,
@@ -96,11 +103,11 @@ function baseView(l: Letter, content: string | null): LetterView {
 
 /** 构建 Sender 视图：始终可见正文（明文由调用方传入）；不含 readState。 */
 export function toSenderLetterView(
-  l: Letter,
+  l: LetterWithImages,
   plainContent: string | null,
   senderState?: SenderState | null
 ): SenderLetterView {
-  const view = baseView(l, plainContent);
+  const view = baseView(l, plainContent, true);
   return {
     ...view,
     senderState: senderState
@@ -111,12 +118,12 @@ export function toSenderLetterView(
 
 /** 构建 Recipient 视图：DELIVERED 前 content 为 null（明文由调用方传入）。 */
 export function toRecipientLetterView(
-  l: Letter,
+  l: LetterWithImages,
   plainContent: string | null,
   recipientState?: RecipientState | null
 ): RecipientLetterView {
   const canRead = l.status === DELIVERED;
-  const view = baseView(l, canRead ? plainContent : null);
+  const view = baseView(l, canRead ? plainContent : null, canRead);
   return {
     ...view,
     readState: recipientState?.readState ?? "UNOPENED",

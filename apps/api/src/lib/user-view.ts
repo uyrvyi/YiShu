@@ -7,6 +7,7 @@ export interface UserPublicView {
   account: string;
   uid: string;
   nickname: string;
+  avatarUrl?: string | null;
   region: {
     province: string;
     city: string;
@@ -22,11 +23,13 @@ export function toUserPublicView(user: {
   province: string;
   city: string;
   district: string;
+  avatarId?: string | null;
 }): UserPublicView {
   return {
     account: user.account,
     uid: user.uid,
     nickname: user.nickname,
+    avatarUrl: user.avatarId ? `/api/v1/media/${user.avatarId}` : null,
     region: {
       province: user.province,
       city: user.city,

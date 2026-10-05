@@ -104,7 +104,7 @@ export type TransportLegStatus = (typeof TRANSPORT_LEG_STATUSES)[number];
  * 规则版本（对应开发规范 §63：rulesVersion="1.0"）。
  * 速度 / 时长换算必须按 rulesVersion 选择，未知版本明确拒绝（Phase 4 Final Gate BLOCKER）。
  */
-export const RULES_VERSIONS = ["1.0"] as const;
+export const RULES_VERSIONS = ["1.0", "1.1"] as const;
 export type RulesVersion = (typeof RULES_VERSIONS)[number];
 
 /**
@@ -125,6 +125,7 @@ export const TRANSPORT_SPEEDS_BY_RULES_VERSION: Record<
   Record<TransportType, number>
 > = {
   "1.0": TRANSPORT_SPEEDS_KM_PER_DAY,
+  "1.1": TRANSPORT_SPEEDS_KM_PER_DAY,
 };
 
 /** 未知规则版本（冻结版本语义：必须显式拒绝，不得静默 fallback）。 */
@@ -145,6 +146,14 @@ export const SECONDS_PER_DAY = 86400;
  * 冻结常量，内部 Simulation 输入，用户 API / Mobile 严禁暴露 ETA / 倒计时（规范 §18/§45）。
  */
 export const LAST_MILE_DURATION_SECONDS = 6 * 3600;
+
+/** District collection is fixed-duration and does not consume a city-leg random draw. */
+export const FIRST_MILE_DURATION_SECONDS = 3 * 3600;
+export function firstMileDurationSeconds(rulesVersion: string): number {
+  if (rulesVersion === "1.0") return 0;
+  if (rulesVersion === "1.1") return FIRST_MILE_DURATION_SECONDS;
+  throw new UnknownRulesVersionError(rulesVersion);
+}
 
 /**
  * 按规则版本取运输速度（km/天）。
@@ -253,6 +262,12 @@ export const TRANSPORT_EVENTS_BY_RULES_VERSION: Record<
   Record<TransportType, readonly WeightedOutcome<TransportEventType>[]>
 > = {
   "1.0": {
+    HAND_CARRY: HAND_CARRY_EVENT_TABLE,
+    HORSE_RELAY: HORSE_RELAY_EVENT_TABLE,
+    EXPRESS_RELAY: EXPRESS_RELAY_EVENT_TABLE,
+    PIGEON: PIGEON_EVENT_TABLE,
+  },
+  "1.1": {
     HAND_CARRY: HAND_CARRY_EVENT_TABLE,
     HORSE_RELAY: HORSE_RELAY_EVENT_TABLE,
     EXPRESS_RELAY: EXPRESS_RELAY_EVENT_TABLE,
@@ -611,6 +626,7 @@ export interface MapStation extends MapPoint {
   name: string;
   province: string;
   city: string;
+  district?: string;
 }
 
 /** 地图事实节点（严格来自用户可见 Timeline；无 sourceKey / nodeId / importance / metadata）。 */
@@ -644,6 +660,16 @@ export interface RouteMapView {
   lastKnownPosition: MapPoint | null;
   /** 最新高优先事实（最多 `MAP_FACT_LIMIT` 个，按时间升序）。 */
   facts: MapFactView[];
+  collection?: MapConnection | null;
+  delivery?: MapConnection | null;
+  stations?: MapStation[];
+  districtLocationsUnavailable?: string[];
+}
+
+export interface MapConnection {
+  from: MapStation;
+  to: MapStation;
+  state: "PLANNED" | "IN_PROGRESS" | "COMPLETED";
 }
 
 const mapPointSchema = z.object({ x: z.number(), y: z.number() });
@@ -652,6 +678,13 @@ const mapStationSchema = mapPointSchema.extend({
   name: z.string(),
   province: z.string(),
   city: z.string(),
+  district: z.string().optional(),
+});
+
+const mapConnectionSchema = z.object({
+  from: mapStationSchema,
+  to: mapStationSchema,
+  state: z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED"]),
 });
 
 const mapFactSchema = z.object({
@@ -680,7 +713,27 @@ export const routeMapViewSchema = z.object({
   approximatePosition: mapPointSchema.nullable(),
   lastKnownPosition: mapPointSchema.nullable(),
   facts: z.array(mapFactSchema),
+  collection: mapConnectionSchema.nullable().optional(),
+  delivery: mapConnectionSchema.nullable().optional(),
+  stations: z.array(mapStationSchema).optional(),
+  districtLocationsUnavailable: z.array(z.string()).optional(),
 });
 
 /** 地图响应契约类型（与 `RouteMapView` 同一结构；用于解析结果类型收窄）。 */
 export type RouteMapViewParsed = z.infer<typeof routeMapViewSchema>;
+
+/** Sender-only estimates are advisory; they never become Timeline facts. */
+export const transportEstimateSchema = z.object({
+  transportType: z.enum(TRANSPORT_TYPES),
+  distanceKm: z.number().finite().nonnegative(),
+  durationSeconds: z.number().int().nonnegative(),
+});
+export const transportEstimatesSchema = z.object({ estimates: z.array(transportEstimateSchema) });
+export type TransportEstimate = z.infer<typeof transportEstimateSchema>;
+
+export const nextStationEstimateSchema = z.object({
+  state: z.enum(["ON_THE_WAY", "UNAVAILABLE"]),
+  remainingSeconds: z.number().int().positive().nullable(),
+  asOf: z.string().datetime(),
+});
+export type NextStationEstimate = z.infer<typeof nextStationEstimateSchema>;

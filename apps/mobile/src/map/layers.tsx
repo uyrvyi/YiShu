@@ -18,30 +18,28 @@
 
 import { Circle, G, Path, Polyline } from "react-native-svg";
 import type { MapFactView, MapPoint } from "@yishu/shared";
-import { CHINA_MAP_OUTLINE_D, CHINA_PROVINCE_SHAPES } from "./chinaMapData";
+import { CHINA_GEOGRAPHIC_OUTLINE_D, CHINA_GEOGRAPHIC_SHAPES } from "./chinaGeographicData";
 import {
-  MAP_FIT_TRANSFORM,
-  toPolylinePoints,
-  toViewBoxPoint,
-  viewBoxStrokeWidth,
-} from "./geometry";
+  toDisplayPolyline as toPolylinePoints,
+  toDisplayPoint as toViewBoxPoint,
+} from "./displayProjection";
 import { MAP_COLORS, MAP_RADIUS, MAP_STROKE, REMAINING_DASH } from "./theme";
 
 /**
  * 中国外轮廓（静态本地资产，示意性几何）。
  *
- * 资产 `path d` 位于 `mapX/mapY` 坐标系 → 必须放进 `MAP_FIT_TRANSFORM` 缩放组；
- * 描边宽度经 `viewBoxStrokeWidth()` 补偿，保证实际渲染宽度 = `MAP_STROKE.outline`（Gate L1）。
+ * 资产已经按 EPSG:3857 投影并等比拟合到 viewBox；无需重复缩放，描边直接使用 viewBox 单位。
  */
 export function ChinaOutlineLayer() {
   return (
-    <G transform={MAP_FIT_TRANSFORM}>
+    <G>
       <Path
         id="china-outline"
-        d={CHINA_MAP_OUTLINE_D}
-        fill="none"
+        d={CHINA_GEOGRAPHIC_OUTLINE_D}
+        fill={MAP_COLORS.paper}
+        fillRule="evenodd"
         stroke={MAP_COLORS.outline}
-        strokeWidth={viewBoxStrokeWidth(MAP_STROKE.outline)}
+        strokeWidth={MAP_STROKE.outline}
         strokeLinejoin="round"
       />
     </G>
@@ -51,21 +49,21 @@ export function ChinaOutlineLayer() {
 /**
  * ADM1 行政单元边界（vendored geoBoundaries `gbOpen / CHN / ADM1`，34 个 feature）。
  *
- * 几何直接来自源数据（仅 canonical projection + 序列化：无简化 / 无外扩 / 无凸包 / 无六边形），
+ * 几何直接来自源数据（仅 Mercator 投影 + 等比拟合 + 序列化，无额外简化或外扩），
  * 与 `ChinaOutlineLayer` 同源 → 省形不会越出国家轮廓；MultiPolygon / 岛屿全部保留。
  * 来源、许可与「非法律边界认定」说明见 `data/maps/README.md`；运行时完全离线。
  */
 export function ProvinceBoundaryLayer() {
   return (
-    <G transform={MAP_FIT_TRANSFORM}>
-      {CHINA_PROVINCE_SHAPES.map((shape) => (
+    <G>
+      {CHINA_GEOGRAPHIC_SHAPES.map((shape) => (
         <Path
           key={shape.id}
           id={shape.id}
           d={shape.d}
           fill="none"
           stroke={MAP_COLORS.province}
-          strokeWidth={viewBoxStrokeWidth(MAP_STROKE.province)}
+          strokeWidth={MAP_STROKE.province}
         />
       ))}
     </G>

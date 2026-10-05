@@ -17,6 +17,7 @@ export interface AuthUser {
   uid: string;
   account: string;
   nickname: string;
+  avatarUrl?: string | null;
   region: {
     province: string;
     city: string;

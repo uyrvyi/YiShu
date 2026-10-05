@@ -1,7 +1,8 @@
 /**
  * Phase 8 — Local Map + Journey Visualization 用户可见安全投影（开发规范 §14–§19 / §74）。
  *
- * 依据（冻结文档 + 项目负责人 2026-09-13 地图可见性冻结，不自行发明规则）：
+ * 历史地图 DTO 契约如下。2026-09-30 经负责人确认允许联网地图和寄件人 ETA；
+ * ETA 使用独立投影与接口，收件人的事实可见性和地图 DTO 字段仍保持不变。
  * - §14 完全本地地图；禁止任何在线地图 / 瓦片 / geocoder；无精确 GPS。
  * - §17 固定 viewBox；§18 已走实线 / 未走虚线 / 当前大概位置 / 无 ETA。
  * - §19 `LETTER_DROPPED` 完全 HIDDEN（全局）：不显示掉落范围（V1 无 `dropArea`）、
@@ -40,6 +41,7 @@ import {
   type PublicLetterStatus,
   type RouteMapView,
   type TimelineEventType,
+  type NextStationEstimate,
 } from "@yishu/shared";
 import type { TimelineEvent } from "@yishu/db";
 import { resolveMapStationPoint } from "./map-station-point.js";
@@ -49,7 +51,7 @@ export interface PlannedLegSegment {
   sequence: number;
   fromNodeId: string;
   toNodeId: string;
-  /** 计划时长（秒）；仅用于把「已确认出发时刻 → now」映射为区间内位置，不输出为 ETA。 */
+  /** 冻结计划时长（秒）；位置与寄件人独立参考预估共用，不读取隐藏异常。 */
   plannedDurationSeconds: number;
 }
 
@@ -67,6 +69,7 @@ export interface MapProjectionInput {
   destinationNodeId: string | null;
   /** 冻结的路线规划（Journey.legs 的几何视图）。 */
   plannedLegs: readonly PlannedLegSegment[];
+  originStationReadyAtMs?: number | null;
 }
 
 /**
@@ -399,6 +402,55 @@ export function projectRouteMap(input: MapProjectionInput): RouteMapView {
     lastKnownPosition,
     facts,
   };
+}
+
+/** Only visible departures and frozen route durations inform this advisory estimate. */
+export function projectNextStationEstimate(input: MapProjectionInput): NextStationEstimate {
+  const unavailable: NextStationEstimate = {
+    state: "UNAVAILABLE",
+    remainingSeconds: null,
+    asOf: new Date(input.nowMs).toISOString(),
+  };
+  const readyAt = input.originStationReadyAtMs;
+  const dispatched = input.visibleEvents.find((event) => event.type === "DISPATCHED");
+  if (
+    readyAt &&
+    dispatched &&
+    input.nowMs >= dispatched.happenedAt.getTime() &&
+    input.nowMs < readyAt &&
+    input.publicStatus === "DISPATCHED"
+  ) {
+    return {
+      state: "ON_THE_WAY",
+      remainingSeconds: Math.ceil((readyAt - input.nowMs) / 1000),
+      asOf: unavailable.asOf,
+    };
+  }
+  if (
+    !["IN_TRANSIT", "DISPATCHED", "RECOVERED", "TRANSPORT_CHANGED"].includes(input.publicStatus) ||
+    isMissingActive(input.visibleEvents)
+  )
+    return unavailable;
+  const stops = confirmedStops(input.visibleEvents, input.originNodeId);
+  const ordered = [...input.plannedLegs].sort((a, b) => a.sequence - b.sequence);
+  const active = ordered[countCompletedLegs(ordered, stops)];
+  const last = stops.at(-1);
+  if (!active || !last || last.confirmedAtMs === null || last.nodeId !== active.fromNodeId)
+    return unavailable;
+  const departure = departureAnchorMs(input.visibleEvents, active.fromNodeId, last.confirmedAtMs);
+  if (
+    departure === null ||
+    departure > input.nowMs ||
+    !Number.isFinite(active.plannedDurationSeconds) ||
+    active.plannedDurationSeconds <= 0
+  )
+    return unavailable;
+  const remaining = Math.ceil(
+    (departure + active.plannedDurationSeconds * 1000 - input.nowMs) / 1000
+  );
+  // An overdue estimate is unknown, not a claim that the next station has been reached.
+  if (remaining <= 0) return unavailable;
+  return { state: "ON_THE_WAY", remainingSeconds: remaining, asOf: unavailable.asOf };
 }
 
 /** 事实排序的确定性 tie-break（不含内部 id；同一事实集合内稳定）。 */

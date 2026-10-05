@@ -1,0 +1,15 @@
+**
+!deploy/
+!deploy/Dockerfile.cloud-preview-smaller-photos
+!deploy/Dockerfile.cloud-preview-smaller-photos.dockerignore
+!apps/
+!apps/mobile/
+!apps/mobile/src/
+!apps/mobile/src/media/
+!apps/mobile/src/media/uploadPreparation.ts
+!apps/mobile/src/media/avatarCrop.ts
+!apps/mobile/src/media/picker.ts
+!apps/mobile/app/
+!apps/mobile/app/letters/
+!apps/mobile/app/letters/new.tsx
+!apps/mobile/app/profile.tsx

@@ -56,13 +56,14 @@ export const STATUS_LABELS: Record<PublicLetterStatus, string> = {
 /** 位置说明：只表达「大概 / 最后确报」，不含 ETA / 剩余时间。 */
 export function positionNoteFor(view: RouteMapViewParsed): string | null {
   if (view.approximatePosition !== null) return "位置更新中：大概位置（非精确坐标）";
-  if (view.lastKnownPosition !== null) return "位置已停止更新：仅显示最后确报位置";
+  if (view.lastKnownPosition !== null) return "仅显示最后确认的位置";
   return null;
 }
 
 /** 路线标题（起点 → 终点）。 */
 export function routeLabelFor(view: RouteMapViewParsed): string {
-  if (view.origin === null || view.destination === null) return "尚未启程";
+  if (view.origin === null) return "尚未启程";
+  if (view.destination === null) return `${view.origin.name} · 已确认轨迹`;
   return `${view.origin.name} → ${view.destination.name}`;
 }
 
@@ -87,4 +88,4 @@ export function factRowsFor(view: RouteMapViewParsed): FactRow[] {
 }
 
 /** 页面底部说明（明确无 ETA）。 */
-export const MAP_FOOTNOTE = "只显示可确认的运输事实；不提供预计送达时间，位置为大概位置。";
+export const MAP_FOOTNOTE = "运输动态请返回物流详情查看；地图不提供预计送达时间。";

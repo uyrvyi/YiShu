@@ -35,6 +35,12 @@ yarn-error.*
 
 # ---- Local ----
 .local
+.temp
 
 # ---- Local agent / tool data ----
 .codebuddy
+
+# Firebase client configuration is supplied for native builds; private keys stay local.
+/apps/mobile/google-services.json
+*firebase-adminsdk*.json
+*fcm-service-account*.json

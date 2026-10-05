@@ -65,8 +65,8 @@ MAY START PHASE X+1: YES
 | Phase 7  | Timeline + 用户可见运输事实                    | FINAL GATE PASS                                  |
 | Phase 8  | Local Map + Journey Visualization              | FINAL GATE PASS · COMPLETE（baseline `10963fb`） |
 | Phase 9  | Worker Scheduling + Push + Refresh             | FINAL GATE PASS · COMPLETE                       |
-| Phase 10 | Mobile V1 Integration + UX Closure             | 未开始                                           |
-| Phase 11 | Security / Reliability / Performance Hardening | 未开始                                           |
+| Phase 10 | Mobile V1 Integration + UX Closure             | FINAL GATE PASS · COMPLETE                       |
+| Phase 11 | Security / Reliability / Performance Hardening | 独立 FINAL GATE PASS · COMPLETE（2026-09-30）    |
 | Phase 12 | Deployment + Release Gate                      | 未开始                                           |
 
 后续 Phase 可以按真实工程需要做小范围拆分，但不得改变冻结产品规则，也不得把多个大阶段一次性合并实施。
@@ -811,7 +811,7 @@ Phase 8 封板记录（2026-09-15）= **实现与全部 Gate 修复完成、独�
 
 历史记录（**不作为当前状态**）：2026-09-14 Gate Repair 报告中的「M5 边界语义 BLOCKED」与「Final Gate 尚未开始」为当时状态，已被上述进展取代。
 
-允许保留 `PHASE 8 COMPLETE: YES` / `MAY START PHASE 9: YES`；Phase 9 已另获明确启动授权。Phase 10 未获启动授权，不得越界。
+允许保留 `PHASE 8 COMPLETE: YES` / `MAY START PHASE 9: YES`；Phase 9 已另获明确启动授权。此段为 Phase 8 历史记录；Phase 10 于 2026-09-29 获授权启动。
 
 ---
 
@@ -830,7 +830,7 @@ REMAINING BLOCKERS: NONE
 ```
 
 M1 / M2 已由独立探针确认关闭；focused 33/33、targeted 56/56 × 3、Phase 5–7 regression 91/91、full 423/0/0（41 文件）通过，Android export 1441 modules。disk/dev/test migrations 16/16/16，drift/unfinished/rolledback 0/0/0。Re-Gate 重跑九项质量门禁；fresh DB 与 production health 引用前次独立 Gate，不声称本次重跑。
-本轮仅授权文档收口与本地 baseline commit，不 Push；Phase 10 启动须另行授权。
+本段为 2026-09-17 Phase 9 封板记录。Phase 10 于 2026-09-29 获授权启动。
 
 ### Historical implementation snapshots — resolved
 
@@ -908,7 +908,7 @@ V1 不使用 WebSocket：
 
 ## 当前状态
 
-**NOT STARTED**。Phase 9 准入已通过，但尚无启动授权。
+**FINAL GATE PASS · PHASE 10 COMPLETE（2026-09-29）**。自动化门禁与新版核心流程 iPhone 人工复验通过，开发环境本地通知已获用户确认。项目负责人明确批准将真实远程推送的设备验证移交 Phase 12 Release Gate；Expo Go 本地通知不代表远程推送通过。Phase 11 已按授权启动，当前进展见 §13。详见 [`docs/PHASE10_IMPLEMENTATION_REPORT.md`](docs/PHASE10_IMPLEMENTATION_REPORT.md)。
 
 ## 目标
 
@@ -976,6 +976,10 @@ V1 不使用 WebSocket：
 ---
 
 # 13. Phase 11 — Security / Reliability / Performance Hardening
+
+## 封板状态（历史记录）
+
+**独立 FINAL GATE PASS · COMPLETE（2026-09-30）**。认证/并发/正文完整性、列表过滤、日志与资源字段审计、一年随机 replay、production 配置、fresh 迁移/schema diff 和 V1 本地性能基线通过；最终全量 503/0、独立定向 302/0。首轮 HIGH（重试耗尽后 Worker 永久停滞）与复审 MEDIUM（旧快照误重试新 domain 错误）均修复并独立复验关闭。多小时耐久由负责人本轮确认完成，不虚构时长/GC 指标。兼容补丁后 audit 仍为 4 HIGH / 3 Moderate、退出 1；Expo 推荐版本检查亦退出 1，均按独立评审的限定边界保留为发布待办，详见 [`docs/PHASE11_DEPENDENCY_AUDIT.md`](docs/PHASE11_DEPENDENCY_AUDIT.md)。源码尚未提交，Phase 12 可进入但尚未开始，真实 iOS 远程推送仍由 Phase 12 Release Gate 验收。详见 [`docs/PHASE11_FINAL_GATE.md`](docs/PHASE11_FINAL_GATE.md)、[`docs/PHASE11_IMPLEMENTATION_REPORT.md`](docs/PHASE11_IMPLEMENTATION_REPORT.md) 与 [`docs/PHASE11_PERFORMANCE_BASELINE.md`](docs/PHASE11_PERFORMANCE_BASELINE.md)。
 
 ## 目标
 
@@ -1054,6 +1058,10 @@ Release 前集中做安全、并发、数据一致性、可靠性和性能加固
 
 # 14. Phase 12 — Deployment + Release Gate
 
+## 当前状态
+
+**IN PROGRESS（2026-09-30）**。负责人确认先完成本机 Docker 生产演练，服务器与域名稍后提供。隔离 Compose、Caddy 本机 HTTPS、API/Worker 就绪/心跳、故障恢复、迁移 16/16 校验、13 表备份恢复/2 封正文解密、最小权限运行账号、真实代理伪造头限流均通过，全量回归 515/0。**本机演练范围 PASS**；真实服务器、公网 TLS、不可变版本回滚、依赖/Expo 和远程推送验收未完成。**RELEASE GATE 未通过，V1 RELEASE READY = NO**。详见 [`docs/PHASE12_IMPLEMENTATION_REPORT.md`](docs/PHASE12_IMPLEMENTATION_REPORT.md)、[`docs/PHASE12_DEPLOYMENT.md`](docs/PHASE12_DEPLOYMENT.md)。
+
 ## 目标
 
 建立 V1 可部署、可升级、可回滚的生产环境，并完成最终 Release Gate。
@@ -1109,6 +1117,7 @@ Production 必须显式提供 DATABASE_URL、REDIS_URL、JWT secret、encryption
 - delivered
 - recipient open
 - sender still cannot know opened
+- 真实远程推送：Expo token 注册、iOS 系统通知送达、点击跳转与冷启动（需 EAS project ID、iOS 推送凭据及开发/发布构建；Expo Go 本地通知不代替）
 
 ## 最终 Release Gate
 

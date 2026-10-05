@@ -1,10 +1,57 @@
-# 驿书 V1 本地开发基础设施
-# PostgreSQL 17 + Redis
+# 驿书 V1 Docker 开发环境
+# PostgreSQL 17 + Redis + Node / API / Worker / Expo
 #
-# 端口仅绑定本机 localhost（127.0.0.1），不对局域网暴露。
+# 数据库和 Redis 端口仅绑定 localhost；API / Metro 支持局域网真机调试。
 # 连接串默认值：DATABASE_URL 需与下方 POSTGRES_* 保持一致。
 
 services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    init: true
+    working_dir: /workspace
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: development
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-yishu}:${POSTGRES_PASSWORD:-yishu}@postgres:5432/${POSTGRES_DB:-yishu}?schema=public
+      TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-yishu}:${POSTGRES_PASSWORD:-yishu}@postgres:5432/yishu_test?schema=public
+      REDIS_URL: redis://redis:6379
+      SIMULATION_CLOCK_OFFSET_MS: ${SIMULATION_CLOCK_OFFSET_MS:-0}
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-yishu}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-yishu}
+      EXPO_PUBLIC_API_BASE_URL: ${EXPO_PUBLIC_API_BASE_URL:-http://localhost:4000}
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${REACT_NATIVE_PACKAGER_HOSTNAME:-localhost}
+      EXPO_NO_TELEMETRY: "1"
+    ports:
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${API_PORT:-4000}:4000"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:8081:8081"
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - pnpm_store:/pnpm/store
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "Promise.all([fetch('http://127.0.0.1:4000/api/v1/health'),fetch('http://127.0.0.1:8081/status')]).then(rs=>{if(rs.some(r=>!r.ok))process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 180s
+    stop_grace_period: 30s
+
   postgres:
     image: postgres:17
     restart: unless-stopped
@@ -38,5 +85,7 @@ services:
       retries: 10
 
 volumes:
+  node_modules:
+  pnpm_store:
   postgres_data:
   redis_data:

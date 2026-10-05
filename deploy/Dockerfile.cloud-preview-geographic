@@ -1,0 +1,6 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-touch-session
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node map-runtime/node_modules/ /workspace/apps/mobile/node_modules/
+COPY --chown=node:node apps/mobile/src/map/ /workspace/apps/mobile/src/map/
+COPY --chown=node:node geographic-patch.json /workspace/geographic-patch.json
+RUN node -e 'const {toMercator}=require("@turf/projection");if(!toMercator([121.4737,31.2304]).every(Number.isFinite))process.exit(1)'

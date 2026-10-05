@@ -35,7 +35,7 @@ const styles = {
     marginTop: 16,
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 8,
+    borderRadius: 28,
     padding: 12,
   },
   factsTitle: { fontWeight: "600", marginBottom: 8 },

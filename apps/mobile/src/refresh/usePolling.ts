@@ -15,6 +15,7 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs: number) {
   const focused = useRef(false);
   const router = useRouter();
   const activate = useRef<() => void>(() => {});
+  const refreshNow = useRef<() => Promise<void>>(async () => {});
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
@@ -47,13 +48,15 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs: number) {
     const refresh = () => {
       void poller.refresh();
     };
+    refreshNow.current = poller.refresh;
     refreshListeners.add(refresh);
     return () => {
       poller.dispose();
       subscription.remove();
       refreshListeners.delete(refresh);
       activate.current = () => {};
+      refreshNow.current = async () => {};
     };
   }, [load, intervalMs, router]);
-  return { data, error };
+  return { data, error, refresh: () => refreshNow.current() };
 }

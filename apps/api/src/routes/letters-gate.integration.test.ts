@@ -220,6 +220,122 @@ describe("letters gate integration", () => {
     expect(openedAt1?.getTime()).toBe(openedAt2?.getTime());
   });
 
+  it("concurrent open/hide writes the first openedAt once and preserves both hidden states", async () => {
+    const created = await createLetter(
+      "bobg",
+      "concurrent read state",
+      "HORSE_RELAY",
+      "open-hide-race"
+    );
+    expect(created.statusCode).toBe(201);
+    const trackingNo = created.json().letter.trackingNo;
+    const letter = await prisma.letter.update({
+      where: { trackingNo },
+      data: { status: DELIVERED, deliveredAt: new Date() },
+    });
+    const changes: number[] = [];
+    const observedPrisma = prisma.$extends({
+      query: {
+        recipientState: {
+          async updateMany({ args, query }) {
+            const result = await query(args);
+            changes.push(result.count);
+            return result;
+          },
+        },
+      },
+    });
+    const raceApp = buildApp(loadConfig({ NODE_ENV: "test" }), {
+      prisma: observedPrisma as unknown as PrismaClient,
+    });
+    try {
+      const responses = await Promise.all([
+        ...Array.from({ length: 12 }, () =>
+          raceApp.inject({
+            method: "POST",
+            url: `/api/v1/letters/${trackingNo}/open`,
+            headers: { authorization: `Bearer ${bob.accessToken}` },
+          })
+        ),
+        ...[alice, bob].map((user) =>
+          raceApp.inject({
+            method: "POST",
+            url: `/api/v1/letters/${trackingNo}/hide`,
+            headers: { authorization: `Bearer ${user.accessToken}` },
+          })
+        ),
+      ]);
+      expect(responses.every((response) => response.statusCode === 200)).toBe(true);
+      expect(changes).toHaveLength(12);
+      expect(changes.reduce((sum, count) => sum + count, 0)).toBe(1);
+      const recipient = await prisma.recipientState.findUniqueOrThrow({
+        where: { letterId: letter.id },
+      });
+      const sender = await prisma.senderState.findUniqueOrThrow({ where: { letterId: letter.id } });
+      expect(recipient.readState).toBe("OPENED");
+      expect(recipient.openedAt).not.toBeNull();
+      expect(recipient.hiddenAt).not.toBeNull();
+      expect(sender.hiddenAt).not.toBeNull();
+      await raceApp.inject({
+        method: "POST",
+        url: `/api/v1/letters/${trackingNo}/open`,
+        headers: { authorization: `Bearer ${bob.accessToken}` },
+      });
+      const repeated = await prisma.recipientState.findUniqueOrThrow({
+        where: { letterId: letter.id },
+      });
+      expect(repeated.openedAt).toEqual(recipient.openedAt);
+    } finally {
+      await raceApp.close();
+    }
+  });
+
+  it("missing recipient state does not falsely report a successful open", async () => {
+    const created = await createLetter(
+      "bobg",
+      "missing read state",
+      "HORSE_RELAY",
+      "missing-read-state"
+    );
+    const trackingNo = created.json().letter.trackingNo;
+    const letter = await prisma.letter.update({
+      where: { trackingNo },
+      data: { status: DELIVERED, deliveredAt: new Date() },
+    });
+    await prisma.recipientState.delete({ where: { letterId: letter.id } });
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/letters/${trackingNo}/open`,
+      headers: { authorization: `Bearer ${bob.accessToken}` },
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "internal_error" });
+  });
+
+  it.each(["contentIv", "contentAuthTag", "encryptedContent"] as const)(
+    "corrupted %s returns only a safe error",
+    async (field) => {
+      const created = await createLetter(
+        "bobg",
+        "integrity-secret-body",
+        "HORSE_RELAY",
+        `corrupt-${field}`
+      );
+      const trackingNo = created.json().letter.trackingNo;
+      const letter = await prisma.letter.findUniqueOrThrow({ where: { trackingNo } });
+      await prisma.letter.update({
+        where: { trackingNo },
+        data: { [field]: `${letter[field]}zz` },
+      });
+      const response = await app.inject({
+        url: `/api/v1/letters/${trackingNo}`,
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+      });
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({ error: "internal_error" });
+    }
+  );
+
   it("snapshot：创建后修改 User 可变字段，Letter 仍返回创建时快照", async () => {
     const r = await createLetter("bobg", "snapshot test", "HORSE_RELAY", "snapshot-1");
     const trackingNo = r.json().letter.trackingNo;
@@ -331,8 +447,13 @@ describe("letters gate integration", () => {
     const d1Row = await prisma.user.findUnique({ where: { uid: d1.uid } });
 
     // Block 事务先获取 pair lock；等待 Letter 请求在锁上排队后，锁内创建 Block，再提交释放锁。
+    let signalBlockLocked!: () => void;
+    const blockLocked = new Promise<void>((resolve) => {
+      signalBlockLocked = resolve;
+    });
     const blockTxn = prisma.$transaction(async (tx) => {
       await acquireBlockLetterPairLock(tx, c1Row?.id ?? 0n, d1Row?.id ?? 0n);
+      signalBlockLocked();
       await waitForAdvisoryWaiter();
       await tx.block.upsert({
         where: {
@@ -342,6 +463,7 @@ describe("letters gate integration", () => {
         create: { blockerId: c1Row?.id ?? 0n, blockedId: d1Row?.id ?? 0n },
       });
     });
+    await Promise.race([blockLocked, blockTxn]);
 
     // Letter 请求（d1 → c1）在锁上排队；Block 提交释放锁后，Letter 获得锁并看到已拉黑 → 403
     const letterRes = await app.inject({
@@ -388,10 +510,16 @@ describe("letters gate integration", () => {
 
     // 先由一个空事务持有 pair lock，让 Letter 请求排队；确认排队后释放锁，
     // 使 Letter 成为第一个获锁者并创建成功。
+    let signalHolderLocked!: () => void;
+    const holderLocked = new Promise<void>((resolve) => {
+      signalHolderLocked = resolve;
+    });
     const holderTxn = prisma.$transaction(async (tx) => {
       await acquireBlockLetterPairLock(tx, d1Row?.id ?? 0n, c1Row?.id ?? 0n);
+      signalHolderLocked();
       await waitForAdvisoryWaiter();
     });
+    await Promise.race([holderLocked, holderTxn]);
 
     const letterRes = await app.inject({
       method: "POST",

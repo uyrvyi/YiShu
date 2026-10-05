@@ -1,6 +1,17 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as Notifications from "expo-notifications";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PushRegistration } from "../src/push/PushRegistration";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 /**
  * 驿书 V1 Mobile 根布局。
@@ -9,9 +20,14 @@ import { PushRegistration } from "../src/push/PushRegistration";
 export default function RootLayout(): React.JSX.Element {
   return (
     <>
-      <StatusBar style="auto" />
-      <PushRegistration />
-      <Stack screenOptions={{ headerShown: false }} />
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <PushRegistration />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="letters/index" options={{ animation: "none" }} />
+          <Stack.Screen name="me" options={{ animation: "none" }} />
+        </Stack>
+      </SafeAreaProvider>
     </>
   );
 }

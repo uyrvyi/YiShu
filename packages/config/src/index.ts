@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isIP } from "node:net";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -35,11 +36,23 @@ const EnvSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     API_PORT: z.coerce.number().int().positive().default(4000),
     API_HOST: z.string().default("0.0.0.0"),
+    NEW_LETTER_RULES_VERSION: z.enum(["1.0", "1.1"]).default("1.0"),
+    TRUSTED_PROXY_IP: z
+      .string()
+      .refine((value) => isIP(value) !== 0, "Expected a single proxy IP")
+      .optional(),
     DATABASE_URL: z.string().default(DEFAULT_DATABASE_URL),
     // 测试数据库（集成测试专用），须为独立 *_test 库。
     TEST_DATABASE_URL: z.string().default(DEFAULT_TEST_DATABASE_URL),
     REDIS_URL: z.string().default(DEFAULT_REDIS_URL),
+    SIMULATION_CLOCK_OFFSET_MS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(365 * 24 * 60 * 60 * 1000)
+      .default(0),
     EXPO_PUSH_ACCESS_TOKEN: z.string().min(1).optional(),
+    MEDIA_STORAGE_DIR: z.string().min(1).default("/media"),
     // Access Token（JWT）签名密钥；production 必须显式提供。
     JWT_SECRET: z.string().min(16).default(DEFAULT_JWT_SECRET),
     // Access Token 有效期（秒），默认 15 分钟。
@@ -58,6 +71,13 @@ const EnvSchema = z
   })
   .superRefine((val, ctx) => {
     if (val.NODE_ENV === "production") {
+      if (val.SIMULATION_CLOCK_OFFSET_MS !== 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SIMULATION_CLOCK_OFFSET_MS"],
+          message: "SIMULATION_CLOCK_OFFSET_MS is development-only",
+        });
+      }
       // production 禁止静默回退到 localhost，必须显式提供 DATABASE_URL / REDIS_URL。
       if (val.DATABASE_URL === DEFAULT_DATABASE_URL) {
         ctx.addIssue({
@@ -73,14 +93,22 @@ const EnvSchema = z
           message: "REDIS_URL must be explicitly provided when NODE_ENV=production",
         });
       }
-      if (val.JWT_SECRET === DEFAULT_JWT_SECRET) {
+      if (
+        val.JWT_SECRET === DEFAULT_JWT_SECRET ||
+        /change[-_ ]?me|replace[-_ ]?me|your[-_ ]?(jwt|secret)/i.test(val.JWT_SECRET) ||
+        Buffer.byteLength(val.JWT_SECRET, "utf8") < 32 ||
+        /^(.)\1+$/u.test(val.JWT_SECRET)
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["JWT_SECRET"],
-          message: "JWT_SECRET must be explicitly provided when NODE_ENV=production",
+          message: "JWT_SECRET must be a non-placeholder secret of at least 32 bytes in production",
         });
       }
-      if (val.CONTENT_ENCRYPTION_KEY === DEFAULT_CONTENT_ENCRYPTION_KEY) {
+      if (
+        val.CONTENT_ENCRYPTION_KEY === DEFAULT_CONTENT_ENCRYPTION_KEY ||
+        /^([0-9a-f]{2})\1{31}$/i.test(val.CONTENT_ENCRYPTION_KEY)
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["CONTENT_ENCRYPTION_KEY"],

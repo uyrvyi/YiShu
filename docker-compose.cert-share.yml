@@ -1,0 +1,36 @@
+name: yishu-cert-share
+services:
+  certificate:
+    image: caddy:2.10.2-alpine
+    pull_policy: never
+    command:
+      [
+        timeout,
+        -s,
+        TERM,
+        -k,
+        "10",
+        "900",
+        caddy,
+        run,
+        --config,
+        /etc/caddy/Caddyfile,
+        --adapter,
+        caddyfile,
+      ]
+    ports:
+      - "${TRIAL_LAN_IP:?LAN address required}:19081:8080"
+    volumes:
+      - ./deploy/Caddyfile.cert-share:/etc/caddy/Caddyfile:ro
+      - ./.local/production/public-cert:/public:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
+    pids_limit: 64
+    mem_limit: 96m
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }

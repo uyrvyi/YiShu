@@ -209,4 +209,12 @@ describe("shared api session", () => {
     // 本地 token 被清理
     expect(secureStore.has("yishu_refresh_token")).toBe(false);
   });
+
+  it("restoreSession：网络故障保留 refresh token，允许稍后重试", async () => {
+    secureStore.set("yishu_refresh_token", "refresh-offline");
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(new TypeError("Network request failed"));
+    await expect(restoreSession()).rejects.toThrow("Network request failed");
+    expect(secureStore.get("yishu_refresh_token")).toBe("refresh-offline");
+    expect(isAuthenticated()).toBe(false);
+  });
 });

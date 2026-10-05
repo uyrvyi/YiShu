@@ -1,3 +1,5 @@
+import { C } from "../ui/theme";
+
 /**
  * 地图配色与描边常量（Phase 8 §17 / §18）。
  *
@@ -8,26 +10,25 @@
  * - lastKnown：最后确报位置（失联 / 终态时保持不变）
  */
 export const MAP_COLORS = {
-  paper: "#FBF7EF",
-  outline: "#C9BFAE",
-  province: "#E7E0D3",
-  completed: "#8C5A2B",
-  remaining: "#B6A78E",
-  approximate: "#C2410C",
-  lastKnown: "#4B5563",
-  fact: "#1F6F5C",
+  water: "#EAF1F4",
+  paper: "#F6F8FA",
+  outline: "#BCC8D0",
+  province: "#DEE5EA",
+  completed: C.green,
+  remaining: "#94A4AF",
+  approximate: C.orange,
+  lastKnown: C.muted,
+  fact: C.green,
   factHalo: "#FFFFFF",
   /** 起点 / 终点标记（§18 视觉规则：起点 / 终点须可见）。 */
-  origin: "#2F6F4E",
-  destination: "#7A3E9D",
+  origin: C.green,
+  destination: C.blue,
 } as const;
 
 /**
  * 描边宽度（**实际渲染宽度**，即 viewBox 单位；viewBox 固定 0 0 1000 800，不随设备变化）。
  *
- * `outline` / `province` 的几何在 `MAP_FIT_TRANSFORM` 缩放组内渲染，必须经
- * `viewBoxStrokeWidth()` 做 scale 补偿后才能得到这里声明的宽度（Gate L1）；
- * 路线 / 标记的几何已在 JS 侧映射到 viewBox，不需要补偿。
+ * 底图和路线均已等比拟合到 viewBox，描边无需额外补偿。
  */
 export const MAP_STROKE = {
   outline: 2,

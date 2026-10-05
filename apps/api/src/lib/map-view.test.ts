@@ -10,7 +10,7 @@ import {
 import type { TimelineEvent } from "@yishu/db";
 import { getStationNode } from "./stationGraph.js";
 import { resolveDisplayStationPoint } from "./map-station-point.js";
-import { projectRouteMap, type PlannedLegSegment } from "./map-view.js";
+import { projectRouteMap, projectNextStationEstimate, type PlannedLegSegment } from "./map-view.js";
 
 /**
  * Map 投影纯函数回归（Phase 8 Gate Repair）。
@@ -125,6 +125,76 @@ function distanceToSegment(point: MapPoint, from: MapPoint, to: MapPoint): numbe
 }
 
 describe("map-view 投影（Phase 8 Gate H1 / M1 回归）", () => {
+  it("下一站时长只依据公开出发事实，按重复站点的有序路径推进", () => {
+    const events = [
+      ...factsAlong([A, B, C, B]),
+      event("DEPARTED_STATION", B, T0 + 3 * HOUR_MS),
+      event("DEPARTED_STATION", B, T0 + 4 * HOUR_MS),
+    ];
+    const input = {
+      graphVersion: GRAPH_VERSION,
+      publicStatus: "IN_TRANSIT" as const,
+      nowMs: T0 + 4.5 * HOUR_MS,
+      visibleEvents: events,
+      originNodeId: A,
+      destinationNodeId: D,
+      plannedLegs: [leg(0, A, B), leg(1, B, C), leg(2, C, B), leg(3, B, D, 7200)],
+    };
+    const snapshot = structuredClone(input);
+    expect(projectNextStationEstimate(input)).toEqual({
+      state: "ON_THE_WAY",
+      remainingSeconds: 5400,
+      asOf: new Date(input.nowMs).toISOString(),
+    });
+    expect(input).toEqual(snapshot);
+  });
+
+  it.each(["DELAYED", "COURIER_MISSING", "DELIVERED", "PERMANENTLY_LOST", "DESTROYED"] as const)(
+    "%s 不输出下一站时长",
+    (publicStatus) => {
+      expect(
+        projectNextStationEstimate({
+          graphVersion: GRAPH_VERSION,
+          publicStatus,
+          nowMs: T0 + 1000,
+          visibleEvents: [event("DISPATCHED", A, T0), event("DEPARTED_STATION", A, T0)],
+          originNodeId: A,
+          destinationNodeId: B,
+          plannedLegs: [leg(0, A, B)],
+        }).remainingSeconds
+      ).toBeNull();
+    }
+  );
+
+  it("无公开出发、超期或失联时不伪造到站倒计时", () => {
+    const input = {
+      graphVersion: GRAPH_VERSION,
+      publicStatus: "IN_TRANSIT" as const,
+      nowMs: T0 + HOUR_MS,
+      visibleEvents: [event("DISPATCHED", A, T0)],
+      originNodeId: A,
+      destinationNodeId: B,
+      plannedLegs: [leg(0, A, B)],
+    };
+    expect(projectNextStationEstimate(input).state).toBe("UNAVAILABLE");
+    expect(
+      projectNextStationEstimate({
+        ...input,
+        visibleEvents: [...input.visibleEvents, event("DEPARTED_STATION", A, T0)],
+      }).state
+    ).toBe("UNAVAILABLE");
+    expect(
+      projectNextStationEstimate({
+        ...input,
+        nowMs: T0 + 1000,
+        visibleEvents: [
+          ...input.visibleEvents,
+          event("DEPARTED_STATION", A, T0),
+          event("COURIER_MISSING", A, T0 + 500),
+        ],
+      }).state
+    ).toBe("UNAVAILABLE");
+  });
   it("H1 · DELIVERED：remainingPath = []、completedPath 完整到终点（不再回退整条路线）", () => {
     const legs = [leg(0, A, B), leg(1, B, C), leg(2, C, D)];
     const events = [

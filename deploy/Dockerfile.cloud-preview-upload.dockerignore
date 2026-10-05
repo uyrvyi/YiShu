@@ -1,0 +1,10 @@
+**
+!apps/
+!apps/mobile/
+!apps/mobile/src/
+!apps/mobile/src/media/
+!apps/mobile/src/media/picker.ts
+!apps/mobile/src/media/avatarCrop.ts
+!apps/mobile/src/media/uploadPreparation.ts
+!deploy/
+!deploy/Dockerfile.cloud-preview-upload

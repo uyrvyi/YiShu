@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
@@ -11,6 +11,21 @@ import {
 } from "../api";
 import { refetchVisibleScreens } from "../refresh/usePolling";
 import { readPushToken } from "./tokenStorage";
+import { setPushStatus, type PushStatus } from "./status";
+
+async function requestPushToken(projectId: string): Promise<{ data: string }> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Notifications.getExpoPushTokenAsync({ projectId }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("push_token_timeout")), 20000);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 /** Enhancement only: denied permission / missing EAS project / offline never block Auth. */
 export function PushRegistration(): null {
@@ -19,35 +34,88 @@ export function PushRegistration(): null {
   const lastResponse = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    const register = async () => {
-      if (!isAuthenticated() || !["ios", "android"].includes(Platform.OS)) return;
-      // Repair a failed offline logout before permission/token acquisition can return early.
-      const retained = await readPushToken();
-      if (retained && !cancelled)
-        await registerDeviceForSession(retained, Platform.OS as "ios" | "android", generation);
-      if (Platform.OS === "android")
-        await Notifications.setNotificationChannelAsync("default", {
-          name: "驿书",
-          importance: Notifications.AndroidImportance.DEFAULT,
-        });
-      const permission = await Notifications.requestPermissionsAsync();
-      if (!permission.granted || cancelled) return;
-      const projectId: unknown =
-        Constants.easConfig?.projectId ??
-        Constants.expoConfig?.extra?.eas?.projectId ??
-        process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
-      if (typeof projectId !== "string" || !projectId) return;
-      const token = await Notifications.getExpoPushTokenAsync({ projectId });
-      if (!cancelled)
-        await registerDeviceForSession(token.data, Platform.OS as "ios" | "android", generation);
+    let registering = false;
+    const report = (status: PushStatus) => {
+      if (!cancelled && generation === getSessionVersion()) setPushStatus(status);
     };
-    void register().catch(() => {}); // deliberately no token/provider details in logs
+    const register = async () => {
+      if (!isAuthenticated()) {
+        report("signed_out");
+        return;
+      }
+      if (!["ios", "android"].includes(Platform.OS)) {
+        report("unsupported");
+        return;
+      }
+      if (Constants.executionEnvironment === "storeClient") {
+        report("expo_go");
+        return;
+      }
+      if (registering || cancelled) return;
+      registering = true;
+      report("registering");
+      try {
+        // Repair a failed offline logout before permission/token acquisition can return early.
+        const retained = await readPushToken();
+        if (retained && !cancelled)
+          await registerDeviceForSession(
+            retained,
+            Platform.OS as "ios" | "android",
+            generation
+          ).catch(() => undefined);
+        if (Platform.OS === "android")
+          await Notifications.setNotificationChannelAsync("letters-v2", {
+            name: "驿书",
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: "default",
+          });
+        const permission = await Notifications.requestPermissionsAsync();
+        if (!permission.granted || cancelled) {
+          report("permission_denied");
+          return;
+        }
+        const projectId: unknown =
+          Constants.easConfig?.projectId ??
+          Constants.expoConfig?.extra?.eas?.projectId ??
+          process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+        if (typeof projectId !== "string" || !projectId) {
+          report("project_missing");
+          return;
+        }
+        let token: { data: string };
+        try {
+          token = await requestPushToken(projectId);
+        } catch {
+          report("token_failed");
+          return;
+        }
+        if (!cancelled) {
+          try {
+            await registerDeviceForSession(
+              token.data,
+              Platform.OS as "ios" | "android",
+              generation
+            );
+            report("ready");
+          } catch {
+            report("server_failed");
+          }
+        }
+      } finally {
+        registering = false;
+      }
+    };
+    void register().catch(() => report("token_failed"));
     const tokenChange = Notifications.addPushTokenListener(() => {
-      void register().catch(() => {});
+      void register().catch(() => report("token_failed"));
+    });
+    const active = AppState.addEventListener("change", (state) => {
+      if (state === "active") void register().catch(() => report("token_failed"));
     });
     return () => {
       cancelled = true;
       tokenChange.remove();
+      active.remove();
     };
   }, [generation]);
   useEffect(() => {

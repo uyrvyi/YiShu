@@ -1,0 +1,5 @@
+ARG API_BASE_IMAGE=yishu-server:next-1.1.0-amd64-20261003
+FROM ${API_BASE_IMAGE}
+COPY --chown=65532:65532 apps/api/dist/server.js /workspace/apps/api/dist/server.js
+COPY --chown=65532:65532 apps/api/dist/routes/media.js /workspace/apps/api/dist/routes/media.js
+COPY --chown=65532:65532 apps/api/dist/lib/media-cleanup.js /workspace/apps/api/dist/lib/media-cleanup.js

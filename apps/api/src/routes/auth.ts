@@ -1,6 +1,6 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { Prisma } from "@yishu/db";
-import { hashPassword, verifyPassword } from "../lib/password.js";
+import { DUMMY_PASSWORD_HASH, hashPassword, verifyPassword } from "../lib/password.js";
 import { generateUid } from "../lib/uid.js";
 import { createUserWithUidRetry, MAX_UID_RETRY } from "../lib/register.js";
 import { generateRefreshToken, hashRefreshToken } from "../lib/tokens.js";
@@ -28,69 +28,83 @@ function uniqueConstraintFields(err: unknown): string[] {
   return Array.isArray(fields) ? fields : [];
 }
 
+const AUTH_LIMITS = {
+  register: { max: 5, timeWindow: "10 minutes" },
+  login: { max: 10, timeWindow: "1 minute" },
+  session: { max: 60, timeWindow: "1 minute" },
+} as const;
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // 注册（对应规范 §5）
-  app.post("/auth/register", async (req, reply) => {
-    const body = registerSchema.parse(req.body);
-    const passwordHash = await hashPassword(body.password);
+  app.post(
+    "/auth/register",
+    { config: { rateLimit: AUTH_LIMITS.register } },
+    async (req, reply) => {
+      const body = registerSchema.parse(req.body);
+      const passwordHash = await hashPassword(body.password);
 
-    // UID 碰撞自动重试（规范 §4.2）；account 冲突明确报错。
-    const result = await createUserWithUidRetry({
-      uidGenerator: generateUid,
-      maxRetries: MAX_UID_RETRY,
-      create: async (uid) => {
-        try {
-          const user = await req.server.prisma.user.create({
-            data: {
-              uid,
-              account: body.account,
-              passwordHash,
-              nickname: body.nickname,
-              province: body.province,
-              city: body.city,
-              district: body.district,
-            },
-          });
-          return { kind: "created" as const, user };
-        } catch (err) {
-          if (isUniqueViolation(err)) {
-            const fields = uniqueConstraintFields(err);
-            if (fields.includes("account")) {
-              return { kind: "account_conflict" as const };
+      // UID 碰撞自动重试（规范 §4.2）；account 冲突明确报错。
+      const result = await createUserWithUidRetry({
+        uidGenerator: generateUid,
+        maxRetries: MAX_UID_RETRY,
+        create: async (uid) => {
+          try {
+            const user = await req.server.prisma.user.create({
+              data: {
+                uid,
+                account: body.account,
+                passwordHash,
+                nickname: body.nickname,
+                province: body.province,
+                city: body.city,
+                district: body.district,
+              },
+            });
+            return { kind: "created" as const, user };
+          } catch (err) {
+            if (isUniqueViolation(err)) {
+              const fields = uniqueConstraintFields(err);
+              if (fields.includes("account")) {
+                return { kind: "account_conflict" as const };
+              }
+              return { kind: "collision" as const };
             }
-            return { kind: "collision" as const };
+            throw err;
           }
-          throw err;
-        }
-      },
-    });
+        },
+      });
 
-    if (result.kind === "account_conflict") {
-      return reply.code(409).send({ error: "account_already_exists" });
-    }
-    if (result.kind === "collision") {
-      return reply.code(500).send({ error: "uid_generation_failed" });
-    }
+      if (result.kind === "account_conflict") {
+        return reply.code(409).send({ error: "account_already_exists" });
+      }
+      if (result.kind === "collision") {
+        return reply.code(500).send({ error: "uid_generation_failed" });
+      }
 
-    const user = result.user;
-    if (!user) {
-      return reply.code(500).send({ error: "uid_generation_failed" });
+      const user = result.user;
+      if (!user) {
+        return reply.code(500).send({ error: "uid_generation_failed" });
+      }
+      const tokens = await issueTokens(app, user);
+      return reply.code(201).send({
+        user: toUserPublicView(user),
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
     }
-    const tokens = await issueTokens(app, user);
-    return reply.code(201).send({
-      user: toUserPublicView(user),
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    });
-  });
+  );
 
   // 登录（对应规范 §5）
-  app.post("/auth/login", async (req, reply) => {
+  app.post("/auth/login", { config: { rateLimit: AUTH_LIMITS.login } }, async (req, reply) => {
     const body = loginSchema.parse(req.body);
     const user = await req.server.prisma.user.findUnique({
       where: { account: body.account },
     });
-    if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+    const passwordMatches = await verifyPassword(
+      body.password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH
+    );
+    if (!user || !passwordMatches) {
       return reply.code(401).send({ error: "invalid_credentials" });
     }
     const tokens = await issueTokens(app, user);
@@ -102,7 +116,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // 刷新 Access Token（对应规范 §5）
-  app.post("/auth/refresh", async (req, reply) => {
+  app.post("/auth/refresh", { config: { rateLimit: AUTH_LIMITS.session } }, async (req, reply) => {
     const body = refreshSchema.parse(req.body);
     const tokenHash = hashRefreshToken(body.refreshToken);
     const record = await req.server.prisma.refreshToken.findUnique({
@@ -123,7 +137,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // 注销（撤销 Refresh Token，对应规范 §5）
-  app.post("/auth/logout", async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post("/auth/logout", { config: { rateLimit: AUTH_LIMITS.session } }, async (req, reply) => {
     const body = refreshSchema.parse(req.body);
     const tokenHash = hashRefreshToken(body.refreshToken);
     await req.server.prisma.refreshToken.updateMany({

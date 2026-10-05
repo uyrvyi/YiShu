@@ -1,0 +1,73 @@
+name: yishu-next-version
+services:
+  api:
+    profiles: [preview]
+    image: yishu-server:next-version-local
+    pull_policy: never
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://yishu:yishu-test-only@postgres:5432/yishu_test?schema=public
+      REDIS_URL: redis://redis:6379
+      MEDIA_STORAGE_DIR: /media
+      SIMULATION_CLOCK_OFFSET_MS: "0"
+    ports: ["127.0.0.1:14000:4000"]
+    volumes: ["runtime_media:/media"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: yishu
+      POSTGRES_PASSWORD: yishu-test-only
+      POSTGRES_DB: yishu_test
+    volumes:
+      - test_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U yishu -d yishu_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7.4-bookworm
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  tools:
+    image: yishu-dev
+    pull_policy: never
+    init: true
+    working_dir: /workspace
+    command: [sleep, infinity]
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://yishu:yishu-test-only@postgres:5432/yishu_test?schema=public
+      TEST_DATABASE_URL: postgresql://yishu:yishu-test-only@postgres:5432/yishu_test?schema=public
+      REDIS_URL: redis://redis:6379
+      MEDIA_STORAGE_DIR: /media
+      SIMULATION_CLOCK_OFFSET_MS: "0"
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - pnpm_store:/pnpm/store
+      - test_media:/media
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+volumes:
+  runtime_media:
+  test_postgres:
+  test_media:
+  node_modules:
+    external: true
+    name: yishu_node_modules
+  pnpm_store:
+    external: true
+    name: yishu_pnpm_store

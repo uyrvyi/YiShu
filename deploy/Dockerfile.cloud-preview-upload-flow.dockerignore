@@ -1,0 +1,16 @@
+**
+!deploy/
+!deploy/Dockerfile.cloud-preview-upload-flow
+!deploy/Dockerfile.cloud-preview-upload-flow.dockerignore
+!apps/
+!apps/mobile/
+!apps/mobile/src/
+!apps/mobile/src/api/
+!apps/mobile/src/api/imageUploadFetch.ts
+!apps/mobile/src/api/letterApi.ts
+!apps/mobile/src/media/
+!apps/mobile/src/media/draftPreview.ts
+!apps/mobile/src/media/UploadProgressRing.tsx
+!apps/mobile/app/
+!apps/mobile/app/letters/
+!apps/mobile/app/letters/new.tsx

@@ -1,0 +1,8 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-map-scroll-lock-r2
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node map-runtime/node_modules/ /workspace/apps/mobile/node_modules/
+COPY --chown=node:node apps/mobile/src/map/ /workspace/apps/mobile/src/map/
+COPY --chown=node:node national-patch.json /workspace/national-patch.json
+USER root
+RUN find /workspace/apps/mobile/src/map -name '._*' -type f -delete
+USER node

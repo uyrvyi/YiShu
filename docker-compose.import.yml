@@ -1,0 +1,31 @@
+# Private staging of migrated development data. Public ingress is a separate decision.
+services:
+  caddy:
+    ports: !override ["127.0.0.1:19443:443"]
+    networks: !override
+      frontend: { ipv4_address: 172.31.232.2 }
+  api:
+    environment:
+      TRUSTED_PROXY_IP: 172.31.232.2
+    networks: !override
+      frontend: { ipv4_address: 172.31.232.3 }
+      backend: {}
+  worker:
+    profiles: [delivery]
+  verify-import:
+    extends:
+      file: docker-compose.prod.yml
+      service: api
+    profiles: [verification]
+    networks: !override [backend]
+    volumes:
+      - ./.local/production/source.json:/evidence/source.json:ro
+      - ./.local/production/source.dump:/evidence/source.dump:ro
+    command: [node, deploy/verify-import.mjs, /evidence]
+    restart: "no"
+    healthcheck:
+      disable: true
+networks:
+  frontend:
+    ipam:
+      config: !override [{ subnet: 172.31.232.0/28 }]

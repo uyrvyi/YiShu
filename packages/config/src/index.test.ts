@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { loadConfig, requireTestDatabaseUrl } from "./index.js";
 
 describe("loadConfig", () => {
+  it("keeps legacy creation as default and explicitly opts into district collection", () => {
+    expect(loadConfig({}).NEW_LETTER_RULES_VERSION).toBe("1.0");
+    expect(loadConfig({ NEW_LETTER_RULES_VERSION: "1.1" }).NEW_LETTER_RULES_VERSION).toBe("1.1");
+    expect(() => loadConfig({ NEW_LETTER_RULES_VERSION: "9.9" })).toThrow();
+  });
   it("返回默认基础设施配置（development）", () => {
     const cfg = loadConfig({});
     expect(cfg.NODE_ENV).toBe("development");
@@ -9,6 +14,17 @@ describe("loadConfig", () => {
     expect(cfg.API_HOST).toBe("0.0.0.0");
     expect(cfg.DATABASE_URL).toContain("postgresql://");
     expect(cfg.REDIS_URL).toContain("redis://");
+    expect(cfg.SIMULATION_CLOCK_OFFSET_MS).toBe(0);
+  });
+
+  it("开发环境允许模拟时钟快进，生产环境拒绝", () => {
+    expect(loadConfig({ SIMULATION_CLOCK_OFFSET_MS: "864000000" }).SIMULATION_CLOCK_OFFSET_MS).toBe(
+      864000000
+    );
+    expect(() => loadConfig({ SIMULATION_CLOCK_OFFSET_MS: "-1" })).toThrow();
+    expect(() => loadConfig({ NODE_ENV: "production", SIMULATION_CLOCK_OFFSET_MS: "1" })).toThrow(
+      /SIMULATION_CLOCK_OFFSET_MS/
+    );
   });
 
   it("读取显式 API 端口与主机（production 显式提供连接串）", () => {
@@ -48,6 +64,37 @@ describe("loadConfig", () => {
         CONTENT_ENCRYPTION_KEY: "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
       })
     ).toThrow();
+  });
+
+  it.each([
+    "change-me-to-a-long-random-secret",
+    "CHANGE_ME_to_a_long_random_secret_12345",
+    "replace-me-with-a-secure-production-key",
+    "your-jwt-secret-for-production-123456",
+    "short-production-secret",
+    "a".repeat(64),
+  ])("production rejects insecure JWT secret %s", (secret) => {
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://u:p@db:5432/app",
+        REDIS_URL: "redis://redis:6379",
+        JWT_SECRET: secret,
+        CONTENT_ENCRYPTION_KEY: "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+      })
+    ).toThrow(/JWT_SECRET/);
+  });
+
+  it.each(["00", "aa", "FF"])("production rejects repeated-byte content key %s", (byte) => {
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://u:p@db:5432/app",
+        REDIS_URL: "redis://redis:6379",
+        JWT_SECRET: "a-very-long-production-jwt-secret-123456",
+        CONTENT_ENCRYPTION_KEY: byte.repeat(32),
+      })
+    ).toThrow(/CONTENT_ENCRYPTION_KEY/);
   });
 
   it("production 未显式提供 CONTENT_ENCRYPTION_KEY 抛错", () => {

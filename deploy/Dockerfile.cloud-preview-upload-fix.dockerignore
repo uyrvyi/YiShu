@@ -1,0 +1,9 @@
+**
+!deploy/
+!deploy/Dockerfile.cloud-preview-upload-fix
+!deploy/Dockerfile.cloud-preview-upload-fix.dockerignore
+!apps/
+!apps/mobile/
+!apps/mobile/src/
+!apps/mobile/src/api/
+!apps/mobile/src/api/imageUploadFetch.ts

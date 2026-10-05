@@ -1,5 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { Letter, RecipientState, SenderState, Journey, TransportLeg } from "@yishu/db";
+import type {
+  Letter,
+  MediaAsset,
+  RecipientState,
+  SenderState,
+  Journey,
+  TransportLeg,
+} from "@yishu/db";
+import { MediaError, STAGED_MEDIA_TTL_MS } from "../lib/media.js";
 import { encryptContent, decryptContent } from "../lib/crypto.js";
 import { generateTrackingNo } from "../lib/trackingNo.js";
 import { createWithTrackingRetry, MAX_TRACKING_RETRY } from "../lib/trackingNoRetry.js";
@@ -23,6 +31,7 @@ import { getDefaultGraphVersion } from "../lib/stationGraph.js";
 interface LetterWithState extends Letter {
   recipientState?: RecipientState | null;
   senderState?: SenderState | null;
+  images?: MediaAsset[];
 }
 
 /** 收件人已拉黑发送者时的业务错误。 */
@@ -60,6 +69,8 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
         recipientUid: recipient.uid,
         content: body.content,
         transportType: body.transportType,
+        imageIds: body.imageIds,
+        writtenAt: body.writtenAt,
       });
 
       // 幂等：senderId + clientRequestId 唯一；同 key 不同 body → 409（规范 §67）
@@ -70,7 +81,11 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
             clientRequestId: body.clientRequestId,
           },
         },
-        include: { senderState: true, recipientState: true },
+        include: {
+          senderState: true,
+          recipientState: true,
+          images: { orderBy: { position: "asc" } },
+        },
       });
       if (existing) {
         if (existing.requestFingerprint !== fingerprint) {
@@ -102,36 +117,52 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
               if (blocked) {
                 throw new BlockedByRecipientError();
               }
-              return tx.letter.create({
+              for (const id of [...new Set([sender.id, recipient.id])].sort((a, b) =>
+                a < b ? -1 : a > b ? 1 : 0
+              )) {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`profile:${id}`}, 0))`;
+              }
+              const currentSender = await tx.user.findUniqueOrThrow({ where: { id: sender.id } });
+              const currentRecipient = await tx.user.findUniqueOrThrow({
+                where: { id: recipient.id },
+              });
+              if (body.imageIds?.length) {
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`media:${sender.id}`}, 0))`;
+              }
+              const letter = await tx.letter.create({
                 data: {
                   trackingNo,
                   senderId: sender.id,
                   recipientId: recipient.id,
                   senderAccountSnapshot: sender.account,
                   senderUidSnapshot: sender.uid,
-                  senderNicknameSnapshot: sender.nickname,
+                  senderNicknameSnapshot: currentSender.nickname,
                   recipientAccountSnapshot: recipient.account,
                   recipientUidSnapshot: recipient.uid,
-                  recipientNicknameSnapshot: recipient.nickname,
+                  recipientNicknameSnapshot: currentRecipient.nickname,
                   encryptedContent: encrypted.ciphertext,
                   contentIv: encrypted.iv,
                   contentAuthTag: encrypted.authTag,
-                  originProvince: sender.province,
-                  originCity: sender.city,
-                  originDistrict: sender.district,
-                  targetProvince: recipient.province,
-                  targetCity: recipient.city,
-                  targetDistrict: recipient.district,
+                  originProvince: currentSender.province,
+                  originCity: currentSender.city,
+                  originDistrict: currentSender.district,
+                  targetProvince: currentRecipient.province,
+                  targetCity: currentRecipient.city,
+                  targetDistrict: currentRecipient.district,
                   status: "CREATED",
                   initialTransport: body.transportType,
                   currentTransport: body.transportType,
                   clientRequestId: body.clientRequestId,
                   requestFingerprint: fingerprint,
-                  rulesVersion: "1.0",
+                  rulesVersion: req.server.config.NEW_LETTER_RULES_VERSION,
                   // 图版本来自注册表（禁止硬编码）：Phase 8 起新信件默认 china-v2
                   graphVersion: getDefaultGraphVersion(),
                   simulationSeed: generateSimulationSeed(),
-                  sentAt: new Date(),
+                  sentAt:
+                    req.server.config.NEW_LETTER_RULES_VERSION === "1.1"
+                      ? new Date(req.server.simulationClock.now())
+                      : new Date(),
+                  writtenAt: body.writtenAt ? new Date(body.writtenAt) : new Date(),
                   recipientState: {
                     create: { recipientId: recipient.id, readState: "UNOPENED" },
                   },
@@ -139,9 +170,28 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                 },
                 include: { senderState: true, recipientState: true },
               });
+              for (const [position, id] of (body.imageIds ?? []).entries()) {
+                const claimed = await tx.mediaAsset.updateMany({
+                  where: {
+                    id,
+                    ownerId: sender.id,
+                    purpose: "LETTER_IMAGE",
+                    letterId: null,
+                    createdAt: { gt: new Date(Date.now() - STAGED_MEDIA_TTL_MS) },
+                  },
+                  data: { letterId: letter.id, position },
+                });
+                if (claimed.count !== 1) throw new MediaError("image_unavailable");
+              }
+              const images = await tx.mediaAsset.findMany({
+                where: { letterId: letter.id },
+                orderBy: { position: "asc" },
+              });
+              return { ...letter, images };
             });
             return { kind: "created" as const, value: letter };
           } catch (err) {
+            if (err instanceof MediaError) throw err;
             if (err instanceof BlockedByRecipientError) {
               return { kind: "blocked" as const };
             }
@@ -153,7 +203,11 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                   clientRequestId: body.clientRequestId,
                 },
               },
-              include: { senderState: true, recipientState: true },
+              include: {
+                senderState: true,
+                recipientState: true,
+                images: { orderBy: { position: "asc" } },
+              },
             });
             if (original) {
               if (original.requestFingerprint !== fingerprint) {
@@ -213,21 +267,36 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
             : { OR: [{ senderId: user.id }, { recipientId: user.id }] };
 
       const letters = await req.server.prisma.letter.findMany({
-        where,
+        where: {
+          AND: [
+            where,
+            {
+              OR: [
+                {
+                  senderId: user.id,
+                  OR: [{ senderState: { is: null } }, { senderState: { is: { hiddenAt: null } } }],
+                },
+                {
+                  senderId: { not: user.id },
+                  OR: [
+                    { recipientState: { is: null } },
+                    { recipientState: { is: { hiddenAt: null } } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
         orderBy: { createdAt: "desc" },
         take: limit,
-        include: { senderState: true, recipientState: true },
+        include: {
+          senderState: true,
+          recipientState: true,
+          images: { orderBy: { position: "asc" } },
+        },
       });
 
-      // 过滤当前查看者已隐藏的信（Sender 看 senderState，Recipient 看 recipientState）
-      const visible = letters.filter((l) => {
-        if (l.senderId === user.id) {
-          return l.senderState?.hiddenAt == null;
-        }
-        return l.recipientState?.hiddenAt == null;
-      });
-
-      const items = visible.map((l) => toLetterViewFor(l, user.id, req));
+      const items = letters.map((l) => toLetterViewFor(l, user.id, req));
       return reply.send({ letters: items });
     }
   );
@@ -247,6 +316,7 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
         include: {
           senderState: true,
           recipientState: true,
+          images: { orderBy: { position: "asc" } },
           journey: { include: { legs: { orderBy: { sequence: "asc" } } } },
         },
       });
@@ -254,10 +324,11 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: "letter_not_found" });
       }
       const view = toLetterViewFor(letter, user.id, req);
-      // 扩展 Journey 摘要（Sender / Recipient 同视图；安全字段，无 internal id / seed / ETA）
-      const journeySummary = letter.journey
-        ? buildJourneySummary(letter.journey, letter.graphVersion)
-        : null;
+      // 计划路线仅向寄件人展示；收件人详情不包含尚未发生的路段。
+      const journeySummary =
+        letter.senderId === user.id && letter.journey
+          ? buildJourneySummary(letter.journey, letter.graphVersion)
+          : null;
       return reply.send({ letter: { ...view, journey: journeySummary } });
     }
   );
@@ -282,12 +353,14 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
       if (letter.status !== DELIVERED) {
         return reply.code(409).send({ error: "not_delivered" });
       }
-      if (letter.recipientState?.readState !== "OPENED") {
-        await req.server.prisma.recipientState.update({
-          where: { letterId: letter.id },
-          data: { readState: "OPENED", openedAt: new Date() },
-        });
+      if (!letter.recipientState) {
+        throw new Error("recipient_state_missing");
       }
+      // Compare-and-set preserves the first openedAt across concurrent requests.
+      await req.server.prisma.recipientState.updateMany({
+        where: { letterId: letter.id, readState: "UNOPENED" },
+        data: { readState: "OPENED", openedAt: new Date() },
+      });
       return reply.send({ ok: true });
     }
   );

@@ -1,5 +1,9 @@
 import argon2 from "argon2";
 
+// Non-secret placeholder using the same Argon2id cost as hashPassword.
+export const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=65536,p=4,t=3$Jar/9pNZ+WQDjDkzmZEgzQ$BI7QC5XrIw2s+B5nojMq7vmbQy5mhZyIbHYcpFzeu3Q";
+
 /**
  * 密码哈希（Argon2id）。
  * 禁止明文保存密码。日志 / 错误响应不得包含密码或哈希。

@@ -1,0 +1,3 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-any-direction
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/src/media/ImagePreview.tsx /workspace/apps/mobile/src/media/ImagePreview.tsx

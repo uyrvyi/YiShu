@@ -1,0 +1,13 @@
+{
+  "cli": { "appVersionSource": "local" },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://8.136.121.71",
+        "EXPO_PUBLIC_BAIDU_MAP_AK": "avLdHjkMY5M5xJbOovKY8r3TH54ebPpU"
+      }
+    }
+  }
+}

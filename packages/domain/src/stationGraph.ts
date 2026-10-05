@@ -169,13 +169,35 @@ export function resolveStationForRegion(
   graphVersion: string
 ): string {
   const map = loadRegionMap(graphVersion);
-  const cityStation = map.cities[region.city];
+  const cityStation = resolveRegionAlias(map.cities, region.city, ["市", "地区", "自治州", "盟"]);
   if (cityStation) return cityStation;
-  const provinceStation = map.provinces[region.province];
+  const provinceStation = resolveRegionAlias(map.provinces, region.province, [
+    "省",
+    "市",
+    "自治区",
+    "壮族自治区",
+    "回族自治区",
+    "维吾尔自治区",
+    "特别行政区",
+  ]);
   if (provinceStation) return provinceStation;
   throw new NoStationMappingError(
     `province=${region.province} city=${region.city} graphVersion=${graphVersion}`
   );
+}
+
+function resolveRegionAlias(
+  stations: Record<string, string>,
+  input: string,
+  suffixes: readonly string[]
+): string | undefined {
+  const name = input.trim();
+  if (Object.hasOwn(stations, name)) return stations[name];
+  for (const suffix of suffixes) {
+    const canonicalName = `${name}${suffix}`;
+    if (Object.hasOwn(stations, canonicalName)) return stations[canonicalName];
+  }
+  return undefined;
 }
 
 /**

@@ -1,0 +1,30 @@
+{
+    admin off
+    auto_https disable_redirects
+    skip_install_trust
+    default_sni {$TRIAL_IPV6}
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+            }
+        }
+    }
+}
+https://localhost, https://[{$TRIAL_IPV6}] {
+    tls internal
+    handle /api/v1/ready {
+        respond 404
+    }
+    handle /api/v1/* {
+        reverse_proxy api:4000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up -Forwarded
+            header_up -X-Real-IP
+        }
+    }
+    handle {
+        respond 404
+    }
+}

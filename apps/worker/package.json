@@ -24,7 +24,7 @@
     "@yishu/shared": "workspace:*",
     "@yishu/simulation": "workspace:*",
     "@yishu/config": "workspace:*",
-    "bullmq": "^6.3.6",
+    "bullmq": "6.3.6",
     "ioredis": "^6.0.0",
     "pino": "^9.14.0"
   },

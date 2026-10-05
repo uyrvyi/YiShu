@@ -26,7 +26,13 @@ export class ExpoPushProvider implements PushProvider {
   }
   async send(token: string, message: SafePushMessage): Promise<PushResult> {
     try {
-      const response = (await this.post("send", { to: token, sound: "default", ...message })) as {
+      const response = (await this.post("send", {
+        to: token,
+        sound: "default",
+        channelId: "letters-v2",
+        priority: "high",
+        ...message,
+      })) as {
         data?: { status?: string; id?: string; details?: { error?: string } };
       };
       const ticket = response.data;

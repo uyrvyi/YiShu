@@ -1,0 +1,125 @@
+{
+  "releaseApproval": "pending",
+  "scope": "Shanghai pilot only",
+  "source": "OpenStreetMap contributors / Geofabrik",
+  "sourceUrl": "https://download.geofabrik.de/asia/china/shanghai-261003.osm.pbf",
+  "supplementUrls": [
+    "https://api.openstreetmap.org/api/0.6/relation/398353/full",
+    "https://api.openstreetmap.org/api/0.6/relation/398374/full"
+  ],
+  "snapshot": "2026-10-03T20:20:50Z",
+  "inputSha256": "58eacdd9697a6224bfcdbb2b4e5aae50ed9a2d2c96b74ac1221b6732492370c7",
+  "sources": {
+    "shanghai-261003.osm.pbf": "cf16ce105a024b9ba304bf09c6f6985dc49acd55bbeac3d3f126e72bc1822d10",
+    "jingan-full.osm": "74127b21927fd17580bbcac5354dd3ddb2c20fb2f1fb85230c2e5e081a74d5d0",
+    "baoshan-full.osm": "cf0ae600438347ed4ea9178b7d111e77f6451babeaf0c58692e63f521acaab5c"
+  },
+  "license": "ODbL-1.0",
+  "licenseUrl": "https://www.openstreetmap.org/copyright",
+  "coordinateSystem": "WGS84",
+  "quantization": 0,
+  "displayScope": {
+    "relation": "r913067",
+    "bbox": [
+      120.8508584,
+      30.6693672,
+      123.225706,
+      31.8720185
+    ],
+    "operation": "Polygon intersection for both layers; out-of-scope exclaves omitted from this pilot, original sources preserved"
+  },
+  "districts": [
+    {
+      "code": "310101",
+      "name": "黄浦区",
+      "sourceId": "r371650"
+    },
+    {
+      "code": "310104",
+      "name": "徐汇区",
+      "sourceId": "r1278188"
+    },
+    {
+      "code": "310105",
+      "name": "长宁区",
+      "sourceId": "r398899"
+    },
+    {
+      "code": "310106",
+      "name": "静安区",
+      "sourceId": "r398353"
+    },
+    {
+      "code": "310107",
+      "name": "普陀区",
+      "sourceId": "r398886"
+    },
+    {
+      "code": "310109",
+      "name": "虹口区",
+      "sourceId": "r398351"
+    },
+    {
+      "code": "310110",
+      "name": "杨浦区",
+      "sourceId": "r398350"
+    },
+    {
+      "code": "310112",
+      "name": "闵行区",
+      "sourceId": "r1278189"
+    },
+    {
+      "code": "310113",
+      "name": "宝山区",
+      "sourceId": "r398374"
+    },
+    {
+      "code": "310114",
+      "name": "嘉定区",
+      "sourceId": "r1673543"
+    },
+    {
+      "code": "310115",
+      "name": "浦东新区",
+      "sourceId": "r398348"
+    },
+    {
+      "code": "310116",
+      "name": "金山区",
+      "sourceId": "r3292756"
+    },
+    {
+      "code": "310117",
+      "name": "松江区",
+      "sourceId": "r3293722"
+    },
+    {
+      "code": "310118",
+      "name": "青浦区",
+      "sourceId": "r3292760"
+    },
+    {
+      "code": "310120",
+      "name": "奉贤区",
+      "sourceId": "r3292751"
+    },
+    {
+      "code": "310151",
+      "name": "崇明区",
+      "sourceId": "r3292750"
+    }
+  ],
+  "waters": 2812,
+  "alignment": {
+    "status": "candidate_only",
+    "riverLengthM": 11456.701962562045,
+    "boundaryLengthM": 11432.340198939542,
+    "medianCenterlineOffsetM": 28.234690682768395,
+    "p95CenterlineOffsetM": 60.290496030503505,
+    "maxCenterlineOffsetM": 73.65435713814608,
+    "note": "Same source is not proof of accuracy. No geometry was snapped or altered.",
+    "boundaryOutsideWaterM": 0
+  },
+  "accuracyLimit": "Sampled spatial consistency, not official administrative boundary or survey certification. River banks and administrative lines are not interchangeable."
+}

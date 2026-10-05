@@ -6,8 +6,14 @@ import { createPrismaClient, type PrismaClient } from "@yishu/db";
 import { TestSimulationClock, deterministicDraw } from "@yishu/simulation";
 import { reconcileLetterPush, registerPushDevice, pushMessage } from "@yishu/domain/push";
 import { advanceJourneyToNow, materializeVisibleTimeline } from "@yishu/domain";
-import { createQueues, redisConnection, type Queues } from "@yishu/worker/queue";
-import { processJourney, scheduleJourney } from "@yishu/worker/scheduler";
+import {
+  JOB_ATTEMPTS,
+  RETRYABLE_FAILURE,
+  createQueues,
+  redisConnection,
+  type Queues,
+} from "@yishu/worker/queue";
+import { processJourney, reconcile, scheduleJourney } from "@yishu/worker/scheduler";
 import { deliverPush, checkPushReceipts } from "@yishu/worker/push-processor";
 import { startWorkerRuntime } from "@yishu/worker/runtime";
 import type { PushProvider } from "@yishu/worker/push-provider";
@@ -98,7 +104,7 @@ describe("Phase 9 scheduling and push integration", () => {
     return db.pushDispatch.findFirstOrThrow({ where: { letterId: row.id } });
   }
   beforeAll(async () => {
-    const config = loadConfig({ NODE_ENV: "test" });
+    const config = loadConfig({ NODE_ENV: "test", REDIS_URL: process.env.REDIS_URL });
     db = createPrismaClient(requireTestDatabaseUrl(process.env));
     redisUrl = config.REDIS_URL;
     app = buildApp(config, { prisma: db, simulationClock: clock });
@@ -456,6 +462,184 @@ describe("Phase 9 scheduling and push integration", () => {
       await runtime?.close();
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => proxy.close(() => resolve()));
+    }
+  });
+
+  function failingTransactions(error: Error) {
+    let unavailable = true;
+    const faultyDb = new Proxy(db, {
+      get(target, property) {
+        if (property === "$transaction")
+          return (...args: Parameters<PrismaClient["$transaction"]>) =>
+            unavailable ? Promise.reject(error) : Reflect.apply(target.$transaction, target, args);
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    return {
+      faultyDb,
+      recover: () => {
+        unavailable = false;
+      },
+    };
+  }
+
+  it("Phase 11: exhausted transient Journey retries recover after restart and concurrent reconciliation", async () => {
+    const row = await letter(true);
+    if (!row.journey) throw new Error("missing_journey");
+    const id = row.journey.id;
+    const jobId = `j-${id}-start`;
+    await queues.journey.add(
+      "advance",
+      { journeyId: String(id) },
+      {
+        jobId,
+        attempts: JOB_ATTEMPTS,
+        backoff: { type: "fixed", delay: 1 },
+      }
+    );
+    await queues.reconcile.add(
+      "reconcile",
+      {},
+      {
+        jobId: "startup",
+        attempts: JOB_ATTEMPTS,
+        backoff: { type: "fixed", delay: 1 },
+      }
+    );
+    const fault = failingTransactions(new Error("DRIVER_SECRET"));
+    let runtime = await startWorkerRuntime({
+      db: fault.faultyDb,
+      redisUrl,
+      clock,
+      provider,
+      prefix,
+    });
+    try {
+      await vi.waitFor(
+        async () => {
+          const job = await queues.journey.getJob(jobId);
+          expect(await job?.getState()).toBe("failed");
+          expect(job?.attemptsMade).toBe(JOB_ATTEMPTS);
+          expect(job?.failedReason).toBe(RETRYABLE_FAILURE);
+          const startup = await queues.reconcile.getJob("startup");
+          expect(await startup?.getState()).toBe("failed");
+          expect(startup?.attemptsMade).toBe(JOB_ATTEMPTS);
+        },
+        { timeout: 10000 }
+      );
+      expect((await db.journey.findUniqueOrThrow({ where: { id } })).lastAdvancedAtSim).toBeNull();
+    } finally {
+      await runtime.close();
+    }
+    fault.recover();
+    runtime = await startWorkerRuntime({ db: fault.faultyDb, redisUrl, clock, provider, prefix });
+    try {
+      await Promise.all([reconcile(db, queues, clock), reconcile(db, queues, clock)]);
+      await vi.waitFor(
+        async () => {
+          expect((await db.journey.findUniqueOrThrow({ where: { id } })).lastAdvancedAtSim).toEqual(
+            new Date(base)
+          );
+          expect(await queues.journey.getJob(jobId)).toBeUndefined();
+          expect(await queues.reconcile.getJob("startup")).toBeUndefined();
+        },
+        { timeout: 10000 }
+      );
+      clock.advanceBy(40 * 86400000);
+      await vi.waitFor(
+        async () =>
+          expect((await db.letter.findUniqueOrThrow({ where: { id: row.id } })).status).toBe(
+            "DELIVERED"
+          ),
+        { timeout: 10000 }
+      );
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it("Phase 11: exhausted transient Push retries recover without exceeding the database provider budget", async () => {
+    const item = await dispatch();
+    const jobId = `p-${item.id}`;
+    await queues.push.add(
+      "deliver",
+      { dispatchId: String(item.id) },
+      {
+        jobId,
+        attempts: JOB_ATTEMPTS,
+        backoff: { type: "fixed", delay: 1 },
+      }
+    );
+    const fault = failingTransactions(new Error("DRIVER_SECRET"));
+    const runtime = await startWorkerRuntime({
+      db: fault.faultyDb,
+      redisUrl,
+      clock,
+      provider,
+      prefix,
+    });
+    try {
+      await vi.waitFor(
+        async () => {
+          const job = await queues.push.getJob(jobId);
+          expect(await job?.getState()).toBe("failed");
+          expect(job?.attemptsMade).toBe(JOB_ATTEMPTS);
+          expect(job?.failedReason).toBe(RETRYABLE_FAILURE);
+        },
+        { timeout: 10000 }
+      );
+      expect((await db.pushDispatch.findUniqueOrThrow({ where: { id: item.id } })).attempts).toBe(
+        0
+      );
+      fault.recover();
+      await Promise.all([reconcile(db, queues, clock), reconcile(db, queues, clock)]);
+      await vi.waitFor(
+        async () =>
+          expect(await db.pushDispatch.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject(
+            { status: "SENT", attempts: 1 }
+          ),
+        { timeout: 10000 }
+      );
+      expect(provider.send).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it("Phase 11: reconciliation leaves unrecoverable domain failures retained and does not retry them", async () => {
+    const row = await letter(true);
+    if (!row.journey) throw new Error("missing_journey");
+    const id = row.journey.id;
+    const jobId = `j-${id}-start`;
+    const error = new Error("PRIVATE_DOMAIN_DETAILS");
+    error.name = "UnknownRulesVersionError";
+    const fault = failingTransactions(error);
+    const runtime = await startWorkerRuntime({
+      db: fault.faultyDb,
+      redisUrl,
+      clock,
+      provider,
+      prefix,
+    });
+    try {
+      await vi.waitFor(
+        async () => {
+          const job = await queues.journey.getJob(jobId);
+          expect(await job?.getState()).toBe("failed");
+          expect(job?.attemptsMade).toBe(1);
+          expect(job?.failedReason).toBe("UnknownRulesVersionError");
+        },
+        { timeout: 10000 }
+      );
+      fault.recover();
+      await Promise.all([reconcile(db, queues, clock), reconcile(db, queues, clock)]);
+      const job = await queues.journey.getJob(jobId);
+      expect(await job?.getState()).toBe("failed");
+      expect(job?.attemptsMade).toBe(1);
+      expect((await db.journey.findUniqueOrThrow({ where: { id } })).lastAdvancedAtSim).toBeNull();
+    } finally {
+      await runtime.close();
     }
   });
 });

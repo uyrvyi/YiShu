@@ -171,6 +171,42 @@ describe("journey integration", () => {
     expect(serialized).not.toMatch(/estimatedArrival/);
   });
 
+  it("省市简称注册的用户也能建立路线，信件快照保持原样", async () => {
+    const sender = await registerUser({
+      account: "shortbj",
+      password: "shortbj-pass",
+      nickname: "Short Beijing",
+      province: "北京",
+      city: "北京",
+      district: "西城",
+    });
+    const recipient = await registerUser({
+      account: "shortsh",
+      password: "shortsh-pass",
+      nickname: "Short Shanghai",
+      province: "上海",
+      city: "上海",
+      district: "徐汇",
+    });
+    const letterRes = await createLetter(
+      recipient.account,
+      "short region journey",
+      "HORSE_RELAY",
+      "j-short-region",
+      sender.accessToken
+    );
+    expect(letterRes.statusCode).toBe(201);
+    const trackingNo = letterRes.json().letter.trackingNo;
+    const journeyRes = await initJourney(trackingNo, sender.accessToken);
+    expect(journeyRes.statusCode).toBe(201);
+    expect(journeyRes.json().journey.origin.name).toBe("北京");
+    expect(journeyRes.json().journey.destination.name).toBe("上海");
+
+    const letter = await prisma.letter.findUniqueOrThrow({ where: { trackingNo } });
+    expect(letter.originProvince).toBe("北京");
+    expect(letter.targetProvince).toBe("上海");
+  });
+
   it("PIGEON Journey：单直连 leg、不走 road graph、Haversine 距离", async () => {
     const letterRes = await createLetter("bobj", "pigeon journey", "PIGEON", "j-pigeon");
     const trackingNo = letterRes.json().letter.trackingNo;
@@ -199,10 +235,16 @@ describe("journey integration", () => {
     // Sender 成功
     const ok = await initJourney(trackingNo);
     expect(ok.statusCode).toBe(201);
-    // Recipient 查询可见（同视图）
+    // 完整计划仅 Sender 可见
     const getByRecipient = await getJourney(trackingNo, bob.accessToken);
-    expect(getByRecipient.statusCode).toBe(200);
-    expect(getByRecipient.json().journey.origin.name).toBe("上海");
+    expect(getByRecipient.statusCode).toBe(404);
+    const detail = await app.inject({
+      method: "GET",
+      url: `/api/v1/letters/${trackingNo}`,
+      headers: { authorization: `Bearer ${bob.accessToken}` },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json().letter.journey).toBeNull();
   });
 
   it("并发初始化：最终仅 1 个 Journey、Legs 不重复（UNIQUE letterId 保障）", async () => {
@@ -237,16 +279,15 @@ describe("journey integration", () => {
     expect(journeys).toHaveLength(1);
   });
 
-  it("Sender/Recipient 看到相同 route 事实（同视图）", async () => {
+  it("Sender 可查询完整计划，Recipient 不能查询未来路段", async () => {
     const letterRes = await createLetter("bobj", "same view", "HORSE_RELAY", "j-sameview");
     const trackingNo = letterRes.json().letter.trackingNo;
     await initJourney(trackingNo);
     const senderView = await getJourney(trackingNo, alice.accessToken);
     const recipientView = await getJourney(trackingNo, bob.accessToken);
-    expect(senderView.json().journey.legs.length).toBe(recipientView.json().journey.legs.length);
-    expect(senderView.json().journey.totalDistanceKm).toBe(
-      recipientView.json().journey.totalDistanceKm
-    );
+    expect(senderView.statusCode).toBe(200);
+    expect(senderView.json().journey.legs.length).toBeGreaterThan(0);
+    expect(recipientView.statusCode).toBe(404);
   });
 
   it("非 CREATED（终态 DELIVERED）Letter 初始化 → 409，状态不倒退（HIGH-2）", async () => {

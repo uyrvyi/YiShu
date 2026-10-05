@@ -1,0 +1,5 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261005-national
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/app/letters/new.tsx /workspace/apps/mobile/app/letters/new.tsx
+COPY --chown=node:node apps/mobile/src/media/AvatarCropper.tsx /workspace/apps/mobile/src/media/AvatarCropper.tsx
+COPY --chown=node:node upload-feedback-patch.json /workspace/upload-feedback-patch.json

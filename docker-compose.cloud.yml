@@ -1,0 +1,21 @@
+# Public ingress for the Aliyun trial ECS (x86, IPv4) deployment.
+# Layered after docker-compose.import.yml; replaces its loopback-only caddy
+# ports with the machine-wide HTTPS listener. The security group must allow
+# TCP 443 only; DB/Redis/internal API stay unpublished.
+services:
+  caddy:
+    init: true
+    environment:
+      CLOUD_PUBLIC_IP: ${CLOUD_PUBLIC_IP:?Set the ECS public IPv4 first}
+    ports: !override
+      - "443:443"
+    volumes: !override
+      - ./deploy/Caddyfile.cloud:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      maps: {}
+networks:
+  maps:
+    external: true
+    name: yishu-maps

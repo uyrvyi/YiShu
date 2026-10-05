@@ -69,6 +69,23 @@ describe("stationGraph", () => {
     ).toBe("laizhou");
   });
 
+  it("常见省市简称匹配同版本图数据中的规范名称", () => {
+    for (const version of ["china-v1", "china-v2"]) {
+      expect(
+        resolveStationForRegion({ province: "北京", city: "北京", district: "西城" }, version)
+      ).toBe("beijing");
+      expect(
+        resolveStationForRegion({ province: "上海", city: "上海", district: "徐汇" }, version)
+      ).toBe("shanghai");
+      expect(
+        resolveStationForRegion({ province: "浙江", city: "杭州", district: "西湖" }, version)
+      ).toBe("hangzhou");
+      expect(
+        resolveStationForRegion({ province: "内蒙古", city: "不存在", district: "" }, version)
+      ).toBe("huhehaote");
+    }
+  });
+
   it("无映射区域抛 NoStationMappingError（类型化，路由映射为 422）", () => {
     expect(() =>
       resolveStationForRegion({ province: "不存在省", city: "不存在市", district: "" }, "china-v1")

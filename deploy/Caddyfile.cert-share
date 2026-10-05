@@ -1,0 +1,14 @@
+{
+    admin off
+    auto_https off
+}
+http://:8080 {
+    handle /yishu.mobileconfig {
+        header Content-Type application/x-apple-aspen-config
+        root * /public
+        file_server
+    }
+    handle {
+        respond 404
+    }
+}

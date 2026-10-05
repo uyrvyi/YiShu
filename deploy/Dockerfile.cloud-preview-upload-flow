@@ -1,0 +1,7 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-upload-fix
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/src/api/imageUploadFetch.ts /workspace/apps/mobile/src/api/imageUploadFetch.ts
+COPY --chown=node:node apps/mobile/src/api/letterApi.ts /workspace/apps/mobile/src/api/letterApi.ts
+COPY --chown=node:node apps/mobile/src/media/draftPreview.ts /workspace/apps/mobile/src/media/draftPreview.ts
+COPY --chown=node:node apps/mobile/src/media/UploadProgressRing.tsx /workspace/apps/mobile/src/media/UploadProgressRing.tsx
+COPY --chown=node:node apps/mobile/app/letters/new.tsx /workspace/apps/mobile/app/letters/new.tsx

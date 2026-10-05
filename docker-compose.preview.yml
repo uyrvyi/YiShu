@@ -1,0 +1,47 @@
+name: yishu-preview
+services:
+  preview:
+    image: yishu-preview-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.preview
+    pull_policy: never
+    init: true
+    working_dir: /workspace
+    env_file: [.local/production/preview.env]
+    environment:
+      NODE_ENV: development
+    command: [pnpm, --filter, "@yishu/mobile", exec, expo, start, --host, tunnel, --go]
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+      - pnpm_store:/pnpm/store
+      - expo_state:/root/.expo
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:8081/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+volumes:
+  node_modules:
+    external: true
+    name: yishu_node_modules
+  pnpm_store:
+    external: true
+    name: yishu_pnpm_store
+  expo_state:
+    external: true
+    name: yishu_expo_state

@@ -110,3 +110,38 @@ pnpm map:generate        # = node data/gen_map.cjs（离线、幂等；校验 so
   它是开源数据，**不是官方测绘成果**，**不是具有法律效力的行政边界认定文件**。
 - License 与监管合规是两个问题：**面向中国大陆公开发布前，Phase 12 Release Gate 必须另行检查
   地图内容与发布合规要求**（本项目不声称该数据已满足任何地图监管要求）。
+
+## 区县候选代表点（2026-10-04，本机验证）
+
+新增 `district-anchors.json`，不是 `china-districts.json` 的省级边界改名，也不是完整当前区县库。它从固定 geoBoundaries ADM3 2017 源生成候选代表点；2281 个名称匹配、775 个缺失，省内名称匹配仍须核验城市归属和行政区变更。原形状 ID、源哈希、ODbL-1.0 许可和未批准发布状态保留在文件中。缺失点不允许回退到市中心冒充区县。
+
+来源、生成方式、覆盖缺口与启用门禁详见 [区县运输地图](../../docs/DISTRICT_TRANSPORT_MAP.md)。省级边界继续使用上述冻结源，显示投影修正见下一节，不改变业务路由或原地图数据的发布审查要求。
+
+## 等比地理显示投影（2026-10-04）
+
+旧 `mapX/mapY` 是冻结业务空间，不适合直接作为显示地图的横纵比例。交互地图改用 [Leaflet EPSG:3857](https://leafletjs.com/reference.html#crs-epsg3857)，将同一 ADM1 WGS84 源交给标准地理投影；业务点先反解经纬度，再交给同一投影绘制。
+
+静态兜底由 `node scripts/generate-geographic-map.mjs` 生成，使用 [Turf toMercator](https://turfjs.org/docs/api/toMercator) 和单一比例等比拟合到 1000×800。新增资产：`apps/mobile/src/map/chinaGeographicData.ts`、`data/maps/china-geographic-map.svg`。生成器校验源哈希，保留全部 34 个 Feature、Polygon/MultiPolygon 和环，不额外简化，不手画或修改国界。旧 `china-districts.json`、`china-map.svg`、`chinaMapData.ts` 和驿站图仍保留冻结，不用于新版显示投影。
+
+这只是显示比例修复，不代表地图内容合规审核完成；原许可、历史边界和公开发布门禁继续适用。
+
+## 分级背景细节（2026-10-04，本机候选）
+
+新增 `apps/mobile/src/map/detailData/` 的离线省份包，补充市级/区县边界和名称；粗略水系候选因不能满足区县级空间对齐要求已停用显示，不修改上述冻结 ADM1 几何、驿站图或业务端点库。
+
+| 项目                     | 值                                                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 行政数据源               | [GaryBikini/ChinaAdminDivisonSHP](https://github.com/GaryBikini/ChinaAdminDivisonSHP)                                                                |
+| 固定版本 / 版次          | `ae72417fee2a63f453e6b2717e40655e87e26887` / `v24.02.06`                                                                                             |
+| 行政源许可               | 仓库 MIT；高德来源的再分发权利仍待核验，不能将仓库许可当作上游授权                                                                                   |
+| 坐标转换                 | 源实际 GCJ-02，生成时 gcoord 转为 WGS84                                                                                                              |
+| 匹配与缺口               | 364 个市级条目、2839 个区县；217 个选择器区县缺失，46 个源条目因编号/名称/归属不匹配拒绝                                                             |
+| 上海背景                 | 16/16 区；与仍缺闵行、金山的后端候选端点库分离                                                                                                       |
+| 水系源                   | [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) `ca96624a56bd078437bca8184e78163e5039ad19`；1:10m 概略河流/湖泊，public domain |
+| 输出编码                 | TopoJSON 量化 1e6、deflateRaw、base64；省份懒解码                                                                                                    |
+| 生成器                   | `scripts/generate-map-details.mjs`，只读固定 SHA-256 的本地源                                                                                        |
+| 逐文件校验 / 拒绝 / 缺失 | `detail-source-report.json`                                                                                                                          |
+| 完整通知                 | `source/ADMIN_DETAIL_LICENSE`、随 WebView 分发的 `detailData/notices.json`                                                                           |
+| 发布状态                 | `releaseApproval: pending`，仅本机候选；未同步服务器或更新 APK                                                                                       |
+
+缩放策略、离线体积、加载缓存和验证证据见 [离线分级运输底图](../../docs/OFFLINE_MAP_DETAILS.md)。开源来源、字段匹配和自动化通过不等于当前全国覆盖或地图公开发布审核通过。

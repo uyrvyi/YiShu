@@ -24,6 +24,7 @@ export const passwordSchema = z.string().min(8).max(72);
 export const nicknameSchema = z
   .string()
   .min(1)
+  .max(40)
   .refine((value) => Array.from(value).length <= 20, {
     message: "nickname exceeds 20 Unicode characters",
   });
@@ -46,5 +47,5 @@ export const loginSchema = z.object({
 });
 
 export const refreshSchema = z.object({
-  refreshToken: z.string().min(1),
+  refreshToken: z.string().min(1).max(256),
 });

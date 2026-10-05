@@ -153,7 +153,7 @@ export async function journeyRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // 查询 Journey（Sender / Recipient 均可；同视图；第三方 404）
+  // 查询完整计划路线（仅 Sender；Recipient 只通过 Map / Timeline 查看已确认事实）
   app.get(
     "/letters/:trackingNo/journey",
     { preHandler: [app.authenticate] },
@@ -167,7 +167,7 @@ export async function journeyRoutes(app: FastifyInstance): Promise<void> {
         where: { trackingNo },
         include: { journey: { include: { legs: { orderBy: { sequence: "asc" } } } } },
       })) as LetterWithJourney | null;
-      if (!letter || (letter.senderId !== user.id && letter.recipientId !== user.id)) {
+      if (!letter || letter.senderId !== user.id) {
         return reply.code(404).send({ error: "letter_not_found" });
       }
       if (!letter.journey) {

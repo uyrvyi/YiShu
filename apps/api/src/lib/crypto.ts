@@ -17,11 +17,10 @@ export interface EncryptedContent {
 
 /** 从 hex 密钥解析 AES-256 密钥缓冲（32 字节）。 */
 export function keyFromHex(hex: string): Buffer {
-  const key = Buffer.from(hex, "hex");
-  if (key.length !== 32) {
-    throw new Error("Invalid encryption key length");
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error("Invalid encryption key");
   }
-  return key;
+  return Buffer.from(hex, "hex");
 }
 
 /** 加密明文，返回 ciphertext / iv / authTag（hex）。 */
@@ -41,6 +40,13 @@ export function encryptContent(plain: string, keyHex: string): EncryptedContent 
 /** 解密正文。认证失败（篡改）抛错。 */
 export function decryptContent(data: EncryptedContent, keyHex: string): string {
   const key = keyFromHex(keyHex);
+  if (
+    !/^[0-9a-fA-F]{24}$/.test(data.iv) ||
+    !/^[0-9a-fA-F]{32}$/.test(data.authTag) ||
+    !/^(?:[0-9a-fA-F]{2})*$/.test(data.ciphertext)
+  ) {
+    throw new Error("Invalid encrypted content");
+  }
   const iv = Buffer.from(data.iv, "hex");
   const authTag = Buffer.from(data.authTag, "hex");
   const encrypted = Buffer.from(data.ciphertext, "hex");

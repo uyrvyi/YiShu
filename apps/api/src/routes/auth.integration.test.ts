@@ -223,4 +223,31 @@ describe("auth integration", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe("validation_error");
   });
+
+  it("refresh rejects expired tokens and stores only their hash", async () => {
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: { account: "xiangshen", password: "example-password" },
+    });
+    const { refreshToken } = login.json();
+    const user = await prisma.user.findUniqueOrThrow({ where: { account: "xiangshen" } });
+    const records = await prisma.refreshToken.findMany({ where: { userId: user.id } });
+    expect(records.length).toBeGreaterThan(0);
+    for (const record of records) {
+      expect(record.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(record.tokenHash).not.toBe(refreshToken);
+    }
+    await prisma.refreshToken.updateMany({
+      where: { userId: user.id },
+      data: { expiresAt: new Date(0) },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      payload: { refreshToken },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "invalid_refresh_token" });
+  });
 });

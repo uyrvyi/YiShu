@@ -3,6 +3,8 @@ import { routeMapViewSchema, toPublicLetterStatus } from "@yishu/shared";
 import { trackingNoParamSchema } from "../schemas/letter.js";
 import { materializeVisibleTimeline } from "../lib/timeline.js";
 import { projectRouteMap, type PlannedLegSegment } from "../lib/map-view.js";
+import { withDistrictConnections } from "../lib/district-map.js";
+import { resolveMapStationPoint } from "../lib/map-station-point.js";
 
 /**
  * Map 路由（Phase 8；对应开发规范 §74 + Phase 8 可见性冻结）。
@@ -11,7 +13,7 @@ import { projectRouteMap, type PlannedLegSegment } from "../lib/map-view.js";
  * GET /api/v1/letters/:trackingNo/map
  * ```
  *
- * - Sender / Recipient 均可访问且**返回完全相同的图**（阶段规划 Phase 8 Gate：sender/recipient 同图）。
+ * - Sender 可看计划路线；Recipient 只看已确认路线及可见事实，不返回目的站、未来路段或推算位置。
  * - 第三方一律 404（不泄露 Letter 是否存在）。
  * - 只返回用户可见状态（`toPublicLetterStatus`，内部 `LETTER_DROPPED` → `IN_TRANSIT`）与
  *   用户可见 Timeline 事实；**不返回** `dropArea` / 掉落范围 / 掉落原因 / exact GPS / ETA /
@@ -66,8 +68,42 @@ export async function mapRoutes(app: FastifyInstance): Promise<void> {
         plannedLegs,
       });
 
-      // 输出净化：strip-parse 保证任何意外多出的内部字段在序列化前被剥离（共享 schema 非 passthrough）。
-      return reply.send(routeMapViewSchema.parse(view));
+      let visibleView =
+        letter.senderId === user.id
+          ? view
+          : { ...view, destination: null, remainingPath: [], approximatePosition: null };
+      if (letter.rulesVersion === "1.1") {
+        const ids = [
+          journey?.originNodeId,
+          ...plannedLegs.flatMap((leg) => [leg.fromNodeId, leg.toNodeId]),
+          journey?.destinationNodeId,
+        ];
+        visibleView = withDistrictConnections(view, {
+          origin: {
+            province: letter.originProvince,
+            city: letter.originCity,
+            district: letter.originDistrict,
+          },
+          target: {
+            province: letter.targetProvince,
+            city: letter.targetCity,
+            district: letter.targetDistrict,
+          },
+          sender: letter.senderId === user.id,
+          nowMs,
+          events: visibleEvents,
+          originStationReadyAtMs: journey?.originStationReadyAtSim?.getTime() ?? null,
+          stations: ids.flatMap((id) =>
+            id
+              ? [resolveMapStationPoint({ graphVersion: letter.graphVersion, nodeId: id })].filter(
+                  (point) => point !== null
+                )
+              : []
+          ),
+        });
+      }
+      // 输出净化：strip-parse 保证任何意外多出的内部字段在序列化前被剥离。
+      return reply.send(routeMapViewSchema.parse(visibleView));
     }
   );
 }

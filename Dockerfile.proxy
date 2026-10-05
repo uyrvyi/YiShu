@@ -1,0 +1,16 @@
+FROM caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b AS download
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+      arm64) checksum=6a59a88914db644d410c4773286784096a97b59ea74152311442c19e988071ac ;; \
+      amd64) checksum=22c84f8d2d4e4e0e2d422f8049fdd0fc1ed8d5665d0fe166f506c7fd863b4555 ;; \
+      *) exit 1 ;; \
+    esac \
+    && curl --fail --location --retry 3 \
+      "https://github.com/caddyserver/caddy/releases/download/v2.11.6/caddy_2.11.6_linux_${TARGETARCH}.tar.gz" \
+      --output /tmp/caddy.tar.gz \
+    && printf '%s  %s\n' "$checksum" /tmp/caddy.tar.gz | sha256sum -c - \
+    && tar -xzf /tmp/caddy.tar.gz -C /tmp caddy
+
+FROM caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+RUN apk upgrade --no-cache && apk del --no-cache curl libcap-utils
+COPY --from=download /tmp/caddy /usr/bin/caddy

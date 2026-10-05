@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { MAP_FACT_LIMIT, MAP_FIT, type RouteMapViewParsed } from "@yishu/shared";
+import { MAP_FACT_LIMIT, type RouteMapViewParsed } from "@yishu/shared";
 
 /**
  * RouteMap / 图层 / 事实列表的**真实渲染树**覆盖（Phase 8 Gate M4）。
@@ -152,7 +152,7 @@ describe("RouteMap 渲染树（Phase 8 M4）", () => {
     expect(RemainingRouteLayer({ points: [] })).toBeNull();
   });
 
-  it("L1 · 缩放组内的底图描边宽度经补偿后 = theme 声明宽度", () => {
+  it("Mercator 底图描边宽度直接使用 viewBox 单位，不再二次拉伸", () => {
     const outline = collectElements(ChinaOutlineLayer()).filter(
       (element) => element.type === "Path"
     )[0];
@@ -160,8 +160,9 @@ describe("RouteMap 渲染树（Phase 8 M4）", () => {
       (element) => element.type === "Path"
     )[0];
     if (outline === undefined || province === undefined) throw new Error("layer missing");
-    expect(Number(outline.props.strokeWidth) * MAP_FIT.scale).toBeCloseTo(MAP_STROKE.outline, 6);
-    expect(Number(province.props.strokeWidth) * MAP_FIT.scale).toBeCloseTo(MAP_STROKE.province, 6);
+    expect(Number(outline.props.strokeWidth)).toBe(MAP_STROKE.outline);
+    expect(Number(province.props.strokeWidth)).toBe(MAP_STROKE.province);
+    expect(collectElements(ChinaOutlineLayer())[0]?.props.transform).toBeUndefined();
     // ADM1 边界渲染 34 个行政单元（数据完整性 / 拓扑由 geometry.test.ts 与 boundary.test.ts 覆盖）
     const provincePaths = collectElements(ProvinceBoundaryLayer()).filter(
       (element) => element.type === "Path"

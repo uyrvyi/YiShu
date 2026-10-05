@@ -1,0 +1,43 @@
+FROM node:24-bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && rm -rf /var/lib/apt/lists/* && npm install --global pnpm@11.22.0
+WORKDIR /workspace
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+FROM base AS build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+COPY apps/worker ./apps/worker
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+COPY data ./data
+RUN pnpm --filter yishu --filter '@yishu/api...' --filter '@yishu/worker...' install --frozen-lockfile --ignore-scripts \
+    && pnpm prisma:generate && pnpm build:packages \
+    && pnpm --filter @yishu/worker build && pnpm --filter @yishu/api build
+
+FROM build AS migrate
+ENV NODE_ENV=production
+COPY deploy ./deploy
+USER node
+CMD ["node", "deploy/migrate.mjs"]
+
+FROM build AS production-deps
+RUN install -d -m 0700 /media
+COPY deploy/prune-runtime.mjs deploy/prune-runtime.mjs
+RUN find . -type d -name node_modules -prune -exec rm -rf '{}' + \
+    && pnpm --filter '@yishu/api...' --filter '@yishu/worker...' install --prod --frozen-lockfile --ignore-scripts \
+    && YISHU_RUNTIME_PRUNE=1 node deploy/prune-runtime.mjs \
+    && for p in packages/* apps/api apps/worker; do rm -rf "$p/src"; done
+
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e AS runtime
+WORKDIR /workspace
+ENV NODE_ENV=production
+ENV PATH=/nodejs/bin:/usr/bin:/bin
+COPY --from=production-deps --chown=65532:65532 /workspace /workspace
+COPY --from=production-deps --chown=65532:65532 /media /media
+COPY --chown=65532:65532 deploy ./deploy
+USER 65532:65532
+ENTRYPOINT []
+CMD ["node", "apps/api/dist/server.js"]

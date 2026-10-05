@@ -1,0 +1,51 @@
+name: yishu-cloud-preview
+services:
+  preview:
+    image: yishu-cloud-preview:${PREVIEW_TAG:?Set PREVIEW_TAG}
+    pull_policy: never
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.75
+    mem_limit: 1280m
+    memswap_limit: 1280m
+    pids_limit: 192
+    command:
+      - node
+      - -e
+      - |
+        const fs = require('node:fs');
+        process.env.EXPO_TOKEN = fs.readFileSync('/home/node/.expo/preview-token', 'utf8').trim();
+        if (!process.env.EXPO_TOKEN) throw new Error('Expo preview credential is missing');
+        process.argv = ['node', 'expo', 'start', '--host', 'tunnel', '--go', '--max-workers', '1'];
+        require('./node_modules/expo/bin/cli');
+    environment:
+      EXPO_PUBLIC_API_BASE_URL: https://8.136.121.71
+      EXPO_PUBLIC_MAP_TILE_BASE_URL: ${EXPO_PUBLIC_MAP_TILE_BASE_URL:-}
+      EXPO_PUBLIC_BAIDU_MAP_AK: ${EXPO_PUBLIC_BAIDU_MAP_AK:?Set browser-side map AK}
+      NODE_OPTIONS: --max-old-space-size=768
+    volumes:
+      - expo_state:/workspace/apps/mobile/.expo
+      - home:/home/node
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=1777,size=268435456
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:8081/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+volumes:
+  expo_state:
+  home:

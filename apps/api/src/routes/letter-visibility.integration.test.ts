@@ -86,7 +86,13 @@ describe("letter visibility attack", () => {
       method: "POST",
       url: "/api/v1/letters",
       headers: { authorization: `Bearer ${alice.accessToken}` },
-      payload: { recipient, content: `content ${clientRequestId}`, transportType, clientRequestId },
+      payload: {
+        recipient,
+        content: `content ${clientRequestId}`,
+        transportType,
+        clientRequestId,
+        writtenAt: new Date(T0).toISOString(),
+      },
     });
     const trackingNo = res.json().letter.trackingNo;
     const initRes = await app.inject({

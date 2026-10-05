@@ -333,7 +333,7 @@ describe("journey advance integration", () => {
 
     const clock = new TestSimulationClock(T0);
     await advanceJourneyToNow(prisma, letterId, clock); // 激活（completed=[]，remaining=full）
-    const view1 = await getJourney(trackingNo, bob.accessToken);
+    const view1 = await getJourney(trackingNo, alice.accessToken);
     const beforeCompleted = view1.json().journey.completedPath.length;
     const beforeRemaining = view1.json().journey.remainingPath.length;
     expect(beforeCompleted).toBe(0);
@@ -341,7 +341,7 @@ describe("journey advance integration", () => {
 
     clock.advanceTo(T0 + 3 * HOUR_MS); // 完成 Leg1（2h）
     await advanceJourneyToNow(prisma, letterId, clock);
-    const view2 = await getJourney(trackingNo, bob.accessToken);
+    const view2 = await getJourney(trackingNo, alice.accessToken);
     const afterCompleted = view2.json().journey.completedPath.length;
     const afterRemaining = view2.json().journey.remainingPath.length;
     expect(afterCompleted).toBeGreaterThan(beforeCompleted); // 只增
@@ -601,7 +601,9 @@ describe("journey advance integration", () => {
     );
     const clock = new TestSimulationClock(T0);
     await advanceJourneyToNow(prisma, letterId, clock);
-    const res = await getJourney(trackingNo, bob.accessToken);
+    const recipientRes = await getJourney(trackingNo, bob.accessToken);
+    expect(recipientRes.statusCode).toBe(404);
+    const res = await getJourney(trackingNo, alice.accessToken);
     expect(res.statusCode).toBe(200);
     const serialized = JSON.stringify(res.json());
     expect(serialized).not.toMatch(/simulationSeed/);

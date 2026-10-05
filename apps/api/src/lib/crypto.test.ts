@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encryptContent, decryptContent } from "./crypto.js";
+import { encryptContent, decryptContent, keyFromHex } from "./crypto.js";
 
 const KEY = "0000000000000000000000000000000000000000000000000000000000000001";
 
@@ -26,5 +26,27 @@ describe("AES-256-GCM content encryption", () => {
     const enc = encryptContent("secret", KEY);
     const tampered = { ...enc, authTag: "00000000000000000000000000000000" };
     expect(() => decryptContent(tampered, KEY)).toThrow();
+  });
+
+  it("rejects truncated authentication tags instead of lowering GCM authentication strength", () => {
+    const enc = encryptContent("secret", KEY);
+    expect(() => decryptContent({ ...enc, authTag: enc.authTag.slice(0, 8) }, KEY)).toThrow();
+  });
+
+  it.each(["iv", "authTag", "ciphertext"] as const)("rejects non-hex suffixes in %s", (field) => {
+    const enc = encryptContent("secret", KEY);
+    expect(() => decryptContent({ ...enc, [field]: `${enc[field]}zz` }, KEY)).toThrow();
+  });
+
+  it.each(["iv", "ciphertext"] as const)("rejects valid-hex tampering in %s", (field) => {
+    const enc = encryptContent("secret", KEY);
+    const altered = `${enc[field].startsWith("00") ? "01" : "00"}${enc[field].slice(2)}`;
+    expect(() => decryptContent({ ...enc, [field]: altered }, KEY)).toThrow();
+  });
+
+  it("rejects a wrong key and invalid key suffixes", () => {
+    const enc = encryptContent("secret", KEY);
+    expect(() => decryptContent(enc, "2".repeat(64))).toThrow();
+    expect(() => keyFromHex(`${KEY}zz`)).toThrow();
   });
 });

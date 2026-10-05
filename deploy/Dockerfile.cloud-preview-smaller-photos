@@ -1,0 +1,7 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-upload-flow
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/src/media/uploadPreparation.ts /workspace/apps/mobile/src/media/uploadPreparation.ts
+COPY --chown=node:node apps/mobile/src/media/avatarCrop.ts /workspace/apps/mobile/src/media/avatarCrop.ts
+COPY --chown=node:node apps/mobile/src/media/picker.ts /workspace/apps/mobile/src/media/picker.ts
+COPY --chown=node:node apps/mobile/app/letters/new.tsx /workspace/apps/mobile/app/letters/new.tsx
+COPY --chown=node:node apps/mobile/app/profile.tsx /workspace/apps/mobile/app/profile.tsx

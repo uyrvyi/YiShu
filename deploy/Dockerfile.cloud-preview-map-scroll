@@ -1,0 +1,9 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-geographic
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/src/map/InteractiveRouteMap.tsx apps/mobile/src/map/localMapHtml.ts /workspace/apps/mobile/src/map/
+COPY --chown=node:node apps/mobile/app/ /workspace/apps/mobile/app/
+# Drop inherited AppleDouble metadata, which Metro can mistake for route modules.
+USER root
+RUN find /workspace/apps/mobile/app /workspace/apps/mobile/src/map -name '._*' -type f -delete
+RUN test -z "$(find /workspace/apps/mobile/app /workspace/apps/mobile/src/map -name '._*' -print -quit)"
+USER node

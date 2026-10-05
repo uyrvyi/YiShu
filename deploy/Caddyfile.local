@@ -1,0 +1,31 @@
+{
+    admin off
+    auto_https disable_redirects
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+            }
+        }
+    }
+}
+https://localhost {
+    tls internal
+    handle /api/v1/ready {
+        respond 404
+    }
+    handle /api/v1/* {
+        reverse_proxy api:4000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up -Forwarded
+            header_up -X-Real-IP
+        }
+    }
+    handle {
+        respond 404
+    }
+}
+http://localhost {
+    redir https://localhost:8443{uri} 308
+}

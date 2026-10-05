@@ -3,6 +3,7 @@ import { createAuthService, type ApiClient, type AuthSuccess } from "../auth/aut
 import { getRefreshToken, deleteRefreshToken } from "../auth/tokenStorage";
 import { API_BASE_URL } from "../config/api";
 import { createAuthenticatedFetch } from "./authenticatedFetch";
+import { imageUploadFetch } from "./imageUploadFetch";
 import { clearPushToken, readPushToken, savePushToken } from "../push/tokenStorage";
 
 /**
@@ -74,7 +75,7 @@ function makeAuthApiClient(baseUrl: string): ApiClient {
         body: JSON.stringify({ refreshToken }),
       });
       if (!res.ok) {
-        throw new Error("refresh_failed");
+        throw new Error(`refresh_failed:${res.status}`);
       }
       return (await res.json()) as { accessToken: string; refreshToken?: string };
     },
@@ -111,6 +112,7 @@ async function getAccessToken(): Promise<string | null> {
 }
 
 const authenticatedFetch = createAuthenticatedFetch({
+  fetchImpl: imageUploadFetch,
   token: getAccessToken,
   version: getSessionVersion,
   refresh: async () => {
@@ -239,9 +241,12 @@ export async function restoreSession(): Promise<boolean> {
     await deleteRefreshToken();
     session.accessToken = null;
     return false;
-  } catch {
+  } catch (error) {
     if (generation !== sessionVersion || loggingOut) return false;
-    // refresh token 无效 → 清理本地 token
+    // Preserve the stored session on network/server failure so startup can retry.
+    if (!(error instanceof Error) || !/^refresh_failed:(400|401|403)$/.test(error.message)) {
+      throw error;
+    }
     await deleteRefreshToken();
     session.accessToken = null;
     return false;

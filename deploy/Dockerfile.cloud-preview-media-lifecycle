@@ -1,0 +1,5 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261004-smaller-photos
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/src/media/ImagePreview.tsx /workspace/apps/mobile/src/media/ImagePreview.tsx
+COPY --chown=node:node apps/mobile/src/media/draftMediaLifecycle.ts /workspace/apps/mobile/src/media/draftMediaLifecycle.ts
+COPY --chown=node:node apps/mobile/app/letters/new.tsx /workspace/apps/mobile/app/letters/new.tsx

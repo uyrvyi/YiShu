@@ -1,0 +1,14 @@
+# Keep infrastructure on its existing RELEASE_TAG while updating application services.
+services:
+  api:
+    image: yishu-server:${API_RELEASE_TAG:-${NEXT_RELEASE_TAG:?Set the approved application release tag}}
+    environment:
+      MEDIA_STORAGE_DIR: /media
+    volumes: ["media_data:/media"]
+  worker:
+    image: yishu-server:${NEXT_RELEASE_TAG:?Set the approved application release tag}
+  migrate:
+    image: yishu-migrate:${NEXT_RELEASE_TAG:?Set the approved application release tag}
+
+volumes:
+  media_data:

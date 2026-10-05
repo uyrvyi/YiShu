@@ -1,6 +1,6 @@
 import type { PrismaClient, Journey, TransportLeg } from "@yishu/db";
 import type { TransportType, JourneyStatus, TransportLegStatus } from "@yishu/shared";
-import { plannedDurationSeconds } from "@yishu/shared";
+import { plannedDurationSeconds, firstMileDurationSeconds } from "@yishu/shared";
 import { resolveStationForRegion, planRoute, getStationNode } from "./stationGraph.js";
 import { resolveDisplayStationPoint } from "./map-station-point.js";
 
@@ -109,10 +109,10 @@ export async function initializeJourney(
 
   // 3. 规划路线（PIGEON / ground；按 graphVersion）
   const transportType = letter.initialTransport as TransportType;
-  const route = planRoute({ graphVersion, originNodeId, destinationNodeId, transportType });
+  let route = planRoute({ graphVersion, originNodeId, destinationNodeId, transportType });
 
   // 4. 构建 Leg 数据（sequence 从 0 开始；时长按 rulesVersion）
-  const legData = route.edges.map((edge, index) => ({
+  let legData = route.edges.map((edge, index) => ({
     sequence: index,
     fromNodeId: edge.from,
     toNodeId: edge.to,
@@ -131,16 +131,56 @@ export async function initializeJourney(
   let txResult: { journey: Journey; legs: TransportLeg[] };
   try {
     txResult = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`profile:${letter.recipientId}`}, 0))`;
+      const currentLetter = await tx.letter.findUniqueOrThrow({
+        where: { id: letter.id },
+        include: { journey: true },
+      });
+      if (currentLetter.journey) throw new JourneyAlreadyExistsError(letter.id);
+      const currentDestination = resolveStationForRegion(
+        {
+          province: currentLetter.targetProvince,
+          city: currentLetter.targetCity,
+          district: currentLetter.targetDistrict,
+        },
+        graphVersion
+      );
+      route = planRoute({
+        graphVersion,
+        originNodeId,
+        destinationNodeId: currentDestination,
+        transportType,
+      });
+      legData = route.edges.map((edge, sequence) => ({
+        sequence,
+        fromNodeId: edge.from,
+        toNodeId: edge.to,
+        transportType: edge.transportType,
+        distanceKm: edge.distanceKm,
+        plannedDurationSeconds: plannedDurationSeconds(
+          rulesVersion,
+          edge.transportType,
+          edge.distanceKm
+        ),
+        status: "PLANNED" as TransportLegStatus,
+      }));
       const journey = await tx.journey.create({
         data: {
           letterId: letter.id,
           originNodeId,
-          destinationNodeId,
+          destinationNodeId: currentDestination,
           status: "PLANNED" as JourneyStatus,
           rulesVersion,
           graphVersion,
           simulationSeed: letter.simulationSeed,
           totalDistanceKm: route.totalDistanceKm,
+          originStationReadyAtSim:
+            firstMileDurationSeconds(rulesVersion) === 0
+              ? null
+              : new Date(
+                  (currentLetter.sentAt ?? currentLetter.createdAt).getTime() +
+                    firstMileDurationSeconds(rulesVersion) * 1000
+                ),
         },
       });
       await tx.transportLeg.createMany({

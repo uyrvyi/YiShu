@@ -1,0 +1,10 @@
+services:
+  caddy:
+    image: yishu-proxy:${RELEASE_TAG:?Release tag required}
+    build: { context: ., dockerfile: Dockerfile.proxy }
+  postgres:
+    image: yishu-postgres:${RELEASE_TAG:?Release tag required}
+    build: { context: ., dockerfile: Dockerfile.postgres }
+  redis:
+    image: yishu-redis:${RELEASE_TAG:?Release tag required}
+    build: { context: ., dockerfile: Dockerfile.redis }

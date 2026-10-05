@@ -549,13 +549,18 @@ describe("map integration (Phase 8)", () => {
     }
   });
 
-  it("sender / recipient 同图；第三方 404；无 Journey 时安全空视图", async () => {
+  it("Recipient 地图不含未来路径和推算位置；第三方 404；无 Journey 时安全空视图", async () => {
     const { trackingNo, letterId } = await createLetter("HORSE_RELAY", "mp-visibility");
     await advanceTo(letterId, T0);
 
     const senderView = await mapOf(trackingNo, alice.accessToken);
     const recipientView = await mapOf(trackingNo, bob.accessToken);
-    expect(recipientView).toEqual(senderView);
+    expect(senderView.remainingPath.length).toBeGreaterThan(0);
+    expect(recipientView.remainingPath).toEqual([]);
+    expect(recipientView.approximatePosition).toBeNull();
+    expect(recipientView.destination).toBeNull();
+    expect(recipientView.completedPath).toEqual(senderView.completedPath);
+    expect(recipientView.facts).toEqual(senderView.facts);
     assertShape(senderView);
     assertNoLeak(senderView);
 

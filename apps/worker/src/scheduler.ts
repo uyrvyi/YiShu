@@ -2,7 +2,13 @@ import type { PrismaClient } from "@yishu/db";
 import { materializeVisibleTimeline, advanceJourneyToNow } from "@yishu/domain";
 import { reconcileLetterPush } from "@yishu/domain/push";
 import type { SimulationClock } from "@yishu/simulation";
-import { PAGE_SIZE, TERMINAL, WAKE_INTERVAL_MS, type Queues } from "./queue.js";
+import {
+  PAGE_SIZE,
+  TERMINAL,
+  WAKE_INTERVAL_MS,
+  enqueueRecoverableJob,
+  type Queues,
+} from "./queue.js";
 
 /** Stable state revision identity: retries reuse the key; failed domain jobs stay inspectable. */
 export async function scheduleJourney(
@@ -16,7 +22,8 @@ export async function scheduleJourney(
     select: { id: true, lastAdvancedAtSim: true, letter: { select: { status: true } } },
   });
   if (!j || TERMINAL.some((s) => s === j.letter.status)) return;
-  await queues.journey.add(
+  await enqueueRecoverableJob(
+    queues.journey,
     "advance",
     { journeyId: String(j.id) },
     {
@@ -87,7 +94,12 @@ export async function reconcile(
       select: { id: true },
     });
     for (const row of rows)
-      await queues.push.add("deliver", { dispatchId: String(row.id) }, { jobId: `p-${row.id}` });
+      await enqueueRecoverableJob(
+        queues.push,
+        "deliver",
+        { dispatchId: String(row.id) },
+        { jobId: `p-${row.id}` }
+      );
     if (rows.length < PAGE_SIZE) break;
     cursor = rows[rows.length - 1]?.id ?? cursor;
   }

@@ -52,4 +52,11 @@ describe("SystemSimulationClock", () => {
     expect(() => new SystemSimulationClock(-3)).toThrow(/positive finite/);
     expect(() => new SystemSimulationClock(Number.NaN)).toThrow(/positive finite/);
   });
+
+  it("开发偏移在正常速度下持续与真实时间同步", () => {
+    const offsetMs = 10 * 24 * 60 * 60 * 1000;
+    const clock = new SystemSimulationClock(1, Date.now(), offsetMs);
+    expect(Math.abs(clock.now() - Date.now() - offsetMs)).toBeLessThan(100);
+    expect(() => new SystemSimulationClock(1, Date.now(), -1)).toThrow(/offset/);
+  });
 });

@@ -2,7 +2,7 @@
  * RouteMap（开发规范 §17 / §18 / §74；阶段规划 Phase 8）。
  *
  * - 固定 `viewBox="0 0 1000 800"`（`@yishu/shared` 的 `MAP_VIEWBOX`），不随设备变化。
- * - 完全本地静态：`chinaMapData.ts`（由 `data/gen_map.cjs` 离线生成）+ `react-native-svg`；
+ * - 完全本地静态：`chinaGeographicData.ts`（由 `scripts/generate-geographic-map.mjs` 离线生成）+ `react-native-svg`；
  *   无在线地图 / 瓦片 / geocoder，无 exact GPS。
  * - 只渲染服务端返回的用户可见 DTO：已走实线 / 未走虚线 / 大概位置 / 最后确报 / 事实节点。
  *   不渲染 ETA、倒计时，不渲染任何掉落范围（`LETTER_DROPPED` 全局 HIDDEN）。
@@ -22,7 +22,8 @@ import {
   ProvinceBoundaryLayer,
   RemainingRouteLayer,
 } from "./layers";
-import { MAP_VIEWBOX_STRING, toViewBoxPoint } from "./geometry";
+import { MAP_VIEWBOX_STRING } from "./geometry";
+import { toDisplayPoint as toViewBoxPoint } from "./displayProjection";
 import { MAP_COLORS, MAP_RADIUS } from "./theme";
 
 interface RouteMapProps {
@@ -42,7 +43,7 @@ export function RouteMap({ view }: RouteMapProps) {
         viewBox={MAP_VIEWBOX_STRING}
         preserveAspectRatio="xMidYMid meet"
       >
-        <Rect x={0} y={0} width="100%" height="100%" fill={MAP_COLORS.paper} />
+        <Rect x={0} y={0} width="100%" height="100%" fill={MAP_COLORS.water} />
         <ChinaOutlineLayer />
         <ProvinceBoundaryLayer />
         <RemainingRouteLayer points={view.remainingPath} />
@@ -81,9 +82,10 @@ const styles = StyleSheet.create({
   container: {
     aspectRatio: 5 / 4, // 与固定 viewBox 1000x800 一致
     width: "100%",
-    borderRadius: 12,
+    borderRadius: 28,
+    borderCurve: "continuous",
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#E3DACB",
+    borderColor: "#E3E8EB",
   },
 });

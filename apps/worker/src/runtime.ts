@@ -2,7 +2,14 @@ import { Worker, UnrecoverableError } from "bullmq";
 import { Redis } from "ioredis";
 import type { PrismaClient } from "@yishu/db";
 import type { SimulationClock } from "@yishu/simulation";
-import { QUEUES, RECONCILE_INTERVAL_MS, createQueues, redisConnection } from "./queue.js";
+import {
+  QUEUES,
+  RECONCILE_INTERVAL_MS,
+  RETRYABLE_FAILURE,
+  createQueues,
+  enqueueRecoverableJob,
+  redisConnection,
+} from "./queue.js";
 import { processJourney, reconcile } from "./scheduler.js";
 import { checkPushReceipts, deliverPush } from "./push-processor.js";
 import type { PushProvider } from "./push-provider.js";
@@ -23,7 +30,7 @@ async function safely(run: () => Promise<void>): Promise<void> {
     if (DOMAIN_ERRORS.has(name)) throw new UnrecoverableError(name);
     if (error instanceof Error && error.message.startsWith("unknown_node:"))
       throw new UnrecoverableError("InvalidGraphNode");
-    throw new Error("worker_operation_failed");
+    throw new Error(RETRYABLE_FAILURE);
   }
 }
 
@@ -92,7 +99,7 @@ export async function startWorkerRuntime(options: {
       { every: RECONCILE_INTERVAL_MS },
       { name: "reconcile", data: {} }
     );
-    await queues.reconcile.add("reconcile", {}, { jobId: "startup" });
+    await enqueueRecoverableJob(queues.reconcile, "reconcile", {}, { jobId: "startup" });
   };
   const onReconnect = () => {
     if (!closing) void repairScheduler().catch(onError);

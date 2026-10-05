@@ -23,7 +23,15 @@ export const createLetterSchema = z.object({
   content: contentSchema,
   transportType: transportTypeSchema,
   clientRequestId: z.string().min(1).max(64),
+  writtenAt: z.string().datetime({ offset: true }).optional(),
+  imageIds: z
+    .array(z.string().uuid())
+    .max(9)
+    .refine((ids) => new Set(ids).size === ids.length)
+    .optional(),
 });
+
+export const transportEstimateRequestSchema = createLetterSchema.pick({ recipient: true });
 
 export const trackingNoParamSchema = z.object({
   trackingNo: z.string().regex(/^YS-\d{8}-[A-Z0-9]{5}$/, "invalid trackingNo"),

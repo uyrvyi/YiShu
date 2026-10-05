@@ -1,0 +1,6 @@
+**
+!apps/
+!apps/mobile/
+!apps/mobile/src/
+!apps/mobile/src/media/
+!apps/mobile/src/media/ImagePreview.tsx

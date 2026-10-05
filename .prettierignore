@@ -11,6 +11,13 @@ data/maps/china-map.svg
 # vendored 上游边界源（必须与 pinned revision 字节一致；禁止任何再格式化）
 data/maps/source
 
+# vendored 行政区原始数据，保留上游字节和 SHA-256
+apps/mobile/src/regions/data/pca-code.json
+apps/mobile/src/map/vendor/leaflet.ts
+apps/mobile/src/map/chinaGeographicData.ts
+data/maps/china-geographic-map.svg
+data/maps/district-anchors.json
+
 # 构建产物
 node_modules
 dist
@@ -21,3 +28,4 @@ generated
 
 # 本地 Agent / 工具数据（非项目源码）
 .codebuddy
+.temp
