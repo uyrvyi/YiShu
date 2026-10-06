@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("react-native", () => ({ Image: { getSize: vi.fn() } }));
 
 // mock expo-constants（原生模块），提供 apiBaseUrl
 vi.mock("expo-constants", () => ({
@@ -7,6 +8,7 @@ vi.mock("expo-constants", () => ({
 // mock SecureStore（authService 依赖），用可存储 Map 支持 logout 读取 refresh token
 const secureStore = new Map<string, string>();
 vi.mock("expo-secure-store", () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 4,
   setItemAsync: vi.fn(async (k: string, v: string) => {
     secureStore.set(k, v);
   }),

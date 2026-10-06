@@ -14,6 +14,7 @@ export function mapUpdateScript(view: RouteMapViewParsed, topInset: number): str
 /** Assets and gesture engine are bundled; polling only replaces business overlays. */
 export function buildLocalMapHtml(options?: StaticTileOptions): string {
   const tiles = staticTileConfig(options);
+  const maxZoom = tiles ? 15 : 13;
   const notices = {
     sources: detailNotices,
     osm: tiles
@@ -33,7 +34,8 @@ html,body,#map{height:100%;width:100%;margin:0;background:#eaf1f4}body{font-fami
 (function(){
 var notify=function(v){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(v)};
 try{
-var map=L.map('map',{crs:L.CRS.EPSG3857,minZoom:2,maxZoom:${tiles ? 15 : 13},zoomControl:false,attributionControl:true,zoomSnap:0.1,bounceAtZoomLimits:false});
+var routeFitMaxZoom=${maxZoom - 3};
+var map=L.map('map',{crs:L.CRS.EPSG3857,minZoom:2,maxZoom:${maxZoom},zoomControl:false,attributionControl:true,zoomSnap:0.1,bounceAtZoomLimits:false});
 map.getContainer().addEventListener('touchmove',function(event){if(event.cancelable)event.preventDefault()},{passive:false});
 L.control.zoom({position:'bottomright',zoomInTitle:'放大',zoomOutTitle:'缩小'}).addTo(map);
 map.attributionControl.setPrefix(false);${tiles ? "" : "map.attributionControl.addAttribution('运输示意图 · geoBoundaries · GaryBikini · © OpenStreetMap contributors');"}
@@ -76,7 +78,7 @@ var latLng=function(p){return [p.lat,p.lng]},addPoint=function(p){if(p&&Number.i
 var line=function(path,color,dash,kind){if(path.length>1)L.polyline(path.map(latLng),{color:color,weight:3,dashArray:dash||null,lineCap:'round',className:'journey-segment '+kind}).addTo(layer);path.forEach(addPoint)};
 var pin=function(p,color,label,direction){if(!p)return;addPoint(p);var el=document.createElement('span');el.className='pin';el.style.backgroundColor=color;var marker=L.marker(latLng(p),{icon:L.divIcon({html:el,className:'',iconSize:[12,12],iconAnchor:[6,6]})}).addTo(layer);if(label){var text=document.createElement('span');text.textContent=label;marker.bindTooltip(text,{permanent:true,direction:direction||'top',offset:[0,direction==='bottom'?8:-8]})}};
 window.yishuMapOverview=function(){map.invalidateSize();map.fitBounds(base.getBounds(),{padding:[24,24],animate:false});};
-window.yishuMapFit=function(){map.invalidateSize();if(points.length){var bounds=L.latLngBounds(points);map.fitBounds(bounds,{paddingTopLeft:[72,inset+44],paddingBottomRight:[80,70],maxZoom:15,animate:false});}else window.yishuMapOverview();};
+window.yishuMapFit=function(){map.invalidateSize();if(points.length){var bounds=L.latLngBounds(points);map.fitBounds(bounds,{paddingTopLeft:[72,inset+44],paddingBottomRight:[80,70],maxZoom:routeFitMaxZoom,animate:false});}else window.yishuMapOverview();};
 window.yishuUpdateMap=function(view,topInset){
 layer.clearLayers();points=[];inset=topInset||18;
 (view.segments||[]).forEach(function(segment){line([segment.from,segment.to],segment.state==='COMPLETED'?'#177b65':'#95a5af',segment.state==='COMPLETED'?null:'7 7',segment.kind)});

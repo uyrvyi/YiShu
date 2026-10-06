@@ -19,7 +19,7 @@ import { usePolling } from "../../src/refresh/usePolling";
 import { ActionButton, Notice, ScreenHeader } from "../../src/ui/controls";
 import { bodyTextFor, isTerminal, problemMessage, statusCopy } from "../../src/ui/presentation";
 import { C, UI } from "../../src/ui/theme";
-import { PrivateImage } from "../../src/media/PrivateImage";
+import { PrivateImages } from "../../src/media/PrivateImage";
 
 export default function LetterDetailScreen() {
   const { trackingNo } = useLocalSearchParams<{ trackingNo: string }>();
@@ -117,14 +117,27 @@ export default function LetterDetailScreen() {
               <Text accessibilityRole="header" style={styles.heading}>
                 信件内容
               </Text>
+              {letter.decryptionError ? (
+                <ActionButton
+                  title="恢复密钥或核对安全码"
+                  onPress={() => {
+                    Alert.alert(
+                      "加密信件未解锁",
+                      problemMessage(new Error(letter.decryptionError))
+                    );
+                    router.push({
+                      pathname: "/encryption",
+                      params: { uid: recipientView ? letter.sender.uid : letter.recipient.uid },
+                    });
+                  }}
+                />
+              ) : null}
               {bodyText !== null ? (
                 <>
                   <Text selectable style={styles.body}>
                     {bodyText}
                   </Text>
-                  {letter.images?.map((image) => (
-                    <PrivateImage key={image.id} image={image} />
-                  ))}
+                  <PrivateImages images={letter.images ?? []} />
                   {letter.writtenAt ? (
                     <Text style={styles.writtenAt}>写于 {formatFactTime(letter.writtenAt)}</Text>
                   ) : null}

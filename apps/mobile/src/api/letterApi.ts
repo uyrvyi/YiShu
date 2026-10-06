@@ -11,6 +11,15 @@ import {
   type TransportType,
 } from "@yishu/shared";
 import type { AuthUser } from "../auth/authService";
+import {
+  identityRegistrationSchema,
+  publicIdentitySchema,
+  E2EE_VERSION,
+  type IdentityRegistration,
+  type ImageSecret,
+  type EncryptedLetter,
+} from "@yishu/shared/e2ee";
+import type { EncryptionClient } from "../e2ee/client";
 
 /**
  * Mobile Letter API 服务（最小真实流程）。
@@ -37,6 +46,9 @@ export interface JourneyView {
 }
 
 export interface LetterView {
+  contentVersion?: string;
+  e2ee?: EncryptedLetter | null;
+  decryptionError?: string;
   trackingNo: string;
   /**
    * 用户可见状态：服务端只返回 PublicLetterStatus（内部 `LETTER_DROPPED` 等 HIDDEN 状态绝不出现）。
@@ -87,6 +99,7 @@ export class LetterApiError extends Error {
 }
 
 export interface CreateLetterInput {
+  encryptedImages?: ImageSecret[];
   recipient: string;
   content: string;
   transportType: TransportType;
@@ -96,6 +109,7 @@ export interface CreateLetterInput {
 }
 
 export interface LetterImage {
+  encryption?: ImageSecret;
   id: string;
   url: string;
   mimeType: string;
@@ -123,11 +137,17 @@ export interface LetterApiDeps {
   baseUrl: string;
   getAccessToken: () => Promise<string | null>;
   fetchImpl?: typeof fetch;
+  encryption?: EncryptionClient;
+  getSessionVersion?: () => number;
 }
 
 /** 构建 Letter API 客户端（可注入 fetch/token）。 */
 export function createLetterApi(deps: LetterApiDeps) {
   const doFetch = deps.fetchImpl ?? fetch;
+  const sessionVersion = deps.getSessionVersion ?? (() => 0);
+  const sameSession = (version: number) => {
+    if (sessionVersion() !== version) throw new Error("e2ee_session_changed");
+  };
 
   async function failure(res: Response, fallback: string): Promise<LetterApiError> {
     const body: unknown = await res.json().catch(() => null);
@@ -140,7 +160,9 @@ export function createLetterApi(deps: LetterApiDeps) {
 
   async function headers(hasJsonBody = false): Promise<Record<string, string>> {
     const token = await deps.getAccessToken();
-    const h: Record<string, string> = {};
+    const h: Record<string, string> = deps.encryption
+      ? { "x-yishu-content-protocol": E2EE_VERSION }
+      : {};
     if (hasJsonBody) {
       h["content-type"] = "application/json";
     }
@@ -151,6 +173,33 @@ export function createLetterApi(deps: LetterApiDeps) {
   }
 
   return {
+    async getEncryptionRegistration(): Promise<IdentityRegistration | null> {
+      const res = await doFetch(`${deps.baseUrl}/api/v1/encryption/me`, {
+        headers: await headers(),
+      });
+      if (res.status === 404) throw new LetterApiError("e2ee_unavailable", 404);
+      if (!res.ok) throw await failure(res, "e2ee_unavailable");
+      const body = (await res.json()) as { registration: unknown };
+      return body.registration === null
+        ? null
+        : identityRegistrationSchema.parse(body.registration);
+    },
+    async getEncryptionKey(uid: string) {
+      const res = await doFetch(
+        `${deps.baseUrl}/api/v1/encryption/keys/${encodeURIComponent(uid)}`,
+        { headers: await headers() }
+      );
+      if (!res.ok) throw await failure(res, "e2ee_recipient_not_ready");
+      return publicIdentitySchema.parse(((await res.json()) as { identity: unknown }).identity);
+    },
+    async enrollEncryption(record: IdentityRegistration): Promise<void> {
+      const res = await doFetch(`${deps.baseUrl}/api/v1/encryption/me`, {
+        method: "POST",
+        headers: await headers(true),
+        body: JSON.stringify(record),
+      });
+      if (!res.ok) throw await failure(res, "e2ee_enrollment_failed");
+    },
     async updateProfile(input: {
       nickname?: string;
       region?: AuthUser["region"];
@@ -168,26 +217,39 @@ export function createLetterApi(deps: LetterApiDeps) {
       avatar = false,
       onProgress?: import("./imageUploadFetch").UploadProgressCallback
     ): Promise<LetterImage> {
-      let form: FormData | undefined;
-      if (!onProgress) {
-        const { File } = await import("expo-file-system");
-        form = new FormData();
-        // Expo 57 fetch reads File bytes; URI-only React Native parts are unsupported.
-        form.append("image", new File(input.uri), input.name);
+      const version = sessionVersion();
+      const encrypted =
+        !avatar && deps.encryption ? await deps.encryption.prepareImage(input) : null;
+      if (encrypted) input = encrypted.input;
+      try {
+        sameSession(version);
+        let form: FormData | undefined;
+        if (!onProgress) {
+          const { File } = await import("expo-file-system");
+          form = new FormData();
+          // Expo 57 fetch reads File bytes; URI-only React Native parts are unsupported.
+          form.append("image", new File(input.uri), input.name);
+        }
+        const request: import("./imageUploadFetch").ImageUploadRequestInit = {
+          method: "POST",
+          headers: await headers(),
+          body: form,
+          signal: AbortSignal.timeout(120000),
+          ...(onProgress ? { imageUpload: { image: input, onProgress } } : {}),
+        };
+        const res = await doFetch(
+          `${deps.baseUrl}/api/v1/${avatar ? "users/me/avatar" : encrypted ? "media/encrypted-images" : "media/images"}`,
+          request
+        );
+        if (!res.ok) throw await failure(res, "image_upload_failed");
+        const image = ((await res.json()) as { image: LetterImage }).image;
+        sameSession(version);
+        return encrypted
+          ? { ...image, ...encrypted.secret, encryption: { ...encrypted.secret, id: image.id } }
+          : image;
+      } finally {
+        encrypted?.cleanup();
       }
-      const request: import("./imageUploadFetch").ImageUploadRequestInit = {
-        method: "POST",
-        headers: await headers(),
-        body: form,
-        signal: AbortSignal.timeout(120000),
-        ...(onProgress ? { imageUpload: { image: input, onProgress } } : {}),
-      };
-      const res = await doFetch(
-        `${deps.baseUrl}/api/v1/${avatar ? "users/me/avatar" : "media/images"}`,
-        request
-      );
-      if (!res.ok) throw await failure(res, "image_upload_failed");
-      return ((await res.json()) as { image: LetterImage }).image;
     },
     async deleteStagedImage(id: string): Promise<void> {
       const res = await doFetch(`${deps.baseUrl}/api/v1/media/${encodeURIComponent(id)}`, {
@@ -196,19 +258,35 @@ export function createLetterApi(deps: LetterApiDeps) {
       });
       if (!res.ok) throw await failure(res, "image_delete_failed");
     },
-    async getImageData(id: string, preview = true): Promise<string> {
+    async getImageData(id: string, preview = true, encryption?: ImageSecret): Promise<string> {
+      const version = sessionVersion();
+      const requestHeaders = await headers();
+      sameSession(version);
       const res = await doFetch(
         `${deps.baseUrl}/api/v1/media/${encodeURIComponent(id)}${preview ? "?size=preview" : ""}`,
         {
-          headers: await headers(),
+          headers: requestHeaders,
           signal: AbortSignal.timeout(60000),
         }
       );
+      sameSession(version);
       if (!res.ok) throw await failure(res, "image_read_failed");
       const mimeType = res.headers.get("content-type")?.split(";")[0] ?? "";
-      if (!/^image\/(png|jpeg|webp|gif|avif)$/.test(mimeType))
+      if (!encryption && !/^image\/(png|jpeg|webp|gif|avif)$/.test(mimeType))
         throw new LetterApiError("invalid_image", 415);
-      return imageDataUrl(await res.arrayBuffer(), mimeType);
+      const buffer = await res.arrayBuffer();
+      sameSession(version);
+      if (encryption) {
+        if (!deps.encryption) throw new Error("e2ee_unavailable");
+        const bytes = await deps.encryption.decodeImage(
+          new Uint8Array(buffer),
+          encryption,
+          version
+        );
+        sameSession(version);
+        return imageDataUrl(bytes.buffer as ArrayBuffer, encryption.mimeType);
+      }
+      return imageDataUrl(buffer, mimeType);
     },
     async getTransportEstimates(recipient: string): Promise<TransportEstimate[]> {
       const res = await doFetch(`${deps.baseUrl}/api/v1/transport-estimates`, {
@@ -272,7 +350,10 @@ export function createLetterApi(deps: LetterApiDeps) {
         throw await failure(res, "list_letters_failed");
       }
       const body = (await res.json()) as { letters: LetterView[] };
-      return body.letters;
+      const encryption = deps.encryption;
+      return encryption
+        ? Promise.all(body.letters.map((letter) => encryption.decodeLetter(letter)))
+        : body.letters;
     },
 
     /** 信件详情。 */
@@ -285,7 +366,7 @@ export function createLetterApi(deps: LetterApiDeps) {
         throw await failure(res, "get_letter_failed");
       }
       const body = (await res.json()) as { letter: LetterView };
-      return body.letter;
+      return deps.encryption ? deps.encryption.decodeLetter(body.letter) : body.letter;
     },
 
     /**
@@ -309,16 +390,17 @@ export function createLetterApi(deps: LetterApiDeps) {
 
     /** 创建信件。 */
     async createLetter(input: CreateLetterInput): Promise<LetterView> {
+      const payload = deps.encryption ? await deps.encryption.prepareCreate(input) : input;
       const res = await doFetch(`${deps.baseUrl}/api/v1/letters`, {
         method: "POST",
         headers: await headers(true),
-        body: JSON.stringify(input),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         throw await failure(res, "create_letter_failed");
       }
       const body = (await res.json()) as { letter: LetterView };
-      return body.letter;
+      return deps.encryption ? deps.encryption.decodeLetter(body.letter) : body.letter;
     },
 
     /** 搜索收件人（完整 account 或 8 位 UID 精准确认）。 */

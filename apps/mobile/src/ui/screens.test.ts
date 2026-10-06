@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactNode } from "react";
+import type { LayoutChangeEvent } from "react-native";
 import type { LetterView } from "../api/letterApi";
 import type { RouteMapViewParsed } from "@yishu/shared";
 
@@ -16,6 +17,13 @@ const harness = vi.hoisted(() => ({
   uploadImage: vi.fn(),
   preparePreview: vi.fn(),
   optimizeImage: vi.fn(),
+  encryptionStatus: vi.fn(),
+  encryptionPrepare: vi.fn(),
+  encryptionActivate: vi.fn(),
+  encryptionRecover: vi.fn(),
+  encryptionVerify: vi.fn(),
+  encryptionEnsure: vi.fn(),
+  encryptionBackup: vi.fn(),
   animate: vi.fn(),
 }));
 
@@ -91,7 +99,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
-  useSafeAreaInsets: () => ({ bottom: 34 }),
+  useSafeAreaInsets: () => ({ top: 59, bottom: 34 }),
 }));
 vi.mock("expo-glass-effect", () => ({
   GlassView: "GlassView",
@@ -147,6 +155,8 @@ vi.mock("lucide-react-native", () => ({
   LogOut: "LogOut",
   LocateFixed: "LocateFixed",
   Layers: "Layers",
+  ShieldCheck: "ShieldCheck",
+  KeyRound: "KeyRound",
   Mail: "Mail",
   MailOpen: "MailOpen",
   MapPin: "MapPin",
@@ -174,6 +184,15 @@ vi.mock("expo-constants", () => ({
   default: { executionEnvironment: "storeClient", nativeAppVersion: "57.0" },
 }));
 vi.mock("../api", () => ({
+  encryptionClient: {
+    ensureReady: harness.encryptionEnsure,
+    backupRecoveryCode: harness.encryptionBackup,
+    status: harness.encryptionStatus,
+    prepareEnrollment: harness.encryptionPrepare,
+    activate: harness.encryptionActivate,
+    recover: harness.encryptionRecover,
+    verifyContact: harness.encryptionVerify,
+  },
   getApi: () => ({ deleteStagedImage: harness.deleteImage, uploadImage: harness.uploadImage }),
   getSessionVersion: () => 1,
   isAuthenticated: vi.fn(),
@@ -194,12 +213,15 @@ import LogisticsScreen from "../../app/letters/[trackingNo]/logistics";
 import NewLetterScreen from "../../app/letters/new";
 import HomeScreen from "../../app/index";
 import MeScreen from "../../app/me";
+import EncryptionScreen from "../../app/encryption";
 import ProfileScreen from "../../app/profile";
 import { AvatarCropper } from "../media/AvatarCropper";
 import { ImagePreview } from "../media/ImagePreview";
+import { PrivateImages } from "../media/PrivateImage";
 import { UploadProgressRing } from "../media/UploadProgressRing";
+import { RegionSelector } from "../regions/RegionSelector";
 import { BottomNav } from "./BottomNav";
-import { ActionButton, FormInput, ScreenHeader } from "./controls";
+import { ActionButton, FormInput, KeyboardFrame, ScreenHeader } from "./controls";
 import { C, UI } from "./theme";
 import { glassMaterial, GlassSurface, getGlassDiagnostics } from "./GlassSurface";
 
@@ -289,6 +311,23 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("移动端页面结构与交互", () => {
+  it("加密设置区分安全码和用户编号，初始化不要求手动开启", () => {
+    harness.state.set(0, { uid: "12345678", enabled: false, available: false, identity: null });
+    const tree = elements(EncryptionScreen());
+    expect(text(tree)).toContain("我的安全码");
+    expect(text(tree)).toContain("用户编号");
+    expect(text(tree)).toContain("正在准备本机密钥");
+    expect(text(tree)).not.toContain("开启加密");
+    expect(text(tree)).not.toContain("核对联系人安全码");
+  });
+  it("恢复码仅在丢失本机密钥时需要输入，不自动生成替代密钥", () => {
+    harness.state.set(0, { uid: "12345678", enabled: true, available: false, identity: null });
+    const tree = elements(EncryptionScreen());
+    expect(button(tree, "恢复密钥").props.disabled).toBe(true);
+    expect(
+      tree.some((node) => node.props.accessibilityLabel === "恢复码" && node.props.secureTextEntry)
+    ).toBe(true);
+  });
   function preview(onClose: () => void) {
     const tree = elements(ImagePreview({ children: "pixels", aspectRatio: 0.5, onClose }));
     const viewport = tree.find((node) => node.props.testID === "image-preview-viewport");
@@ -872,6 +911,116 @@ describe("移动端页面结构与交互", () => {
     tree = elements(NewLetterScreen());
     expect(tree.some((node) => node.props.accessibilityLabel === "预览信件图片")).toBe(false);
   });
+  it("草稿全屏按同一封信的缩略图顺序切换，切图不关闭预览", () => {
+    harness.state.set(0, [
+      { id: "one", localUri: "file:one", width: 100, height: 100 },
+      { id: "two", localUri: "file:two", width: 200, height: 100 },
+      { id: "three", localUri: "file:three", width: 100, height: 200 },
+    ]);
+    let tree = elements(NewLetterScreen());
+    const thumbnails = tree.filter((node) => node.props.accessibilityLabel === "预览信件图片");
+    press(thumbnails[1]);
+    const currentImage = () => {
+      rerender();
+      tree = elements(NewLetterScreen());
+      return tree.find((node) => node.type === "Image" && node.props.resizeMode === "contain");
+    };
+    expect(currentImage()?.props.source).toEqual({ uri: "file:two" });
+    const changePage = (actionName: string) => {
+      const viewer = tree.find((node) => node.props.testID === "image-preview-viewport");
+      (viewer?.props.onAccessibilityAction as (event: unknown) => void)({
+        nativeEvent: { actionName },
+      });
+    };
+    changePage("increment");
+    expect(currentImage()?.props.source).toEqual({ uri: "file:three" });
+    changePage("increment");
+    expect(currentImage()?.props.source).toEqual({ uri: "file:three" });
+    changePage("decrement");
+    expect(currentImage()?.props.source).toEqual({ uri: "file:two" });
+  });
+  it("已寄信件从选中的图片开始，只在本信图片内切换并支持重新打开", () => {
+    const images = [
+      { id: "one", width: 100, height: 100 },
+      { id: "two", width: 200, height: 100 },
+      { id: "three", width: 100, height: 200 },
+    ] as NonNullable<LetterView["images"]>;
+    let tree = elements(PrivateImages({ images }));
+    press(tree.filter((node) => node.props.accessibilityLabel === "查看完整图片")[1]);
+    const current = () => {
+      rerender();
+      tree = elements(PrivateImages({ images }));
+      return tree.find((node) => node.props.fullscreen === true)?.props.id;
+    };
+    expect(current()).toBe("two");
+    const action = (actionName: string) => {
+      const viewer = tree.find((node) => node.props.testID === "image-preview-viewport");
+      (viewer?.props.onAccessibilityAction as (event: unknown) => void)({
+        nativeEvent: { actionName },
+      });
+    };
+    action("increment");
+    expect(current()).toBe("three");
+    action("increment");
+    expect(current()).toBe("three");
+    action("decrement");
+    expect(current()).toBe("two");
+    action("decrement");
+    expect(current()).toBe("one");
+    action("dismiss");
+    expect(current()).toBeUndefined();
+    press(tree.filter((node) => node.props.accessibilityLabel === "查看完整图片")[1]);
+    expect(current()).toBe("two");
+  });
+  it("整封信预加载完成后，全屏切换和重新打开直接复用像素，不再出现加载框", async () => {
+    const cacheModule = await import("../media/privateImageCache");
+    const images = [
+      { id: "one", width: 100, height: 100 },
+      { id: "two", width: 200, height: 100 },
+      { id: "three", width: 100, height: 200 },
+    ] as NonNullable<LetterView["images"]>;
+    const loadImage = vi.fn(async (id: string) => `data:image/jpeg;base64,${id}`);
+    const cache = cacheModule.createPrivateImageCache({
+      ids: images.map((image) => image.id),
+      loadImage,
+      sameSession: () => true,
+    });
+    cache.preload();
+    await vi.waitFor(() => expect(cache.read("three")?.status).toBe("ready"));
+    const create = vi.spyOn(cacheModule, "createPrivateImageCache").mockReturnValue(cache);
+    try {
+      let tree = elements(PrivateImages({ images }));
+      press(button(tree, "查看完整图片"));
+      const current = () => {
+        rerender();
+        tree = elements(PrivateImages({ images }));
+        const fullscreen = tree.find((node) => node.props.fullscreen === true);
+        expect(tree.some((node) => node.type === "ActivityIndicator")).toBe(false);
+        return fullscreen?.props.pixels;
+      };
+      expect(current()).toEqual({ status: "ready", data: "data:image/jpeg;base64,one" });
+      const action = (actionName: string) => {
+        const viewer = tree.find((node) => node.props.testID === "image-preview-viewport");
+        (viewer?.props.onAccessibilityAction as (event: unknown) => void)({
+          nativeEvent: { actionName },
+        });
+      };
+      action("increment");
+      expect(current()).toEqual({ status: "ready", data: "data:image/jpeg;base64,two" });
+      action("increment");
+      expect(current()).toEqual({ status: "ready", data: "data:image/jpeg;base64,three" });
+      action("decrement");
+      expect(current()).toEqual({ status: "ready", data: "data:image/jpeg;base64,two" });
+      action("dismiss");
+      current();
+      press(button(tree, "查看完整图片"));
+      expect(current()).toEqual({ status: "ready", data: "data:image/jpeg;base64,one" });
+      expect(loadImage).toHaveBeenCalledTimes(3);
+    } finally {
+      create.mockRestore();
+      cache.dispose();
+    }
+  });
   it("缩略图解码失败时弹窗提示，不静默留下空白", async () => {
     const { Alert } = await import("react-native");
     harness.state.set(0, [{ id: "staged-image", localUri: "file:broken" }]);
@@ -1048,7 +1197,7 @@ describe("移动端页面结构与交互", () => {
       });
     expect(
       tree.filter((node) => (node.props.style as { height?: number })?.height === 0.5)
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(text(tree)).not.toContain("个人资料");
     press(button(tree, "修改头像和昵称"));
     expect(harness.navigate).toHaveBeenLastCalledWith("/profile");
@@ -1261,8 +1410,176 @@ describe("移动端页面结构与交互", () => {
     expect(tree.find((node) => node.type === "KeyboardAvoidingView")?.props.behavior).toBe(
       "padding"
     );
+    expect(
+      tree.find((node) => node.type === "KeyboardAvoidingView")?.props.keyboardVerticalOffset
+    ).toBe(59);
     expect(button(tree, "继续").props.disabled).toBe(true);
     expect(text(tree)).toContain("0 / 2000");
+  });
+
+  it("登录注册、资料与信件搜索使用原生 iOS 键盘边距，不重复避让", () => {
+    harness.state.set(0, false);
+    const home = elements(HomeScreen());
+    harness.state.clear();
+    rerender();
+    const pages = [home, elements(ProfileScreen())];
+    rerender();
+    pages.push(elements(LettersScreen()));
+    for (const tree of pages) {
+      const frame = tree.find((node) => node.type === "KeyboardAvoidingView");
+      expect(frame?.props.enabled).toBe(false);
+      expect(frame?.props.keyboardVerticalOffset).toBe(59);
+      const scroll = tree.find((node) => node.type === "ScrollView" || node.type === "FlatList");
+      expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+      expect(scroll?.props.keyboardShouldPersistTaps).toBe("handled");
+      expect(scroll?.props.keyboardDismissMode).toBe("on-drag");
+    }
+  });
+
+  it("加密页固定顶栏，输入框随键盘缩小后的真实视口滚动", () => {
+    harness.state.set(0, { enabled: true, available: true });
+    harness.params.uid = "23456789";
+    const tree = elements(EncryptionScreen());
+    const frame = tree.find((node) => node.type === "KeyboardAvoidingView");
+    const scroll = tree.find((node) => node.type === "ScrollView");
+    const input = tree.find((node) => node.props.accessibilityLabel === "联系人用户编号");
+    if (!scroll || !input || !frame) throw new Error("Missing encryption keyboard layout");
+    expect(frame.props.enabled).toBe(true);
+    expect(frame.props.keyboardVerticalOffset).toBe(59);
+    expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(false);
+    expect(scroll.props.contentInsetAdjustmentBehavior).toBe("never");
+    expect(text(elements(frame.props.children))).not.toContain("端到端加密");
+    expect(text(tree)).toContain("端到端加密");
+    const scrollTo = vi.fn();
+    const viewport = tree.find((node) => node.type === "View" && node.props.collapsable === false);
+    if (!viewport) throw new Error("Missing keyboard viewport");
+    let viewportHeight = 700;
+    let inputTop = 650;
+    (viewport.props.ref as { current: unknown }).current = {
+      measureInWindow: (callback: (...values: number[]) => void) =>
+        callback(0, 123, 390, viewportHeight),
+    };
+    (scroll.props.ref as { current: unknown }).current = { scrollTo };
+    (input.props.ref as { current: unknown }).current = {
+      isFocused: () => true,
+      measureInWindow: (callback: (...values: number[]) => void) => callback(0, inputTop, 350, 56),
+    };
+    (input.props.onFocus as (event: unknown) => void)({});
+    expect(scrollTo).not.toHaveBeenCalled();
+    (scroll.props.onScroll as (event: unknown) => void)({
+      nativeEvent: { contentOffset: { y: 40 } },
+    });
+    viewportHeight = 300;
+    (scroll.props.onLayout as () => void)();
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 339, animated: true });
+    scrollTo.mockClear();
+    inputTop = 350;
+    (viewport.props.onLayout as () => void)();
+    expect(scrollTo).not.toHaveBeenCalled();
+    (input.props.onBlur as (event: unknown) => void)({});
+    inputTop = 650;
+    (viewport.props.onLayout as () => void)();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("加密设置默认没有开启、恢复码确认或联系人安全码的必填步骤", () => {
+    harness.state.set(0, { enabled: true, available: true, backupAvailable: true });
+    const tree = elements(EncryptionScreen());
+    expect(tree.filter((node) => node.type === "TextInput")).toHaveLength(0);
+    expect(text(tree)).not.toContain("开启加密");
+    expect(button(tree, "备份恢复码（可选）")).toBeDefined();
+    (button(tree, "核验联系人（可选）").props.onPress as () => void)();
+    rerender();
+    expect(elements(EncryptionScreen()).filter((node) => node.type === "TextInput")).toHaveLength(
+      2
+    );
+  });
+  it("原密钥可用的旧手动账号可以选填原恢复码保存备份", async () => {
+    harness.state.set(0, { enabled: true, available: true, backupAvailable: false });
+    const tree = elements(EncryptionScreen());
+    expect(tree.filter((node) => node.type === "TextInput")).toHaveLength(0);
+    (button(tree, "保存原恢复码（可选）").props.onPress as () => void)();
+    await Promise.resolve();
+    rerender();
+    const imported = elements(EncryptionScreen());
+    expect(imported.some((node) => node.props.accessibilityLabel === "恢复码")).toBe(true);
+    expect(button(imported, "保存原恢复码").props.disabled).toBe(true);
+    expect(harness.encryptionPrepare).not.toHaveBeenCalled();
+    expect(harness.encryptionActivate).not.toHaveBeenCalled();
+  });
+
+  it("地区搜索弹窗以全屏坐标避让键盘，并允许收缩选项列表", () => {
+    harness.state.set(0, "province");
+    const tree = elements(
+      RegionSelector({
+        value: { province: "", city: "", district: "" },
+        onChange: vi.fn(),
+      })
+    );
+    const frame = tree.find((node) => node.type === "KeyboardAvoidingView");
+    expect(frame?.props.enabled).toBe(true);
+    expect(frame?.props.keyboardVerticalOffset).toBe(0);
+    expect(tree.some((node) => node.props.accessibilityLabel === "搜索地区")).toBe(true);
+    expect(tree.find((node) => node.type === "FlatList")?.props.style).toMatchObject({
+      flexShrink: 1,
+      minHeight: 0,
+    });
+  });
+
+  it("安卓键盘框使用高度避让，原生 iOS 模式不会禁用安卓避让", async () => {
+    const { Platform } = await import("react-native");
+    const original = Platform.OS;
+    try {
+      Platform.OS = "android";
+      const frame = elements(KeyboardFrame({ nativeInsets: true })).find(
+        (node) => node.type === "KeyboardAvoidingView"
+      );
+      expect(frame?.props.enabled).toBe(true);
+      expect(frame?.props.behavior).toBe("height");
+      expect(frame?.props.keyboardVerticalOffset).toBe(59);
+    } finally {
+      Platform.OS = original;
+    }
+  });
+
+  it("正文聚焦和键盘压缩视口时滚入可见区域，失焦后不抢滚动", () => {
+    const tree = elements(NewLetterScreen());
+    const scroll = tree.find((node) => node.type === "ScrollView");
+    const body = tree.find((node) => node.props.accessibilityLabel === "信件正文");
+    if (!scroll || !body) throw new Error("Missing composer editor");
+    const wrapper = tree.find(
+      (node) =>
+        node.type === "View" && node.props.onLayout && elements(node.props.children).includes(body)
+    );
+    if (!wrapper) throw new Error("Missing composer keyboard layout");
+    const scrollTo = vi.fn();
+    (scroll.props.ref as { current: unknown }).current = { scrollTo };
+    const layout = (node: Element, height: number, y = 0) =>
+      (node.props.onLayout as (event: LayoutChangeEvent) => void)({
+        nativeEvent: { layout: { x: 0, y, width: 390, height } },
+      } as LayoutChangeEvent);
+    layout(wrapper, 220, 340);
+    expect(scrollTo).not.toHaveBeenCalled();
+    (body.props.onFocus as () => void)();
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 324, animated: true });
+    layout(scroll, 200);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 324, animated: false });
+    expect(body.props.scrollEnabled).toBe(true);
+    rerender();
+    const resized = elements(NewLetterScreen()).find(
+      (node) => node.props.accessibilityLabel === "信件正文"
+    );
+    if (!resized) throw new Error("Missing resized editor");
+    expect(resized.props.style).toContainEqual({ height: 168 });
+    (body.props.onBlur as () => void)();
+    scrollTo.mockClear();
+    layout(scroll, 700);
+    expect(scrollTo).not.toHaveBeenCalled();
+    rerender();
+    expect(
+      elements(NewLetterScreen()).find((node) => node.props.accessibilityLabel === "信件正文")
+        ?.props.style
+    ).toContainEqual({ height: 220 });
   });
 
   it("寄送方式切换时同步介绍和实际寄收地区的参考时长", () => {

@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+import process from "node:process";
+import console from "node:console";
+import { URL } from "node:url";
+/* global fetch, AbortSignal, Response, Blob */
 
 const base = new URL(process.argv[2] ?? "");
 assert.equal(base.protocol, "https:");
-assert.ok(base.hostname.endsWith(".exp.direct"));
+const directHttps = base.hostname === "8.136.121.71";
+assert.ok(directHttps || base.hostname.endsWith(".exp.direct"));
 
 const manifestResponse = await fetch(base, {
   headers: {
@@ -37,6 +42,15 @@ assert.ok((await certificateChain.text()).includes("BEGIN CERTIFICATE"), "certif
 assert.ok(manifest.launchAsset?.url, "launch asset missing");
 const bundleUrl = new URL(manifest.launchAsset.url);
 assert.equal(bundleUrl.hostname, base.hostname, "bundle must come from the preview server");
+if (directHttps) {
+  assert.equal(bundleUrl.protocol, "https:", "direct bundle must already use HTTPS");
+  assert.equal(bundleUrl.port || "443", "443", "direct bundle must use existing ingress");
+  assert.equal(
+    bundleUrl.searchParams.get("lazy") ?? "false",
+    "false",
+    "public preview must be self-contained"
+  );
+}
 assert.equal(
   bundleUrl.searchParams.get("dev"),
   "true",
@@ -52,12 +66,158 @@ const bundleResponse = await fetch(bundleUrl, { signal: AbortSignal.timeout(1800
 assert.ok(bundleResponse.ok, `bundle HTTP ${bundleResponse.status}`);
 const bundle = await bundleResponse.text();
 assert.ok(bundle.length > 100000, "bundle is unexpectedly small");
+let packagedAssetFiles = 0;
+if (directHttps) {
+  assert.ok(
+    ["gzip", "br"].includes(bundleResponse.headers.get("content-encoding")),
+    "bundle compression missing"
+  );
+  const iconUrl = new URL(manifest.extra.expoClient.iconUrl);
+  assert.equal(iconUrl.protocol, "https:");
+  assert.equal(iconUrl.hostname, base.hostname);
+  const iconResponse = await fetch(iconUrl, { signal: AbortSignal.timeout(15000) });
+  assert.equal(iconResponse.status, 200, "preview image asset unavailable");
+  const icon = new Uint8Array(await iconResponse.arrayBuffer());
+  assert.deepEqual(
+    [...icon.slice(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+    "preview asset is not PNG"
+  );
+  const assets = [
+    ...bundle.matchAll(/\.registerAsset\((\{\s*"__packager_asset":[\s\S]*?\})\)/g),
+  ].map((match) => JSON.parse(match[1]));
+  assert.ok(assets.length > 0, "native asset metadata missing");
+  for (const asset of assets) {
+    for (const scale of asset.scales) {
+      const suffix = scale === 1 ? "" : `@${scale}x`;
+      const url = new URL(`${asset.httpServerLocation}/${asset.name}${suffix}.${asset.type}`, base);
+      url.searchParams.set("platform", "ios");
+      url.searchParams.set("hash", asset.hash);
+      const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      assert.equal(response.status, 200, `native asset unavailable: ${asset.name}${suffix}`);
+      const pixels = new Uint8Array(await response.arrayBuffer());
+      assert.ok(pixels.length > 0);
+      if (asset.type === "png")
+        assert.deepEqual([...pixels.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+      packagedAssetFiles++;
+    }
+  }
+  const validUrl = new URL(
+    `${assets[0].httpServerLocation}/${assets[0].name}.${assets[0].type}`,
+    base
+  );
+  const invalidPaths = [
+    "./../../home/node/.expo/preview-token",
+    "./../../node_modules/.pnpm/../.env",
+    "./../../node_modules/.pnpm/expo-router@57.0.24_fake/node_modules/expo-router/assets/../../../../.env",
+    "./../../node_modules/.pnpm/expo-router@57.0.24_fake/node_modules/expo-router/assets/test.json",
+  ];
+  for (const path of invalidPaths) {
+    const url = new URL(validUrl);
+    url.searchParams.set("unstable_path", path);
+    url.searchParams.set("platform", "ios");
+    url.searchParams.set("hash", assets[0].hash);
+    assert.equal(
+      (await fetch(url, { signal: AbortSignal.timeout(10000) })).status,
+      404,
+      "package asset path escape allowed"
+    );
+  }
+  const duplicate = new URL(validUrl);
+  duplicate.searchParams.set("platform", "ios");
+  duplicate.searchParams.set("hash", assets[0].hash);
+  duplicate.searchParams.append("unstable_path", invalidPaths[0]);
+  assert.equal(
+    (await fetch(duplicate, { signal: AbortSignal.timeout(10000) })).status,
+    404,
+    "duplicate asset path allowed"
+  );
+}
 assert.ok(bundle.includes("https://8.136.121.71"), "production API configuration missing");
+const checkE2ee = process.argv.includes("--e2ee");
+if (checkE2ee) {
+  for (const symbol of [
+    "yishu-e2ee-v1",
+    "getRandomBytesAsync",
+    "prepareEnrollment",
+    "verifyContact",
+    "e2ee_contact_unverified",
+    "e2ee_recovery_required",
+    "e2ee_session_changed",
+    "x-yishu-content-protocol",
+  ])
+    assert.ok(bundle.includes(symbol), `E2EE preview module missing: ${symbol}`);
+}
+const checkKeyboard = process.argv.includes("--keyboard-all");
+if (checkKeyboard) {
+  for (const symbol of ["KeyboardFrame", "revealBody", "bodyTop.current", "setBodyHeight"])
+    assert.ok(bundle.includes(symbol), `keyboard avoidance missing: ${symbol}`);
+  assert.ok(
+    [...bundle.matchAll(/nativeInsets:\s*true\b/g)].length >= 3,
+    "native keyboard mode missing from an input page"
+  );
+  assert.ok(
+    [...bundle.matchAll(/automaticallyAdjustKeyboardInsets:\s*true\b/g)].length >= 3,
+    "native keyboard scroll insets missing from an input page"
+  );
+  assert.ok(
+    /keyboardVerticalOffset:\s*0\b/.test(bundle),
+    "region-modal keyboard coordinate offset missing"
+  );
+}
+const checkAutomatic = process.argv.includes("--automatic-e2ee");
+if (checkAutomatic) {
+  for (const symbol of [
+    "EncryptionBootstrap",
+    "ensureReady",
+    "backupRecoveryCode",
+    "contactChecks",
+    "revealKeyboardInput",
+    "measureInWindow",
+    "focusedInput.current",
+  ])
+    assert.ok(bundle.includes(symbol), `automatic E2EE/keyboard module missing: ${symbol}`);
+  assert.ok(
+    !bundle.includes('if (!pinned) throw new Error("e2ee_contact_unverified")'),
+    "manual contact gate still present"
+  );
+}
+const checkLetterGallery = process.argv.includes("--letter-gallery");
+if (checkLetterGallery) {
+  for (const symbol of [
+    "changePage",
+    "pages.current.index",
+    "previewItems",
+    "activeImage.id",
+    "pageIndicator",
+  ])
+    assert.ok(bundle.includes(symbol), `letter gallery missing: ${symbol}`);
+  assert.ok(bundle.includes('start.axis === "horizontal"'), "horizontal page gesture missing");
+  assert.ok(bundle.includes("letter.images"), "letter-scoped image list missing");
+}
+const checkGalleryPreload = process.argv.includes("--gallery-preload");
+if (checkGalleryPreload) {
+  for (const symbol of [
+    "createPrivateImageCache",
+    "cache.preload()",
+    "cache.read(activeImage.id)",
+    ".getImageData(id, false,",
+    "cache.dispose()",
+    "idsKey",
+    "sameSession",
+  ])
+    assert.ok(bundle.includes(symbol), `gallery preloading missing: ${symbol}`);
+}
+const checkRouteFitLimit = process.argv.includes("--route-fit-limit");
+if (checkRouteFitLimit) {
+  assert.ok(bundle.includes("routeFitMaxZoom"), "route auto-fit zoom limit missing");
+  assert.ok(bundle.includes("maxZoom:routeFitMaxZoom"), "route auto-fit does not use zoom limit");
+}
 const checkUploadFeedback = process.argv.includes("--upload-feedback");
 if (checkUploadFeedback) {
   const contains = (symbol) => {
     const escaped = symbol.replace(
-      /[^\x00-\x7f]/g,
+      /[\u0080-\uFFFF]/g,
       (character) => "\\u" + character.charCodeAt(0).toString(16).padStart(4, "0")
     );
     return (
@@ -190,7 +350,7 @@ if (checkGeographicMap) {
   // JSX labels can be emitted as Unicode escapes in Metro's development bundle.
   const contains = (symbol) => {
     const escaped = symbol.replace(
-      /[^\x00-\x7f]/g,
+      /[\u0080-\uFFFF]/g,
       (character) => "\\u" + character.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")
     );
     return (
@@ -247,11 +407,37 @@ if (checkStaticTiles) {
     );
 }
 assert.ok(launchResponse.ok, `launch page HTTP ${launchResponse.status}`);
+if (directHttps) {
+  assert.ok((await launchResponse.text()).includes('href="exps://8.136.121.71:443"'));
+  for (const path of [
+    "/open",
+    "/_expo/open",
+    "/inspector",
+    "/json/list",
+    "/message",
+    "/symbolicate",
+    "/.env",
+    "/status",
+    "/assets/home/node/.expo/preview-token",
+    "/assets/../package.json",
+  ]) {
+    const response = await fetch(new URL(path, base), { signal: AbortSignal.timeout(10000) });
+    assert.equal(response.status, 404, `debug/private route exposed: ${path}`);
+  }
+  const blockedWrite = await fetch(new URL(bundleUrl), {
+    method: "POST",
+    signal: AbortSignal.timeout(10000),
+  });
+  assert.equal(blockedWrite.status, 404, "preview write route exposed");
+}
 console.log(
   JSON.stringify({
     status: "EXPO_PREVIEW_HTTP_PASS",
     sdk: manifest.extra.expoClient.sdkVersion,
     host: base.hostname,
+    directHttps,
+    bundleCompression: bundleResponse.headers.get("content-encoding"),
+    packagedAssetFiles,
     bundleCharacters: bundle.length,
     productionApiConfigured: true,
     signedManifestProvided: true,
@@ -270,6 +456,12 @@ console.log(
     mapScrollLockProvided: checkMapScrollLock ? true : "not_checked",
     staticTilesProvided: checkStaticTiles ? true : "not_checked",
     uploadFeedbackProvided: checkUploadFeedback ? true : "not_checked",
+    letterGalleryProvided: checkLetterGallery ? true : "not_checked",
+    galleryPreloadProvided: checkGalleryPreload ? true : "not_checked",
+    routeFitLimitProvided: checkRouteFitLimit ? true : "not_checked",
+    e2eeProtocolBundled: checkE2ee ? true : "not_checked",
+    keyboardAvoidanceProvided: checkKeyboard ? true : "not_checked",
+    automaticEncryptionProvided: checkAutomatic ? true : "not_checked",
     expoGoAccountVerification: "pending",
     deviceVerification: "pending",
   })

@@ -1,7 +1,8 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { RotateCw } from "lucide-react-native";
 import { ImagePreview } from "./ImagePreview";
+import { createPrivateImageCache, type PrivatePixels } from "./privateImageCache";
 import { getApi, getSessionVersion, subscribeSession } from "../api";
 import type { LetterImage } from "../api/letterApi";
 import { C, UI } from "../ui/theme";
@@ -41,17 +42,44 @@ function ProtectedPixels({
       active = false;
     };
   }, [id, preview, attempt, generation]);
+  return (
+    <ImagePixels
+      id={id}
+      pixels={data ? { status: "ready", data } : { status: failed ? "failed" : "loading" }}
+      aspectRatio={aspectRatio}
+      fullscreen={fullscreen}
+      onRetry={() => setAttempt((value) => value + 1)}
+    />
+  );
+}
+
+function ImagePixels({
+  id,
+  pixels,
+  aspectRatio,
+  fullscreen = false,
+  onRetry,
+}: {
+  id: string;
+  pixels?: PrivatePixels;
+  aspectRatio?: number;
+  fullscreen?: boolean;
+  onRetry: () => void;
+}) {
   const dimensions = aspectRatio ? { aspectRatio } : { flex: 1 };
   return (
-    <View style={[styles.pixels, dimensions, fullscreen && styles.fullscreen]}>
-      {data ? (
-        <Image source={{ uri: data }} resizeMode="contain" style={StyleSheet.absoluteFill} />
-      ) : failed ? (
+    <View
+      testID={`private-image-${id}`}
+      style={[styles.pixels, dimensions, fullscreen && styles.fullscreen]}
+    >
+      {pixels?.status === "ready" ? (
+        <Image source={{ uri: pixels.data }} resizeMode="contain" style={StyleSheet.absoluteFill} />
+      ) : pixels?.status === "failed" ? (
         <Pressable
           style={styles.retry}
           accessibilityRole="button"
           accessibilityLabel="重新加载图片"
-          onPress={() => setAttempt((value) => value + 1)}
+          onPress={onRetry}
         >
           <RotateCw color={C.muted} size={22} />
           <Text style={styles.error}>图片暂不可用</Text>
@@ -63,29 +91,65 @@ function ProtectedPixels({
   );
 }
 
-export function PrivateImage({ image }: { image: LetterImage }) {
-  const [expanded, setExpanded] = useState(false);
+export function PrivateImages({ images }: { images: LetterImage[] }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const index = images.findIndex((item) => item.id === activeId);
+  const activeImage = images[index];
   const generation = useSyncExternalStore(subscribeSession, getSessionVersion, getSessionVersion);
+  const idsKey = JSON.stringify(images.map((image) => image.id));
+  const cache = useMemo(
+    () =>
+      createPrivateImageCache({
+        ids: JSON.parse(idsKey) as string[],
+        loadImage: (id) =>
+          getApi().getImageData(id, false, images.find((image) => image.id === id)?.encryption),
+        sameSession: () => generation === getSessionVersion(),
+      }),
+    [idsKey, generation]
+  );
+  useSyncExternalStore(cache.subscribe, cache.getVersion, cache.getVersion);
   useEffect(() => {
-    setExpanded(false);
+    cache.preload();
+    return () => cache.dispose();
+  }, [cache]);
+  useEffect(() => {
+    setActiveId(null);
   }, [generation]);
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="查看完整图片"
-        onPress={() => setExpanded(true)}
-        style={styles.frame}
-      >
-        <ProtectedPixels
-          id={image.id}
-          preview
-          aspectRatio={Math.max(0.5, Math.min(2, image.width / image.height))}
-        />
-      </Pressable>
-      {expanded ? (
-        <ImagePreview aspectRatio={image.width / image.height} onClose={() => setExpanded(false)}>
-          <ProtectedPixels id={image.id} preview={false} fullscreen />
+      {images.map((image) => (
+        <Pressable
+          key={image.id}
+          accessibilityRole="button"
+          accessibilityLabel="查看完整图片"
+          onPress={() => setActiveId(image.id)}
+          style={styles.frame}
+        >
+          <ImagePixels
+            id={image.id}
+            pixels={cache.read(image.id)}
+            aspectRatio={Math.max(0.5, Math.min(2, image.width / image.height))}
+            onRetry={() => cache.retry(image.id)}
+          />
+        </Pressable>
+      ))}
+      {activeImage ? (
+        <ImagePreview
+          aspectRatio={activeImage.width / activeImage.height}
+          onClose={() => setActiveId(null)}
+          gallery={{
+            index,
+            count: images.length,
+            onChange: (next) => setActiveId(images[next].id),
+          }}
+        >
+          <ImagePixels
+            key={activeImage.id}
+            id={activeImage.id}
+            pixels={cache.read(activeImage.id)}
+            onRetry={() => cache.retry(activeImage.id)}
+            fullscreen
+          />
         </ImagePreview>
       ) : null}
     </>

@@ -41,6 +41,7 @@ export class NoStationMappingError extends Error {
 interface RegionStationMap {
   cities: Record<string, string>;
   provinces: Record<string, string>;
+  provinceFallback?: "allow" | "reject";
 }
 
 interface GraphRegistry {
@@ -157,7 +158,7 @@ export function getGraphVersions(): readonly string[] {
 /** 解析 region（省/市/区县）→ 最近 station node id（按指定图版本）。
  * 策略（Phase 4 Prompt §19）：
  *  1. exact city station
- *  2. province major/capital station fallback
+ *  2. province major/capital fallback for legacy maps only
  *  找不到明确抛 NoStationMappingError（不 fallback 外部 geocoder）。
  */
 export function resolveStationForRegion(
@@ -170,8 +171,7 @@ export function resolveStationForRegion(
 ): string {
   const map = loadRegionMap(graphVersion);
   const cityStation = resolveRegionAlias(map.cities, region.city, ["市", "地区", "自治州", "盟"]);
-  if (cityStation) return cityStation;
-  const provinceStation = resolveRegionAlias(map.provinces, region.province, [
+  const provinceSuffixes = [
     "省",
     "市",
     "自治区",
@@ -179,7 +179,29 @@ export function resolveStationForRegion(
     "回族自治区",
     "维吾尔自治区",
     "特别行政区",
-  ]);
+  ];
+  if (cityStation) {
+    if (map.provinceFallback === "reject") {
+      const node = getStationNode(cityStation, graphVersion);
+      const matchesProvince = resolveRegionAlias(
+        { [node.province]: cityStation },
+        region.province,
+        provinceSuffixes
+      );
+      if (!matchesProvince) {
+        throw new NoStationMappingError(
+          `province_city_mismatch: province=${region.province} city=${region.city} graphVersion=${graphVersion}`
+        );
+      }
+    }
+    return cityStation;
+  }
+  if (map.provinceFallback === "reject") {
+    throw new NoStationMappingError(
+      `local_city_station_required: province=${region.province} city=${region.city} graphVersion=${graphVersion}`
+    );
+  }
+  const provinceStation = resolveRegionAlias(map.provinces, region.province, provinceSuffixes);
   if (provinceStation) return provinceStation;
   throw new NoStationMappingError(
     `province=${region.province} city=${region.city} graphVersion=${graphVersion}`

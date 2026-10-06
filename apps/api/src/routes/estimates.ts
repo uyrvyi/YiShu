@@ -19,6 +19,7 @@ import {
 } from "../lib/stationGraph.js";
 import { materializeVisibleTimeline } from "../lib/timeline.js";
 import { projectNextStationEstimate } from "../lib/map-view.js";
+import { assertDistrictTransportRegion } from "../lib/district-transport-validation.js";
 
 export async function estimateRoutes(app: FastifyInstance): Promise<void> {
   app.post(
@@ -46,6 +47,10 @@ export async function estimateRoutes(app: FastifyInstance): Promise<void> {
       if (blocked) return reply.code(403).send({ error: "blocked_by_recipient" });
       try {
         const graphVersion = getDefaultGraphVersion();
+        if (app.config.NEW_LETTER_RULES_VERSION === "1.1") {
+          assertDistrictTransportRegion(sender, graphVersion, "origin");
+          assertDistrictTransportRegion(recipient, graphVersion, "destination");
+        }
         const originNodeId = resolveStationForRegion(sender, graphVersion);
         const destinationNodeId = resolveStationForRegion(recipient, graphVersion);
         const estimates = TRANSPORT_TYPES.flatMap((transportType) => {

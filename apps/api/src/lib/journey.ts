@@ -1,4 +1,4 @@
-import type { PrismaClient, Journey, TransportLeg } from "@yishu/db";
+import type { PrismaClient, Prisma, Letter, Journey, TransportLeg } from "@yishu/db";
 import type { TransportType, JourneyStatus, TransportLegStatus } from "@yishu/shared";
 import { plannedDurationSeconds, firstMileDurationSeconds } from "@yishu/shared";
 import { resolveStationForRegion, planRoute, getStationNode } from "./stationGraph.js";
@@ -65,6 +65,74 @@ export interface InitializedJourney {
   created: boolean;
 }
 
+/** Caller holds the recipient profile lock; shared by explicit initialization and address catch-up. */
+export async function createJourneyWithinTransaction(
+  tx: Prisma.TransactionClient,
+  letter: Letter
+): Promise<InitializedJourney> {
+  if (letter.status !== "CREATED") throw new LetterStatusConflictError(letter.id);
+  const { graphVersion, rulesVersion } = letter;
+  const originNodeId = resolveStationForRegion(
+    { province: letter.originProvince, city: letter.originCity, district: letter.originDistrict },
+    graphVersion
+  );
+  const destinationNodeId = resolveStationForRegion(
+    { province: letter.targetProvince, city: letter.targetCity, district: letter.targetDistrict },
+    graphVersion
+  );
+  const route = planRoute({
+    graphVersion,
+    originNodeId,
+    destinationNodeId,
+    transportType: letter.initialTransport as TransportType,
+  });
+  const journey = await tx.journey.create({
+    data: {
+      letterId: letter.id,
+      originNodeId,
+      destinationNodeId,
+      status: "PLANNED" as JourneyStatus,
+      rulesVersion,
+      graphVersion,
+      simulationSeed: letter.simulationSeed,
+      totalDistanceKm: route.totalDistanceKm,
+      originStationReadyAtSim:
+        firstMileDurationSeconds(rulesVersion) === 0
+          ? null
+          : new Date(
+              (letter.sentAt ?? letter.createdAt).getTime() +
+                firstMileDurationSeconds(rulesVersion) * 1000
+            ),
+    },
+  });
+  await tx.transportLeg.createMany({
+    data: route.edges.map((edge, sequence) => ({
+      journeyId: journey.id,
+      sequence,
+      fromNodeId: edge.from,
+      toNodeId: edge.to,
+      transportType: edge.transportType,
+      distanceKm: edge.distanceKm,
+      plannedDurationSeconds: plannedDurationSeconds(
+        rulesVersion,
+        edge.transportType,
+        edge.distanceKm
+      ),
+      status: "PLANNED" as TransportLegStatus,
+    })),
+  });
+  const updated = await tx.letter.updateMany({
+    where: { id: letter.id, status: "CREATED" },
+    data: { status: "DISPATCHED" },
+  });
+  if (updated.count === 0) throw new LetterStatusConflictError(letter.id);
+  const legs = await tx.transportLeg.findMany({
+    where: { journeyId: journey.id },
+    orderBy: { sequence: "asc" },
+  });
+  return { journey, legs, fullRouteNodeIds: route.nodes, created: true };
+}
+
 /**
  * 初始化某封信的 Journey。
  * @param prisma 数据库客户端
@@ -91,7 +159,6 @@ export async function initializeJourney(
   }
   // 冻结版本语义：Letter 上的 graphVersion/rulesVersion 必须真实参与规划
   const graphVersion = letter.graphVersion;
-  const rulesVersion = letter.rulesVersion;
   // 只有 CREATED 可初始化；终态/中间态一律拒绝（Phase 4 Final Gate HIGH-2）
   if (letter.status !== "CREATED") {
     throw new LetterNotCreatedError(letterId, letter.status);
@@ -109,26 +176,11 @@ export async function initializeJourney(
 
   // 3. 规划路线（PIGEON / ground；按 graphVersion）
   const transportType = letter.initialTransport as TransportType;
-  let route = planRoute({ graphVersion, originNodeId, destinationNodeId, transportType });
-
-  // 4. 构建 Leg 数据（sequence 从 0 开始；时长按 rulesVersion）
-  let legData = route.edges.map((edge, index) => ({
-    sequence: index,
-    fromNodeId: edge.from,
-    toNodeId: edge.to,
-    transportType: edge.transportType,
-    distanceKm: edge.distanceKm,
-    plannedDurationSeconds: plannedDurationSeconds(
-      rulesVersion,
-      edge.transportType,
-      edge.distanceKm
-    ),
-    status: "PLANNED" as TransportLegStatus,
-  }));
+  planRoute({ graphVersion, originNodeId, destinationNodeId, transportType });
 
   // 5. 事务原子创建 Journey + Legs + 条件更新 Letter → DISPATCHED
   let created = true;
-  let txResult: { journey: Journey; legs: TransportLeg[] };
+  let txResult: InitializedJourney;
   try {
     txResult = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`profile:${letter.recipientId}`}, 0))`;
@@ -137,68 +189,7 @@ export async function initializeJourney(
         include: { journey: true },
       });
       if (currentLetter.journey) throw new JourneyAlreadyExistsError(letter.id);
-      const currentDestination = resolveStationForRegion(
-        {
-          province: currentLetter.targetProvince,
-          city: currentLetter.targetCity,
-          district: currentLetter.targetDistrict,
-        },
-        graphVersion
-      );
-      route = planRoute({
-        graphVersion,
-        originNodeId,
-        destinationNodeId: currentDestination,
-        transportType,
-      });
-      legData = route.edges.map((edge, sequence) => ({
-        sequence,
-        fromNodeId: edge.from,
-        toNodeId: edge.to,
-        transportType: edge.transportType,
-        distanceKm: edge.distanceKm,
-        plannedDurationSeconds: plannedDurationSeconds(
-          rulesVersion,
-          edge.transportType,
-          edge.distanceKm
-        ),
-        status: "PLANNED" as TransportLegStatus,
-      }));
-      const journey = await tx.journey.create({
-        data: {
-          letterId: letter.id,
-          originNodeId,
-          destinationNodeId: currentDestination,
-          status: "PLANNED" as JourneyStatus,
-          rulesVersion,
-          graphVersion,
-          simulationSeed: letter.simulationSeed,
-          totalDistanceKm: route.totalDistanceKm,
-          originStationReadyAtSim:
-            firstMileDurationSeconds(rulesVersion) === 0
-              ? null
-              : new Date(
-                  (currentLetter.sentAt ?? currentLetter.createdAt).getTime() +
-                    firstMileDurationSeconds(rulesVersion) * 1000
-                ),
-        },
-      });
-      await tx.transportLeg.createMany({
-        data: legData.map((leg) => ({ ...leg, journeyId: journey.id })),
-      });
-      // 条件更新：只有仍为 CREATED 才允许 → DISPATCHED（防止终态 Letter 状态倒退）
-      const updated = await tx.letter.updateMany({
-        where: { id: letter.id, status: "CREATED" },
-        data: { status: "DISPATCHED" },
-      });
-      if (updated.count === 0) {
-        throw new LetterStatusConflictError(letter.id);
-      }
-      const legs = await tx.transportLeg.findMany({
-        where: { journeyId: journey.id },
-        orderBy: { sequence: "asc" },
-      });
-      return { journey, legs: legs as TransportLeg[] };
+      return createJourneyWithinTransaction(tx, currentLetter);
     });
   } catch (err) {
     if (err instanceof LetterStatusConflictError) throw err;
@@ -209,7 +200,12 @@ export async function initializeJourney(
         where: { letterId: letter.id },
         include: { legs: { orderBy: { sequence: "asc" } } },
       });
-      txResult = { journey: existing, legs: existing.legs as TransportLeg[] };
+      txResult = {
+        journey: existing,
+        legs: existing.legs as TransportLeg[],
+        fullRouteNodeIds: [existing.originNodeId, ...existing.legs.map((leg) => leg.toNodeId)],
+        created: false,
+      };
     } else {
       throw err;
     }
@@ -218,7 +214,7 @@ export async function initializeJourney(
   return {
     journey: txResult.journey,
     legs: txResult.legs,
-    fullRouteNodeIds: route.nodes,
+    fullRouteNodeIds: txResult.fullRouteNodeIds,
     created,
   };
 }

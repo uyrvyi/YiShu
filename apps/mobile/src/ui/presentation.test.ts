@@ -49,4 +49,12 @@ describe("letter presentation", () => {
       "操作过于频繁，请稍后再试"
     );
   });
+  it("区县或本市驿站不完整时明确提示修改哪一端地址", () => {
+    expect(problemMessage(new LetterApiError("origin_region_unavailable", 422))).toContain(
+      "你的所在地区"
+    );
+    expect(problemMessage(new LetterApiError("destination_region_unavailable", 422))).toContain(
+      "收件人的地区"
+    );
+  });
 });

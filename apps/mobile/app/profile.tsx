@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +15,7 @@ import { getApi } from "../src/api";
 import { AuthExpiredError } from "../src/api/authenticatedFetch";
 import type { AuthUser } from "../src/auth/authService";
 import { RegionSelector } from "../src/regions/RegionSelector";
-import { ActionButton, FormInput, ScreenHeader } from "../src/ui/controls";
+import { ActionButton, FormInput, KeyboardFrame, ScreenHeader } from "../src/ui/controls";
 import { problemMessage } from "../src/ui/presentation";
 import { C, UI } from "../src/ui/theme";
 import { refetchVisibleScreens } from "../src/refresh/usePolling";
@@ -150,11 +148,14 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <KeyboardFrame nativeInsets>
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          style={styles.flex}
+          contentContainerStyle={styles.page}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           <ScreenHeader
             title={editingRegion ? "所在地区" : "头像与昵称"}
             backLabel="返回我的"
@@ -219,7 +220,7 @@ export default function ProfileScreen() {
             <ActionButton title="重试" quiet onPress={() => setAttempt((value) => value + 1)} />
           ) : null}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardFrame>
       {crop ? (
         <AvatarCropper image={crop} onCancel={() => setCrop(null)} onConfirm={uploadAvatar} />
       ) : null}

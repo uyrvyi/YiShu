@@ -1,0 +1,6 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261005-keyboard-r3
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/app/ /workspace/apps/mobile/app/
+COPY --chown=node:node apps/mobile/src/ui/controls.tsx /workspace/apps/mobile/src/ui/controls.tsx
+COPY --chown=node:node apps/mobile/src/regions/RegionSelector.tsx /workspace/apps/mobile/src/regions/RegionSelector.tsx
+COPY --chown=node:node e2ee-image-patch.json /workspace/e2ee-image-patch.json

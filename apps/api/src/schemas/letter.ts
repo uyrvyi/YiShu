@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRANSPORT_TYPES } from "@yishu/shared";
+import { encryptedLetterSchema } from "@yishu/shared/e2ee";
 
 /**
  * 运输方式（对应开发规范 §13，Phase 3 仅保存选择，不实现运输逻辑）。
@@ -18,20 +19,31 @@ const contentSchema = z
 /** 收件人：完整 account 或 8 位 UID（规范 §7 / §73）。 */
 const recipientSchema = z.string().min(4).max(24);
 
-export const createLetterSchema = z.object({
-  recipient: recipientSchema,
-  content: contentSchema,
-  transportType: transportTypeSchema,
-  clientRequestId: z.string().min(1).max(64),
-  writtenAt: z.string().datetime({ offset: true }).optional(),
-  imageIds: z
-    .array(z.string().uuid())
-    .max(9)
-    .refine((ids) => new Set(ids).size === ids.length)
-    .optional(),
-});
+export const createLetterSchema = z
+  .object({
+    recipient: recipientSchema,
+    content: contentSchema.optional(),
+    e2ee: encryptedLetterSchema.optional(),
+    transportType: transportTypeSchema,
+    clientRequestId: z.string().min(1).max(64),
+    writtenAt: z.string().datetime({ offset: true }).optional(),
+    imageIds: z
+      .array(z.string().uuid())
+      .max(9)
+      .refine((ids) => new Set(ids).size === ids.length)
+      .optional(),
+  })
+  .strict()
+  .superRefine((body, ctx) => {
+    if (
+      body.e2ee
+        ? body.content !== undefined || body.writtenAt !== undefined
+        : body.content === undefined
+    )
+      ctx.addIssue({ code: "custom", message: "exactly_one_content_version" });
+  });
 
-export const transportEstimateRequestSchema = createLetterSchema.pick({ recipient: true });
+export const transportEstimateRequestSchema = z.object({ recipient: recipientSchema });
 
 export const trackingNoParamSchema = z.object({
   trackingNo: z.string().regex(/^YS-\d{8}-[A-Z0-9]{5}$/, "invalid trackingNo"),

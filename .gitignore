@@ -37,6 +37,10 @@ yarn-error.*
 .local
 .temp
 
+# ---- Python ----
+__pycache__/
+*.pyc
+
 # ---- Local agent / tool data ----
 .codebuddy
 

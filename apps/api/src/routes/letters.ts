@@ -27,6 +27,11 @@ import {
 } from "../lib/letter-view.js";
 import { stationName } from "../lib/journey.js";
 import { getDefaultGraphVersion } from "../lib/stationGraph.js";
+import {
+  assertDistrictTransportRegion,
+  InvalidTransportRegionError,
+} from "../lib/district-transport-validation.js";
+import { E2EE_VERSION, identityRegistrationSchema, verifyLetter } from "@yishu/shared/e2ee";
 
 interface LetterWithState extends Letter {
   recipientState?: RecipientState | null;
@@ -43,10 +48,23 @@ class BlockedByRecipientError extends Error {
 }
 
 export async function letterRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook("onSend", async (_req, reply, payload) => {
+    reply.header("Cache-Control", "private, no-store");
+    return payload;
+  });
   // 创建信件（对应规范 §8 / §73）
   app.post(
     "/letters",
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: [app.authenticate],
+      onRequest: async (req, reply) => {
+        if (
+          app.config.NODE_ENV === "production" &&
+          req.headers["x-yishu-content-protocol"] !== E2EE_VERSION
+        )
+          return reply.code(409).send({ error: "e2ee_required" });
+      },
+    },
     async (req: FastifyRequest, reply: FastifyReply) => {
       const body = createLetterSchema.parse(req.body);
       const sender = await req.server.prisma.user.findUnique({ where: { uid: req.user.sub } });
@@ -67,7 +85,7 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
       // 请求指纹（规范化 recipient UID + content + transportType，规范 §67）
       const fingerprint = computeRequestFingerprint({
         recipientUid: recipient.uid,
-        content: body.content,
+        content: body.e2ee ? JSON.stringify(body.e2ee) : (body.content ?? ""),
         transportType: body.transportType,
         imageIds: body.imageIds,
         writtenAt: body.writtenAt,
@@ -96,8 +114,23 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      if (app.config.NODE_ENV === "production" && !body.e2ee)
+        return reply.code(409).send({ error: "e2ee_required" });
+
       // 加密正文（规范 §48）
-      const encrypted = encryptContent(body.content, req.server.config.CONTENT_ENCRYPTION_KEY);
+      const encrypted = body.e2ee
+        ? { ciphertext: "", iv: "", authTag: "" }
+        : encryptContent(body.content ?? "", req.server.config.CONTENT_ENCRYPTION_KEY);
+      if (
+        body.e2ee &&
+        (!verifyLetter(body.e2ee) ||
+          body.e2ee.sender.uid !== sender.uid ||
+          body.e2ee.recipient.uid !== recipient.uid ||
+          body.e2ee.clientRequestId !== body.clientRequestId ||
+          body.e2ee.transportType !== body.transportType ||
+          JSON.stringify(body.e2ee.imageIds) !== JSON.stringify(body.imageIds ?? []))
+      )
+        return reply.code(400).send({ error: "e2ee_invalid_envelope" });
 
       // block 检查 + 创建在事务内（advisory lock 协调并发）；Tracking Number 碰撞重试
       const result = await createWithTrackingRetry<LetterWithState>({
@@ -123,9 +156,36 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`profile:${id}`}, 0))`;
               }
               const currentSender = await tx.user.findUniqueOrThrow({ where: { id: sender.id } });
+              const senderKey = await tx.encryptionIdentity.findUnique({
+                where: { userId: sender.id },
+              });
+              const recipientKey = await tx.encryptionIdentity.findUnique({
+                where: { userId: recipient.id },
+              });
+              if (!body.e2ee && (senderKey || recipientKey))
+                throw new MediaError("e2ee_required", 409);
+              if (
+                body.e2ee &&
+                (!senderKey ||
+                  !recipientKey ||
+                  senderKey.keyId !== body.e2ee.sender.keyId ||
+                  recipientKey.keyId !== body.e2ee.recipient.keyId ||
+                  JSON.stringify(
+                    identityRegistrationSchema.parse(senderKey.registration).identity
+                  ) !== JSON.stringify(body.e2ee.sender) ||
+                  JSON.stringify(
+                    identityRegistrationSchema.parse(recipientKey.registration).identity
+                  ) !== JSON.stringify(body.e2ee.recipient))
+              )
+                throw new MediaError("e2ee_key_changed", 409);
               const currentRecipient = await tx.user.findUniqueOrThrow({
                 where: { id: recipient.id },
               });
+              const graphVersion = getDefaultGraphVersion();
+              if (req.server.config.NEW_LETTER_RULES_VERSION === "1.1") {
+                assertDistrictTransportRegion(currentSender, graphVersion, "origin");
+                assertDistrictTransportRegion(currentRecipient, graphVersion, "destination");
+              }
               if (body.imageIds?.length) {
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`media:${sender.id}`}, 0))`;
               }
@@ -143,6 +203,7 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                   encryptedContent: encrypted.ciphertext,
                   contentIv: encrypted.iv,
                   contentAuthTag: encrypted.authTag,
+                  ...(body.e2ee ? { contentVersion: E2EE_VERSION, e2ee: body.e2ee } : {}),
                   originProvince: currentSender.province,
                   originCity: currentSender.city,
                   originDistrict: currentSender.district,
@@ -156,13 +217,17 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                   requestFingerprint: fingerprint,
                   rulesVersion: req.server.config.NEW_LETTER_RULES_VERSION,
                   // 图版本来自注册表（禁止硬编码）：Phase 8 起新信件默认 china-v2
-                  graphVersion: getDefaultGraphVersion(),
+                  graphVersion,
                   simulationSeed: generateSimulationSeed(),
                   sentAt:
                     req.server.config.NEW_LETTER_RULES_VERSION === "1.1"
                       ? new Date(req.server.simulationClock.now())
                       : new Date(),
-                  writtenAt: body.writtenAt ? new Date(body.writtenAt) : new Date(),
+                  writtenAt: body.e2ee
+                    ? null
+                    : body.writtenAt
+                      ? new Date(body.writtenAt)
+                      : new Date(),
                   recipientState: {
                     create: { recipientId: recipient.id, readState: "UNOPENED" },
                   },
@@ -176,6 +241,7 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
                     id,
                     ownerId: sender.id,
                     purpose: "LETTER_IMAGE",
+                    contentVersion: body.e2ee ? E2EE_VERSION : "server-v1",
                     letterId: null,
                     createdAt: { gt: new Date(Date.now() - STAGED_MEDIA_TTL_MS) },
                   },
@@ -215,6 +281,7 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
               }
               return { kind: "created" as const, value: original, existed: true };
             }
+            if (err instanceof InvalidTransportRegionError) throw err;
             const fields = conflictFields(err);
             if (fields.includes("trackingNo")) {
               return { kind: "collision" as const };
@@ -404,6 +471,7 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
 
 /** 解密正文（服务端内部）；完整性错误抛出，进入统一安全错误处理（500），不静默置 null。 */
 function decrypt(l: LetterWithState, req: FastifyRequest): string | null {
+  if (l.contentVersion === E2EE_VERSION) return null;
   return decryptContent(
     { ciphertext: l.encryptedContent, iv: l.contentIv, authTag: l.contentAuthTag },
     req.server.config.CONTENT_ENCRYPTION_KEY

@@ -19,9 +19,11 @@ services:
         const fs = require('node:fs');
         process.env.EXPO_TOKEN = fs.readFileSync('/home/node/.expo/preview-token', 'utf8').trim();
         if (!process.env.EXPO_TOKEN) throw new Error('Expo preview credential is missing');
-        process.argv = ['node', 'expo', 'start', '--host', 'tunnel', '--go', '--max-workers', '1'];
+        process.argv = ['node', 'expo', 'start', '--host', 'lan', '--go', '--max-workers', '1'];
         require('./node_modules/expo/bin/cli');
     environment:
+      EXPO_PACKAGER_PROXY_URL: https://8.136.121.71
+      EXPO_NO_METRO_LAZY: "1"
       EXPO_PUBLIC_API_BASE_URL: https://8.136.121.71
       EXPO_PUBLIC_MAP_TILE_BASE_URL: ${EXPO_PUBLIC_MAP_TILE_BASE_URL:-}
       EXPO_PUBLIC_BAIDU_MAP_AK: ${EXPO_PUBLIC_BAIDU_MAP_AK:?Set browser-side map AK}

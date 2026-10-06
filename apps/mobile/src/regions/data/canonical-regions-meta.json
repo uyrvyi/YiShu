@@ -1,14 +1,80 @@
 {
-  "revision": "mainland-county-20251231-r1",
+  "revision": "mainland-county-20261006-draft-r2",
   "sourceUrl": "https://raw.githubusercontent.com/caijf/lcn/caa859cdce009a4afc72fde0141a0edad7ed26dc/data/pca.json",
   "commit": "caa859cdce009a4afc72fde0141a0edad7ed26dc",
   "sourceSha256": "9e3f9514d5831cda7f73f147943124fc399c6b510c9b38c3072f02bb69c06af2",
-  "outputSha256": "d1b636c6c5c5af1ba96b9128fb9fb4ad0851f623340da299cde8d4eccc645825",
+  "outputSha256": "930bd3c5a0171679d246bd8c64ccb7059b4ad0b6f67c28a1dd252345daab2fc9",
   "sourceCutoff": "2024-12-31",
-  "changesCutoff": "2025-12-31",
+  "changesCutoff": "2026-06-30",
+  "nationalChangesComplete": false,
+  "officialChangesSha256": "de853538dd54747ef320dbf1963f2d5e912d3f1c48aafe3281ebbf5992375b51",
+  "officialAdditions": [
+    {
+      "code": "653132",
+      "name": "岑岭县",
+      "provinceCode": "65",
+      "cityCode": "6531",
+      "announcementUrl": "https://www.xinjiang.gov.cn/xinjiang/tzgg/202603/285e5d25b8ad4eae8df6b0f0efe847f6.shtml",
+      "announcementFile": "cenling-2026-announcement.html",
+      "announcementSha256": "89f468922d26153136d705375f2be7d87d6fd4185a9b7be00dedccbb59557b4c",
+      "requiredAnnouncementText": [
+        "设立岑岭县",
+        "喀什地区管辖",
+        "2026年3月26日"
+      ],
+      "codePageUrl": "https://mzt.xinjiang.gov.cn/xjmzt/c112990/202607/d4e25e9ed58e4371a1798d6e623ffc3d/images/20260730124558325041.png",
+      "codePageFile": "xinjiang-codes-41.png",
+      "codePageSha256": "0ec146b68fa485063be3660cfbc383ea146021f1fb5c38f98c93ac872f7bc441",
+      "manualTranscription": {
+        "page": 41,
+        "rows": [
+          733,
+          734,
+          735,
+          736
+        ],
+        "countyName": "岑岭县",
+        "countyCode": "653132"
+      }
+    },
+    {
+      "code": "659013",
+      "name": "草湖市",
+      "provinceCode": "65",
+      "cityCode": "6590",
+      "announcementUrl": "https://www.xinjiang.gov.cn/xinjiang/tzgg/202604/3691350b13064945947d8f78933ccb3e.shtml",
+      "announcementFile": "caohu-2026-announcement.html",
+      "announcementSha256": "65292967eed56ba575cf5ddfc490a4cd5c92c48ec17c8382a2111d4161783bd5",
+      "requiredAnnouncementText": [
+        "设立县级草湖市",
+        "草湖市由新疆维吾尔自治区直辖",
+        "2026年4月17日"
+      ],
+      "codePageUrl": "https://mzt.xinjiang.gov.cn/xjmzt/c112990/202607/d4e25e9ed58e4371a1798d6e623ffc3d/images/20260730124601827067.png",
+      "codePageFile": "xinjiang-codes-67.png",
+      "codePageSha256": "982e42d867c823275ce5782f2435fa07489160d97b85fde9822400af9f802319",
+      "manualTranscription": {
+        "page": 67,
+        "rows": [
+          1196,
+          1197,
+          1198,
+          1199,
+          1200,
+          1201,
+          1202,
+          1203,
+          1204,
+          1205
+        ],
+        "countyName": "草湖市",
+        "countyCode": "659013"
+      }
+    }
+  ],
   "license": "MIT",
   "provinces": 31,
-  "countyEntries": 2845,
+  "countyEntries": 2847,
   "citiesWithoutDistricts": 4,
   "patches": [
     {

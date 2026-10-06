@@ -1,0 +1,2 @@
+FROM yishu-gis-tools:local
+RUN pip install --no-cache-dir pyshp==3.1.3

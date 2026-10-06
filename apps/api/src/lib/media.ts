@@ -133,3 +133,20 @@ export async function readEncryptedMedia(
 export async function removeMediaFile(directory: string, id: string): Promise<void> {
   await rm(filePath(directory, id), { force: true });
 }
+
+export async function writeOpaqueMedia(
+  directory: string,
+  id: string,
+  ciphertext: Buffer
+): Promise<void> {
+  if (ciphertext.length < 41 || ciphertext.length > MAX_IMAGE_BYTES + 40)
+    throw new MediaError("image_too_large", 413);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await writeFile(filePath(directory, id), ciphertext, { flag: "wx", mode: 0o600 });
+}
+export async function readOpaqueMedia(directory: string, id: string): Promise<Buffer> {
+  const bytes = await readFile(filePath(directory, id));
+  if (bytes.length < 41 || bytes.length > MAX_IMAGE_BYTES + 40)
+    throw new Error("invalid_media_envelope");
+  return bytes;
+}

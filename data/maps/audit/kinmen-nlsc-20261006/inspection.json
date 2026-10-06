@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "inspectedOn": "2026-10-06",
+  "status": "source_acquired_runtime_mapping_pending",
+  "provider": "內政部國土測繪中心",
+  "license": "https://data.gov.tw/license",
+  "attribution": [
+    "內政部國土測繪中心 2020 直轄市、縣市界線(TWD97經緯度)，COUNTY_MOI_1090820。",
+    "內政部國土測繪中心 2023 鄉鎮市區界線(TWD97經緯度)，TOWN_MOI_1120317。",
+    "此開放資料依政府資料開放授權條款第1版進行公眾釋出；使用須遵守該條款。",
+    "https://data.gov.tw/license"
+  ],
+  "sources": {
+    "county": {
+      "file": "nlsc-county-20261006.zip",
+      "sha256": "0c6fca34a92b92ef3e9a41957e403cb89e814bb64942ca7c7e51c746f913d49d",
+      "stem": "COUNTY_MOI_1090820",
+      "url": "https://maps.nlsc.gov.tw/download/縣市界線(TWD97經緯度).zip",
+      "dataset": "https://data.gov.tw/dataset/7442",
+      "listingVersion": "2020/8",
+      "listingUpdated": "2025-11-18"
+    },
+    "town": {
+      "file": "nlsc-town-20261006.zip",
+      "sha256": "e028e5a750eee48cf7913330655e5e5c5bb1f176868fbd0afdfc661fca60557c",
+      "stem": "TOWN_MOI_1120317",
+      "url": "https://maps.nlsc.gov.tw/download/鄉鎮市區界線(TWD97經緯度).zip",
+      "dataset": "https://data.gov.tw/dataset/7441",
+      "listingVersion": "2023/3/23",
+      "listingUpdated": "2025-11-18"
+    }
+  },
+  "sourceCrs": "EPSG:3824",
+  "outputCrs": "EPSG:4326",
+  "coordinateTransform": {
+    "operation": "axis order change (2D) + TWD97 to WGS 84 (1) + axis order change (2D)",
+    "accuracyMetres": 1.0
+  },
+  "encoding": "UTF-8 (actual DBF, strict decode)",
+  "features": [
+    {
+      "kind": "county",
+      "attributes": {
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020",
+        "COUNTYNAME": "金門縣",
+        "COUNTYENG": "Kinmen County"
+      },
+      "valid": true,
+      "geometryType": "MultiPolygon",
+      "bounds": [
+        118.13797245900003,
+        24.16025806600004,
+        119.47920615500004,
+        24.999616759000048
+      ],
+      "polygonCount": 43,
+      "vertexCount": 6733,
+      "areaKm2": 184.726142
+    },
+    {
+      "kind": "town",
+      "attributes": {
+        "TOWNID": "W03",
+        "TOWNCODE": "09020010",
+        "COUNTYNAME": "金門縣",
+        "TOWNNAME": "金城鎮",
+        "TOWNENG": "Jincheng Township",
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020"
+      },
+      "valid": true,
+      "geometryType": "MultiPolygon",
+      "bounds": [
+        118.27799129736059,
+        24.385553947956396,
+        118.34667098148066,
+        24.444926752367792
+      ],
+      "polygonCount": 4,
+      "vertexCount": 1835,
+      "areaKm2": 22.487787
+    },
+    {
+      "kind": "town",
+      "attributes": {
+        "TOWNID": "W02",
+        "TOWNCODE": "09020020",
+        "COUNTYNAME": "金門縣",
+        "TOWNNAME": "金沙鎮",
+        "TOWNENG": "Jinsha Township",
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020"
+      },
+      "valid": true,
+      "geometryType": "MultiPolygon",
+      "bounds": [
+        118.37196806437476,
+        24.446629741869117,
+        118.46911536877928,
+        24.534228161700355
+      ],
+      "polygonCount": 5,
+      "vertexCount": 1154,
+      "areaKm2": 54.178806
+    },
+    {
+      "kind": "town",
+      "attributes": {
+        "TOWNID": "W01",
+        "TOWNCODE": "09020030",
+        "COUNTYNAME": "金門縣",
+        "TOWNNAME": "金湖鎮",
+        "TOWNENG": "Jinhu Township",
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020"
+      },
+      "valid": true,
+      "geometryType": "MultiPolygon",
+      "bounds": [
+        118.3588331250487,
+        24.406753121559348,
+        118.50597742471848,
+        24.47907182510471
+      ],
+      "polygonCount": 18,
+      "vertexCount": 3847,
+      "areaKm2": 41.985611
+    },
+    {
+      "kind": "town",
+      "attributes": {
+        "TOWNID": "W04",
+        "TOWNCODE": "09020040",
+        "COUNTYNAME": "金門縣",
+        "TOWNNAME": "金寧鄉",
+        "TOWNENG": "Jinning Township",
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020"
+      },
+      "valid": true,
+      "geometryType": "Polygon",
+      "bounds": [
+        118.28599447126794,
+        24.41125639037017,
+        118.36807171473788,
+        24.496016126243262
+      ],
+      "polygonCount": 1,
+      "vertexCount": 713,
+      "areaKm2": 42.492376
+    },
+    {
+      "kind": "town",
+      "attributes": {
+        "TOWNID": "W05",
+        "TOWNCODE": "09020050",
+        "COUNTYNAME": "金門縣",
+        "TOWNNAME": "烈嶼鄉",
+        "TOWNENG": "Lieyu Township",
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020"
+      },
+      "valid": true,
+      "geometryType": "MultiPolygon",
+      "bounds": [
+        118.1379798373996,
+        24.160255444533163,
+        118.2776860989344,
+        24.460326413932933
+      ],
+      "polygonCount": 16,
+      "vertexCount": 1365,
+      "areaKm2": 21.186634
+    },
+    {
+      "kind": "town",
+      "attributes": {
+        "TOWNID": "W06",
+        "TOWNCODE": "09020060",
+        "COUNTYNAME": "金門縣",
+        "TOWNNAME": "烏坵鄉",
+        "TOWNENG": "Wuqiu Township",
+        "COUNTYID": "W",
+        "COUNTYCODE": "09020"
+      },
+      "valid": true,
+      "geometryType": "MultiPolygon",
+      "bounds": [
+        119.44319536307557,
+        24.977600130341784,
+        119.47921345293855,
+        24.999614154469725
+      ],
+      "polygonCount": 2,
+      "vertexCount": 70,
+      "areaKm2": 2.39535
+    }
+  ],
+  "countyVsTownUnion": {
+    "symmetricDifferenceKm2": 0.075147,
+    "symmetricDifferenceFraction": 0.00040680168935407023,
+    "overlappingTownAreaKm2": 0.0,
+    "note": "Different source versions; differences are measured, not repaired or snapped."
+  },
+  "geometry": {
+    "file": "kinmen-nlsc-wgs84.geojson",
+    "sha256": "06fdd17d3cda47f3b34bf12d8185c8a0ecd34a1396ceeeae761b31e68fe490f9",
+    "bytes": 619562
+  },
+  "scope": {
+    "sourceCountyCode": "09020",
+    "containsWuqiu": true,
+    "runtimeCountyCode": "350527",
+    "mapping": "pending_not_equated",
+    "note": "Preserve all six source towns; no automatic inclusion/exclusion or OSM ID relabelling."
+  },
+  "release": "pending"
+}

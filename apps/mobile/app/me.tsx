@@ -20,6 +20,7 @@ import {
   LogOut,
   MapPin,
   UserRound,
+  ShieldCheck,
 } from "lucide-react-native";
 import { getApi, logoutSession } from "../src/api";
 import { AuthExpiredError } from "../src/api/authenticatedFetch";
@@ -174,6 +175,17 @@ export default function MeScreen() {
           设置
         </Text>
         <View style={styles.group} testID="preferences-settings-group">
+          <Pressable
+            style={styles.row}
+            accessibilityRole="button"
+            accessibilityLabel="端到端加密设置"
+            onPress={() => router.push("/encryption")}
+          >
+            <ShieldCheck size={19} color={C.green} />
+            <Text style={styles.rowLabel}>端到端加密</Text>
+            <ChevronRight size={17} color={C.muted} />
+          </Pressable>
+          <View style={styles.separator} />
           <Pressable
             style={({ pressed }) => [styles.row, pressed && styles.pressed]}
             accessibilityRole="button"

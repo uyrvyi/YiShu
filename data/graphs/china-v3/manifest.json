@@ -1,0 +1,2345 @@
+{
+  "version": "china-v3",
+  "status": "candidate",
+  "baseSha256": {
+    "station_nodes.json": "64be6aa1348efebbabeaf6640f6dcde46eadb547416b1c3d592993bbf8041ca3",
+    "route_edges.json": "c58306c6a16c893df63288b188b6d88e1ca9cc36278b2efe6f85ab7820bef50c",
+    "region_station_map.json": "bb196ce39f18be922333af5d416ddc495d7e57b00fbe44013afebc0a333ec384"
+  },
+  "stationEvidenceSha256": "fb9e4b981145378d18e879b36500f463eb24acbb82b261255ed865374a0f9980",
+  "outputSha256": {
+    "station_nodes.json": "744db9593393a1e57ed0b980c223127bf7bb22f33fc6dc95b3684e9d8817698e",
+    "route_edges.json": "117e2b04cc92274efab241eb8e6e6b23268aec677494ebafc00ce7c473e44ee4",
+    "region_station_map.json": "824b59ae903b72a5c55b96bea5987c71a6b2f97c3f360759da812812b7334e07"
+  },
+  "cityCount": 370,
+  "validation": {
+    "nodeCount": 370,
+    "duplicateNodeIds": 0,
+    "edgeCount": 2869,
+    "invalidEdgeCount": 0,
+    "duplicateEdgeCount": 0,
+    "selfLoopCount": 0,
+    "invalidDistanceCount": 0,
+    "disabledEdgeCount": 0,
+    "connectedComponentCount": 1,
+    "isolatedNodeCount": 0,
+    "fullyConnected": true,
+    "duplicateCities": [],
+    "badMappings": [],
+    "missingProvince": [],
+    "routing": {
+      "nodeCount": 370,
+      "edgeCount": 2869,
+      "connectedComponentCount": 1,
+      "isolatedNodeCount": 0,
+      "invalidEdgeCount": 0,
+      "duplicateEdgeCount": 0
+    }
+  },
+  "changes": [
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-533300",
+      "source": {
+        "osmId": "r2729768",
+        "code": "533300",
+        "name": "怒江傈僳族自治州",
+        "sourceNames": [
+          "怒江傈僳族自治州",
+          "怒江傈僳族自治州 ꓠꓳ-ꓟꓵ ꓡꓲ-ꓢꓴ ꓫꓵꓽ ꓚꓲꓸ ꓛꓬꓽ ꓗꓪꓼ ꓫꓵꓽ ꓝꓳꓴ"
+        ],
+        "level": 5,
+        "bounds": [
+          98.132047,
+          25.5525801,
+          99.6424255,
+          28.3970972
+        ],
+        "point": [
+          98.8573411,
+          25.8255921
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2729768"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-533400",
+      "source": {
+        "osmId": "r2729695",
+        "code": "533400",
+        "name": "迪庆藏族自治州",
+        "sourceNames": [
+          "迪庆藏族自治州",
+          "迪庆藏族自治州 བདེ་ཆེན་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          98.5940122,
+          26.8697988,
+          100.307934,
+          29.2257206
+        ],
+        "point": [
+          99.7040577,
+          27.8363076
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2729695"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-150900",
+      "source": {
+        "osmId": "r2752977",
+        "code": "150900",
+        "name": "乌兰察布市",
+        "sourceNames": [
+          "乌兰察布市",
+          "乌兰察布市 ᠤᠯᠠᠭᠠᠨᠴᠠᠪ ᠬᠣᠲᠠ"
+        ],
+        "level": 5,
+        "bounds": [
+          110.3339767,
+          40.1623148,
+          114.8015513,
+          43.3770097
+        ],
+        "point": [
+          113.1315646,
+          40.9902685
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2752977"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-152200",
+      "source": {
+        "osmId": "r2753442",
+        "code": "152200",
+        "name": "兴安盟",
+        "sourceNames": [
+          "兴安盟",
+          "兴安盟 ᠬᠢᠩᠭ᠋ᠠᠨ ᠠᠶᠢᠮᠠᠭ"
+        ],
+        "level": 5,
+        "bounds": [
+          119.4743753,
+          44.2559854,
+          123.6256693,
+          47.6559895
+        ],
+        "point": [
+          122.0873444,
+          46.0698111
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2753442"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-150700",
+      "source": {
+        "osmId": "r161769",
+        "code": "",
+        "name": "呼伦贝尔市",
+        "sourceNames": [
+          "呼伦贝尔市",
+          "呼伦贝尔市 ᠬᠥᠯᠥᠨ ᠪᠤᠶᠢᠷ"
+        ],
+        "level": 5,
+        "bounds": [
+          115.5203698,
+          47.0944242,
+          125.3272934,
+          53.3340564
+        ],
+        "point": [
+          119.7370167,
+          49.2125235
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/161769"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-150800",
+      "source": {
+        "osmId": "r2752813",
+        "code": "150800",
+        "name": "巴彦淖尔市",
+        "sourceNames": [
+          "巴彦淖尔市",
+          "巴彦淖尔市 ᠪᠠᠶᠠᠨᠨᠠᠭᠤᠷ ᠬᠣᠲᠠ"
+        ],
+        "level": 5,
+        "bounds": [
+          105.2129668,
+          40.1714306,
+          109.8977438,
+          42.46064
+        ],
+        "point": [
+          107.3819572,
+          40.7419202
+        ],
+        "pointMethod": "label",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2752813"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-152500",
+      "source": {
+        "osmId": "r2753029",
+        "code": "152500",
+        "name": "锡林郭勒盟",
+        "sourceNames": [
+          "锡林郭勒盟",
+          "锡林郭勒盟 ᠰᠢᠯᠢ ᠶᠢᠨ ᠭᠣᠣᠯ ᠠᠶᠢᠮᠠᠭ"
+        ],
+        "level": 5,
+        "bounds": [
+          111.1560068,
+          41.5693055,
+          119.8988188,
+          46.775786
+        ],
+        "point": [
+          116.0789127,
+          43.9312058
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2753029"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-152900",
+      "source": {
+        "osmId": "r2752743",
+        "code": "152900",
+        "name": "阿拉善盟",
+        "sourceNames": [
+          "阿拉善盟",
+          "阿拉善盟 ᠠᠯᠠᠱᠠ ᠠᠶᠢᠮᠠᠭ"
+        ],
+        "level": 5,
+        "bounds": [
+          97.1717401,
+          37.4066418,
+          106.8605878,
+          42.7945457
+        ],
+        "point": [
+          105.6951134,
+          38.8376394
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2752743"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-222400",
+      "source": {
+        "osmId": "r2761941",
+        "code": "222400",
+        "name": "延边朝鲜族自治州",
+        "sourceNames": [
+          "延边朝鲜族自治州",
+          "延边朝鲜族自治州 연변조선족자치주"
+        ],
+        "level": 5,
+        "bounds": [
+          127.4633713,
+          41.9969654,
+          131.3103747,
+          44.2046278
+        ],
+        "point": [
+          129.5043827,
+          42.9047375
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2761941"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-513400",
+      "source": {
+        "osmId": "r2785750",
+        "code": "513400",
+        "name": "凉山彝族自治州",
+        "sourceNames": [
+          "凉山彝族自治州",
+          "凉山彝族自治州 ꆃꎭꆈꌠꊨꏦꏱꅉꍏ"
+        ],
+        "level": 5,
+        "bounds": [
+          100.0606883,
+          26.0481659,
+          103.8751749,
+          29.305102
+        ],
+        "point": [
+          102.2660286,
+          27.8848791
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2785750"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-513300",
+      "source": {
+        "osmId": "r2049312",
+        "code": "513300",
+        "name": "甘孜藏族自治州",
+        "sourceNames": [
+          "甘孜藏族自治州",
+          "甘孜藏族自治州 དཀར་མཛེས་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          97.3473754,
+          27.965415,
+          102.492427,
+          34.2115526
+        ],
+        "point": [
+          101.9545581,
+          30.0002558
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2049312"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-513200",
+      "source": {
+        "osmId": "r2110265",
+        "code": "513200",
+        "name": "阿坝藏族羌族自治州",
+        "sourceNames": [
+          "阿坝藏族羌族自治州",
+          "阿坝藏族羌族自治州 རྔ་བ་བོད་རིགས་ཆ་བ༹ང་རིགས་རང་སྐྱོང་ཁུལ་"
+        ],
+        "level": 5,
+        "bounds": [
+          100.525582,
+          30.59525,
+          104.4336072,
+          34.3147096
+        ],
+        "point": [
+          102.2229237,
+          31.9015694
+        ],
+        "pointMethod": "label",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2110265"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-341100",
+      "source": {
+        "osmId": "r3231588",
+        "code": "341100",
+        "name": "滁州市",
+        "sourceNames": [
+          "滁州市"
+        ],
+        "level": 5,
+        "bounds": [
+          117.15433,
+          31.8479275,
+          119.2237776,
+          33.2195313
+        ],
+        "point": [
+          118.3139455,
+          32.3027377
+        ],
+        "pointMethod": "label",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3231588"
+      }
+    },
+    {
+      "method": "coordinate_corrected_from_city_source",
+      "nodeId": "datong",
+      "before": {
+        "id": "datong",
+        "name": "大同",
+        "province": "山西省",
+        "city": "大同市",
+        "lat": 37.6584,
+        "lng": 113.3001,
+        "mapX": 814.7,
+        "mapY": 232.6
+      },
+      "after": {
+        "id": "datong",
+        "name": "大同",
+        "province": "山西省",
+        "city": "大同市",
+        "lat": 40.0923194,
+        "lng": 113.2952665,
+        "mapX": 814.7090736111112,
+        "mapY": 221.8119137777778
+      },
+      "source": {
+        "osmId": "r3008552",
+        "code": "1402",
+        "name": "大同市",
+        "sourceNames": [
+          "大同市"
+        ],
+        "level": 5,
+        "bounds": [
+          112.5718374,
+          39.0468006,
+          114.5629405,
+          40.7449525
+        ],
+        "point": [
+          113.2952665,
+          40.0923194
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3008552"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-140500",
+      "source": {
+        "osmId": "r3237073",
+        "code": "1405",
+        "name": "晋城市",
+        "sourceNames": [
+          "晋城市"
+        ],
+        "level": 5,
+        "bounds": [
+          111.9341516,
+          35.189035,
+          113.6196028,
+          36.0664176
+        ],
+        "point": [
+          112.8454497,
+          35.4913132
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3237073"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-140600",
+      "source": {
+        "osmId": "r3008553",
+        "code": "1406",
+        "name": "朔州市",
+        "sourceNames": [
+          "朔州市"
+        ],
+        "level": 5,
+        "bounds": [
+          111.8912264,
+          39.0856336,
+          113.5651109,
+          40.298503
+        ],
+        "point": [
+          112.4262465,
+          39.3305654
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3008553"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659004",
+      "source": {
+        "osmId": "r2752471",
+        "code": "659004",
+        "name": "五家渠市",
+        "sourceNames": [
+          "五家渠市"
+        ],
+        "level": 6,
+        "bounds": [
+          87.3646545,
+          43.9995962,
+          87.7437067,
+          44.5938136
+        ],
+        "point": [
+          87.61063390863359,
+          44.2981472
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2752471"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-654000",
+      "source": {
+        "osmId": "r2750980",
+        "code": "",
+        "name": "伊犁哈萨克自治州",
+        "sourceNames": [
+          "伊犁哈萨克自治州"
+        ],
+        "level": 5,
+        "bounds": [
+          80.204497,
+          42.2579048,
+          85.2530249,
+          44.6549953
+        ],
+        "point": [
+          81.2747797,
+          43.9052027
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2750980"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-653000",
+      "source": {
+        "osmId": "r2710679",
+        "code": "653000",
+        "name": "克孜勒苏柯尔克孜自治州",
+        "sourceNames": [
+          "克孜勒苏柯尔克孜自治州",
+          "克孜勒苏柯尔克孜自治州 قىزىلسۇ قىرغىز ئاپتونوم ئوبلاستى / قىزىلسۇۇ قىرعىز اپتونوم وبلاسى"
+        ],
+        "level": 5,
+        "bounds": [
+          73.4997347,
+          37.6512024,
+          78.8902119,
+          41.4124187
+        ],
+        "point": [
+          76.166016,
+          39.715261
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2710679"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659005",
+      "source": {
+        "osmId": "r9077256",
+        "code": "659005",
+        "name": "北屯市",
+        "sourceNames": [
+          "北屯市"
+        ],
+        "level": 6,
+        "bounds": [
+          87.392774,
+          46.1276271,
+          90.9813666,
+          47.4395105
+        ],
+        "point": [
+          87.87887422144938,
+          47.273241150000004
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/9077256"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-652700",
+      "source": {
+        "osmId": "r239457",
+        "code": "652700",
+        "name": "博尔塔拉蒙古自治州",
+        "sourceNames": [
+          "博尔塔拉蒙古自治州",
+          "博尔塔拉蒙古自治州 ᠪᠣᠷᠣᠲᠠᠯ᠎ᠠ ᠶᠢᠨ ᠮᠣᠩᠭᠣᠯ ᠥᠪᠡᠷᠲᠡᠭᠡᠨ ᠵᠠᠰᠠᠬᠤ ᠵᠧᠦ"
+        ],
+        "level": 5,
+        "bounds": [
+          79.8819854,
+          44.005543,
+          83.7958142,
+          45.3860937
+        ],
+        "point": [
+          82.0629703,
+          44.904806
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/239457"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659007",
+      "source": {
+        "osmId": "r9068337",
+        "code": "659007",
+        "name": "双河市",
+        "sourceNames": [
+          "双河市"
+        ],
+        "level": 6,
+        "bounds": [
+          81.9375948,
+          44.6318027,
+          82.7437818,
+          45.1465506
+        ],
+        "point": [
+          82.50129459042662,
+          44.82607925
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/9068337"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659008",
+      "source": {
+        "osmId": "r20281769",
+        "code": "",
+        "name": "可克达拉市",
+        "sourceNames": [
+          "可克达拉市"
+        ],
+        "level": 6,
+        "bounds": [
+          80.9505968,
+          43.9078869,
+          81.0341169,
+          43.9763627
+        ],
+        "point": [
+          80.9938740031871,
+          43.942163199999996
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/20281769"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-653200",
+      "source": {
+        "osmId": "r2748339",
+        "code": "653200",
+        "name": "和田地区",
+        "sourceNames": [
+          "和田地区",
+          "和田地区 خوتەن ۋىلايىتى"
+        ],
+        "level": 5,
+        "bounds": [
+          77.3983738,
+          34.3340633,
+          84.9837541,
+          39.6227473
+        ],
+        "point": [
+          79.920893,
+          37.1110359
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2748339"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-653100",
+      "source": {
+        "osmId": "r2748436",
+        "code": "653100",
+        "name": "喀什地区",
+        "sourceNames": [
+          "喀什地区",
+          "喀什地区 قەشقەر ۋىلايىتى"
+        ],
+        "level": 5,
+        "bounds": [
+          74.455974,
+          35.4515989,
+          79.8615073,
+          40.2580453
+        ],
+        "point": [
+          75.9900135,
+          39.4665981
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2748436"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659003",
+      "source": {
+        "osmId": "r2748778",
+        "code": "659003",
+        "name": "图木舒克市",
+        "sourceNames": [
+          "图木舒克市"
+        ],
+        "level": 6,
+        "bounds": [
+          77.0542012,
+          37.1360365,
+          79.6053346,
+          40.0972228
+        ],
+        "point": [
+          79.10758880891618,
+          39.851349299999995
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2748778"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-654200",
+      "source": {
+        "osmId": "r239064",
+        "code": "654200",
+        "name": "塔城地区",
+        "sourceNames": [
+          "塔城地区",
+          "塔城地区 تارباعاتاي ايماعى"
+        ],
+        "level": 5,
+        "bounds": [
+          82.2588014,
+          43.477061,
+          87.337937,
+          47.2346519
+        ],
+        "point": [
+          82.9838309,
+          46.7510282
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/239064"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-652800",
+      "source": {
+        "osmId": "r2747242",
+        "code": "652800",
+        "name": "巴音郭楞蒙古自治州",
+        "sourceNames": [
+          "巴音郭楞蒙古自治州",
+          "巴音郭楞蒙古自治州 بايىنغولىن موڭغۇل ئاپتونوم ئوبلاستى"
+        ],
+        "level": 5,
+        "bounds": [
+          82.4673474,
+          35.6411152,
+          93.8196823,
+          43.5683274
+        ],
+        "point": [
+          86.1441004,
+          41.7617218
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2747242"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659011",
+      "source": {
+        "osmId": "r12279740",
+        "code": "",
+        "name": "新星市",
+        "sourceNames": [
+          "新星市"
+        ],
+        "level": 6,
+        "bounds": [
+          93.5034243,
+          42.5212041,
+          94.1560812,
+          42.869438
+        ],
+        "point": [
+          93.57361213888043,
+          42.7069448
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/12279740"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659009",
+      "source": {
+        "osmId": "r9051185",
+        "code": "659009",
+        "name": "昆玉市",
+        "sourceNames": [
+          "昆玉市"
+        ],
+        "level": 6,
+        "bounds": [
+          78.3260859,
+          35.9580068,
+          81.390466,
+          37.8275757
+        ],
+        "point": [
+          78.47239923171125,
+          37.6962086
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/9051185"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-652300",
+      "source": {
+        "osmId": "r2752412",
+        "code": "652300",
+        "name": "昌吉回族自治州",
+        "sourceNames": [
+          "昌吉回族自治州",
+          "昌吉回族自治州 سانجى خۇيزۇ ئاپتونوم ئوبلاستى"
+        ],
+        "level": 5,
+        "bounds": [
+          85.5771284,
+          43.0958084,
+          91.5624146,
+          45.4869744
+        ],
+        "point": [
+          87.2640443,
+          44.0124158
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2752412"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659012",
+      "source": {
+        "osmId": "r15340171",
+        "code": "659012",
+        "name": "白杨市",
+        "sourceNames": [
+          "白杨市"
+        ],
+        "level": 6,
+        "bounds": [
+          82.2604187,
+          45.6173341,
+          84.81384,
+          47.0633787
+        ],
+        "point": [
+          84.4727310456384,
+          46.913801649999996
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/15340171"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659001",
+      "source": {
+        "osmId": "r3431881",
+        "code": "659001",
+        "name": "石河子市",
+        "sourceNames": [
+          "石河子市"
+        ],
+        "level": 6,
+        "bounds": [
+          85.6633989,
+          43.9280756,
+          86.1404943,
+          44.4587785
+        ],
+        "point": [
+          86.04240835425202,
+          44.29001265
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3431881"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659010",
+      "source": {
+        "osmId": "r11033793",
+        "code": "",
+        "name": "胡杨河市",
+        "sourceNames": [
+          "胡杨河市"
+        ],
+        "level": 6,
+        "bounds": [
+          84.6240271,
+          44.6269313,
+          85.0519429,
+          45.1013562
+        ],
+        "point": [
+          84.71571424548742,
+          44.8636054
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/11033793"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659013",
+      "source": {
+        "osmId": "r20460284",
+        "code": "659013",
+        "name": "草湖市",
+        "sourceNames": [
+          "草湖市"
+        ],
+        "level": 6,
+        "bounds": [
+          75.880156,
+          39.2461129,
+          76.0275521,
+          39.2849586
+        ],
+        "point": [
+          75.95508102459814,
+          39.2655125
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/20460284"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659006",
+      "source": {
+        "osmId": "r7002046",
+        "code": "659006",
+        "name": "铁门关市",
+        "sourceNames": [
+          "铁门关市"
+        ],
+        "level": 6,
+        "bounds": [
+          83.94001,
+          37.6458229,
+          90.0378068,
+          42.4465043
+        ],
+        "point": [
+          85.56913907834227,
+          41.8003512
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/7002046"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-652900",
+      "source": {
+        "osmId": "r2748825",
+        "code": "",
+        "name": "阿克苏地区",
+        "sourceNames": [
+          "阿克苏地区",
+          "阿克苏地区 ئاقسۇ ۋىلايىتى"
+        ],
+        "level": 5,
+        "bounds": [
+          78.0264208,
+          39.4637646,
+          84.0860294,
+          42.6483273
+        ],
+        "point": [
+          80.2581875,
+          41.1686701
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2748825"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-654300",
+      "source": {
+        "osmId": "r239062",
+        "code": "654300",
+        "name": "阿勒泰地区",
+        "sourceNames": [
+          "阿勒泰地区"
+        ],
+        "level": 5,
+        "bounds": [
+          85.5264543,
+          44.999992,
+          91.074933,
+          49.179347
+        ],
+        "point": [
+          88.1291701,
+          47.8257562
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/239062"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-659002",
+      "source": {
+        "osmId": "r2748887",
+        "code": "659002",
+        "name": "阿拉尔市",
+        "sourceNames": [
+          "阿拉尔市"
+        ],
+        "level": 6,
+        "bounds": [
+          79.3846321,
+          40.289347,
+          81.9766123,
+          41.5482228
+        ],
+        "point": [
+          81.26122146728959,
+          40.65143655
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2748887"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-419001",
+      "source": {
+        "osmId": "r3010773",
+        "code": "419001",
+        "name": "济源市",
+        "sourceNames": [
+          "济源市"
+        ],
+        "level": 6,
+        "bounds": [
+          112.0296551,
+          34.8951185,
+          112.7665652,
+          35.2808984
+        ],
+        "point": [
+          112.40177537911038,
+          35.090860199999995
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3010773"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469006",
+      "source": {
+        "osmId": "r2784620",
+        "code": "469006",
+        "name": "万宁市",
+        "sourceNames": [
+          "万宁市"
+        ],
+        "level": 6,
+        "bounds": [
+          110.0008463,
+          18.5806113,
+          110.6065378,
+          19.1049768
+        ],
+        "point": [
+          110.33034689118773,
+          18.8454976
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784620"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-460300",
+      "source": {
+        "osmId": "r2833102",
+        "code": "460300",
+        "name": "三沙市",
+        "sourceNames": [
+          "三沙市"
+        ],
+        "level": 5,
+        "bounds": [
+          110.9808749,
+          8.6650385,
+          118.0551487,
+          17.3178567
+        ],
+        "point": [
+          112.3338649,
+          16.8322112
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2833102"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469007",
+      "source": {
+        "osmId": "r2784612",
+        "code": "469007",
+        "name": "东方市",
+        "sourceNames": [
+          "东方市"
+        ],
+        "level": 6,
+        "bounds": [
+          108.5827892,
+          18.7173248,
+          109.1221879,
+          19.3510635
+        ],
+        "point": [
+          108.84027278300152,
+          19.0338993
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784612"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469024",
+      "source": {
+        "osmId": "r2784615",
+        "code": "",
+        "name": "临高县",
+        "sourceNames": [
+          "临高县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.494785,
+          19.5754209,
+          109.8929186,
+          20.0193556
+        ],
+        "point": [
+          109.72065920243024,
+          19.7967246
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784615"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469027",
+      "source": {
+        "osmId": "r2784614",
+        "code": "",
+        "name": "乐东黎族自治县",
+        "sourceNames": [
+          "乐东黎族自治县"
+        ],
+        "level": 6,
+        "bounds": [
+          108.6466596,
+          18.3369608,
+          109.4028757,
+          18.9567964
+        ],
+        "point": [
+          109.02906137301028,
+          18.64878545
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784614"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469001",
+      "source": {
+        "osmId": "r2784622",
+        "code": "469001",
+        "name": "五指山市",
+        "sourceNames": [
+          "五指山市"
+        ],
+        "level": 6,
+        "bounds": [
+          109.3196526,
+          18.6286654,
+          109.7276536,
+          19.0342894
+        ],
+        "point": [
+          109.5210845618696,
+          18.83166595
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784622"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469029",
+      "source": {
+        "osmId": "r2784607",
+        "code": "469029",
+        "name": "保亭黎族苗族自治县",
+        "sourceNames": [
+          "保亭黎族苗族自治县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.4004098,
+          18.3886533,
+          109.8479237,
+          18.8351196
+        ],
+        "point": [
+          109.6018249865164,
+          18.615409800000002
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784607"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-460400",
+      "source": {
+        "osmId": "r2784610",
+        "code": "460400",
+        "name": "儋州市",
+        "sourceNames": [
+          "儋州市"
+        ],
+        "level": 5,
+        "bounds": [
+          108.9245655,
+          19.175029,
+          109.7652075,
+          19.927599
+        ],
+        "point": [
+          109.5697188,
+          19.5173795
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": {
+          "sourceCode": "469003",
+          "officialCode": "460400",
+          "officialName": "儋州市",
+          "officialSource": "https://www.mca.gov.cn/mzsj/xzqh/2025/202401xzqh.html"
+        },
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784610"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469021",
+      "source": {
+        "osmId": "r2784611",
+        "code": "",
+        "name": "定安县",
+        "sourceNames": [
+          "定安县"
+        ],
+        "level": 6,
+        "bounds": [
+          110.1193569,
+          19.2149374,
+          110.5471569,
+          19.7307935
+        ],
+        "point": [
+          110.38468208064246,
+          19.4727219
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784611"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469022",
+      "source": {
+        "osmId": "r2784619",
+        "code": "469022",
+        "name": "屯昌县",
+        "sourceNames": [
+          "屯昌县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.8153003,
+          19.1329229,
+          110.2510931,
+          19.5945906
+        ],
+        "point": [
+          110.00094612385953,
+          19.362906600000002
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784619"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469005",
+      "source": {
+        "osmId": "r2784621",
+        "code": "469005",
+        "name": "文昌市",
+        "sourceNames": [
+          "文昌市"
+        ],
+        "level": 6,
+        "bounds": [
+          110.4643214,
+          19.3522379,
+          111.2841325,
+          20.1656227
+        ],
+        "point": [
+          110.83549458496742,
+          19.756897700000003
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784621"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469026",
+      "source": {
+        "osmId": "r2784608",
+        "code": "",
+        "name": "昌江黎族自治县",
+        "sourceNames": [
+          "昌江黎族自治县"
+        ],
+        "level": 6,
+        "bounds": [
+          108.6407939,
+          18.8787749,
+          109.2897413,
+          19.5261871
+        ],
+        "point": [
+          109.03972633234466,
+          19.201837249999997
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784608"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469023",
+      "source": {
+        "osmId": "r2784609",
+        "code": "469023",
+        "name": "澄迈县",
+        "sourceNames": [
+          "澄迈县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.7212068,
+          19.3746847,
+          110.2581365,
+          20.0275618
+        ],
+        "point": [
+          110.0386229304799,
+          19.700738899999997
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784609"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469030",
+      "source": {
+        "osmId": "r2784618",
+        "code": "469030",
+        "name": "琼中黎族苗族自治县",
+        "sourceNames": [
+          "琼中黎族苗族自治县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.5194539,
+          18.7223319,
+          110.1544526,
+          19.4219602
+        ],
+        "point": [
+          109.86256430398316,
+          19.07131665
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784618"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469002",
+      "source": {
+        "osmId": "r2784617",
+        "code": "",
+        "name": "琼海市",
+        "sourceNames": [
+          "琼海市"
+        ],
+        "level": 6,
+        "bounds": [
+          110.1108933,
+          18.9779536,
+          110.7259451,
+          19.4707124
+        ],
+        "point": [
+          110.4722529606841,
+          19.22430515
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784617"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469025",
+      "source": {
+        "osmId": "r2784606",
+        "code": "469025",
+        "name": "白沙黎族自治县",
+        "sourceNames": [
+          "白沙黎族自治县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.0353928,
+          18.9385573,
+          109.6947023,
+          19.4895284
+        ],
+        "point": [
+          109.37108120016421,
+          19.215900400000002
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784606"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-469028",
+      "source": {
+        "osmId": "r2784616",
+        "code": "469028",
+        "name": "陵水黎族自治县",
+        "sourceNames": [
+          "陵水黎族自治县"
+        ],
+        "level": 6,
+        "bounds": [
+          109.7487563,
+          18.3491955,
+          110.2102169,
+          18.8048154
+        ],
+        "point": [
+          110.01089367139947,
+          18.574117299999997
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2784616"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-429004",
+      "source": {
+        "osmId": "r3258834",
+        "code": "429004",
+        "name": "仙桃市",
+        "sourceNames": [
+          "仙桃市"
+        ],
+        "level": 6,
+        "bounds": [
+          112.934103,
+          30.070539,
+          113.8192338,
+          30.5345315
+        ],
+        "point": [
+          113.37929284666197,
+          30.30257
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3258834"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-429006",
+      "source": {
+        "osmId": "r3258833",
+        "code": "429006",
+        "name": "天门市",
+        "sourceNames": [
+          "天门市"
+        ],
+        "level": 6,
+        "bounds": [
+          112.5866461,
+          30.3801838,
+          113.4603594,
+          30.9062968
+        ],
+        "point": [
+          113.08196526122697,
+          30.64315315
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3258833"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-429005",
+      "source": {
+        "osmId": "r3258831",
+        "code": "429005",
+        "name": "潜江市",
+        "sourceNames": [
+          "潜江市"
+        ],
+        "level": 6,
+        "bounds": [
+          112.494974,
+          30.076622,
+          113.027101,
+          30.6477796
+        ],
+        "point": [
+          112.73221992207831,
+          30.362036
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/3258831"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-429021",
+      "source": {
+        "osmId": "r2984052",
+        "code": "429021",
+        "name": "神农架林区",
+        "sourceNames": [
+          "神农架林区"
+        ],
+        "level": 6,
+        "bounds": [
+          109.9362105,
+          31.2986239,
+          110.9728318,
+          31.8626059
+        ],
+        "point": [
+          110.5795979578941,
+          31.57938055
+        ],
+        "pointMethod": "county_interior_representative_point_for_local_hub",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2984052"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-433100",
+      "source": {
+        "osmId": "r2972168",
+        "code": "433100",
+        "name": "湘西土家族苗族自治州",
+        "sourceNames": [
+          "湘西土家族苗族自治州"
+        ],
+        "level": 5,
+        "bounds": [
+          109.1762446,
+          27.7225176,
+          110.3829531,
+          29.6369724
+        ],
+        "point": [
+          109.6938658,
+          28.265262
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2972168"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-622900",
+      "source": {
+        "osmId": "r2697555",
+        "code": "622900",
+        "name": "临夏回族自治州",
+        "sourceNames": [
+          "临夏回族自治州"
+        ],
+        "level": 5,
+        "bounds": [
+          102.6839963,
+          34.945968,
+          103.8574891,
+          36.2218654
+        ],
+        "point": [
+          103.2108449,
+          35.595904
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2697555"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-623000",
+      "source": {
+        "osmId": "r165639",
+        "code": "6230",
+        "name": "甘南藏族自治州",
+        "sourceNames": [
+          "甘南藏族自治州",
+          "甘南藏族自治州 ཀན་ལྷོ་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          100.762864,
+          33.1051955,
+          104.7601191,
+          35.5883789
+        ],
+        "point": [
+          102.90827,
+          35.0013957
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/165639"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-540300",
+      "source": {
+        "osmId": "r2734866",
+        "code": "540300",
+        "name": "昌都市",
+        "sourceNames": [
+          "昌都市",
+          "昌都市 ཆབ་མདོ་ས་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          93.5930481,
+          28.4393364,
+          99.1155467,
+          32.5894771
+        ],
+        "point": [
+          97.1712342,
+          31.1434873
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2734866"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-540600",
+      "source": {
+        "osmId": "r2744938",
+        "code": "540600",
+        "name": "那曲市",
+        "sourceNames": [
+          "那曲市",
+          "那曲市 ནག་ཆུ་ས་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          85.0536653,
+          29.9393168,
+          95.0466473,
+          36.484074
+        ],
+        "point": [
+          92.0498064,
+          31.4786233
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2744938"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-542500",
+      "source": {
+        "osmId": "r1997914",
+        "code": "542500",
+        "name": "阿里地区",
+        "sourceNames": [
+          "阿里地区",
+          "阿里地区 མངའ་རིས་ས་ཁུལ་"
+        ],
+        "level": 5,
+        "bounds": [
+          78.3923198,
+          29.6822469,
+          86.3243817,
+          35.8612159
+        ],
+        "point": [
+          80.1056099,
+          32.502433
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/1997914"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-522600",
+      "source": {
+        "osmId": "r2777847",
+        "code": "522600",
+        "name": "黔东南苗族侗族自治州",
+        "sourceNames": [
+          "黔东南苗族侗族自治州"
+        ],
+        "level": 5,
+        "bounds": [
+          107.3079603,
+          25.3099396,
+          109.5939991,
+          27.5274029
+        ],
+        "point": [
+          107.9769525,
+          26.5710542
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2777847"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-522700",
+      "source": {
+        "osmId": "r2777425",
+        "code": "522700",
+        "name": "黔南布依族苗族自治州",
+        "sourceNames": [
+          "黔南布依族苗族自治州"
+        ],
+        "level": 5,
+        "bounds": [
+          106.2074774,
+          25.0796163,
+          108.3020443,
+          27.4848269
+        ],
+        "point": [
+          107.5144965,
+          26.2631518
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2777425"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-522300",
+      "source": {
+        "osmId": "r2781292",
+        "code": "522300",
+        "name": "黔西南布依族苗族自治州",
+        "sourceNames": [
+          "黔西南布依族苗族自治州"
+        ],
+        "level": 5,
+        "bounds": [
+          104.5268677,
+          24.6207172,
+          106.5340275,
+          26.1794249
+        ],
+        "point": [
+          104.8930671,
+          25.0949483
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2781292"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-211400",
+      "source": {
+        "osmId": "r2769902",
+        "code": "211400",
+        "name": "葫芦岛市",
+        "sourceNames": [
+          "葫芦岛市"
+        ],
+        "level": 5,
+        "bounds": [
+          119.2157669,
+          39.9890751,
+          121.0356478,
+          41.2180415
+        ],
+        "point": [
+          120.8315721,
+          40.7094235
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2769902"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-632600",
+      "source": {
+        "osmId": "r2707987",
+        "code": "6326",
+        "name": "果洛藏族自治州",
+        "sourceNames": [
+          "果洛藏族自治州",
+          "果洛藏族自治州 མགོ་ལོག་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          96.9349725,
+          32.5245995,
+          101.7773033,
+          35.6212024
+        ],
+        "point": [
+          100.2367862,
+          34.4793066
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2707987"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-632200",
+      "source": {
+        "osmId": "r2707655",
+        "code": "632200",
+        "name": "海北藏族自治州",
+        "sourceNames": [
+          "海北藏族自治州",
+          "海北藏族自治州 མཚོ་བཡྣང་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          98.0932955,
+          36.7401102,
+          102.640491,
+          39.0891822
+        ],
+        "point": [
+          100.9013735,
+          36.9584578
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2707655"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-632500",
+      "source": {
+        "osmId": "r2707863",
+        "code": "6325",
+        "name": "海南藏族自治州",
+        "sourceNames": [
+          "海南藏族自治州",
+          "海南藏族自治州 མཚོ་ལྷོ་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          98.9195545,
+          34.6423263,
+          101.7722783,
+          37.1769238
+        ],
+        "point": [
+          100.6191998,
+          36.2828182
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2707863"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-632800",
+      "source": {
+        "osmId": "r2707989",
+        "code": "632800",
+        "name": "海西蒙古族藏族自治州",
+        "sourceNames": [
+          "海西蒙古族藏族自治州",
+          "海西蒙古族藏族自治州 མཚོ་ནུབ་སོག་རིགས་ཆ་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          90.1077604,
+          33.8666156,
+          99.691902,
+          39.2124324
+        ],
+        "point": [
+          95.4597216,
+          37.0824853
+        ],
+        "pointMethod": "label",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2707989"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-632700",
+      "source": {
+        "osmId": "r2707991",
+        "code": "632700",
+        "name": "玉树藏族自治州",
+        "sourceNames": [
+          "玉树藏族自治州",
+          "玉树藏族自治州 ཡུལ་ཤུལ་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          89.4017089,
+          31.6018045,
+          97.7582285,
+          36.2801105
+        ],
+        "point": [
+          97.0083245,
+          32.9951139
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2707991"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-632300",
+      "source": {
+        "osmId": "r2707864",
+        "code": "6323",
+        "name": "黄南藏族自治州",
+        "sourceNames": [
+          "黄南藏族自治州",
+          "黄南藏族自治州 རྨ་ལྷོ་བོད་རིགས་རང་སྐྱོང་ཁུལ།"
+        ],
+        "level": 5,
+        "bounds": [
+          100.6875451,
+          34.0814197,
+          102.4490976,
+          36.1644313
+        ],
+        "point": [
+          102.0168846,
+          35.516166
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/2707864"
+      }
+    },
+    {
+      "method": "coordinate_corrected_from_city_source",
+      "nodeId": "qitaihe",
+      "before": {
+        "id": "qitaihe",
+        "name": "七台河",
+        "province": "黑龙江省",
+        "city": "七台河市",
+        "lat": 45.2234,
+        "lng": 131.0152,
+        "mapX": 863.9,
+        "mapY": 199
+      },
+      "after": {
+        "id": "qitaihe",
+        "name": "七台河",
+        "province": "黑龙江省",
+        "city": "七台河市",
+        "lat": 45.7703578,
+        "lng": 131.0066556,
+        "mapX": 863.9073766666667,
+        "mapY": 196.57618755555555
+      },
+      "source": {
+        "osmId": "r199174",
+        "code": "",
+        "name": "七台河市",
+        "sourceNames": [
+          "七台河市"
+        ],
+        "level": 5,
+        "bounds": [
+          130.0962389,
+          45.586491,
+          131.9253662,
+          46.2487865
+        ],
+        "point": [
+          131.0066556,
+          45.7703578
+        ],
+        "pointMethod": "admin_centre",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/199174"
+      }
+    },
+    {
+      "method": "new_source_city_station",
+      "nodeId": "city-232700",
+      "source": {
+        "osmId": "r199127",
+        "code": "232700",
+        "name": "大兴安岭地区",
+        "sourceNames": [
+          "大兴安岭地区"
+        ],
+        "level": 5,
+        "bounds": [
+          121.1841127,
+          50.1170476,
+          127.0243343,
+          53.5608154
+        ],
+        "point": [
+          124.5619384,
+          52.3413513
+        ],
+        "pointMethod": "label",
+        "metadataCorrection": null,
+        "geometryAdapter": null,
+        "parentGeometryAdapter": null,
+        "url": "https://www.openstreetmap.org/relation/199127"
+      }
+    }
+  ],
+  "retiredIntermediateStations": [
+    {
+      "id": "laizhou",
+      "name": "莱州",
+      "province": "山东省",
+      "city": "莱州市",
+      "lat": 37.0879,
+      "lng": 119.9426,
+      "mapX": 833.2,
+      "mapY": 235.2
+    }
+  ],
+  "edgeStrategy": "Retain unchanged old edges; recalculate incident distances for two city corrections; extend changed/new nodes with existing K=4 and same-province <=1600 km strategy.",
+  "releaseApproval": "pending",
+  "registered": false,
+  "defaultGraphChanged": false
+}

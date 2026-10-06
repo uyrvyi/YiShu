@@ -51,6 +51,7 @@ vi.mock("react", async (original) => ({
 vi.mock("react-native", () => ({
   View: "View",
   Modal: "Modal",
+  Text: "Text",
   StyleSheet: { create: (styles: unknown) => styles },
   Animated: {
     View: "AnimatedView",
@@ -64,7 +65,7 @@ vi.mock("react-native", () => ({
     },
   },
 }));
-import { ImagePreview } from "./ImagePreview";
+import { ImagePreview, type PreviewGallery } from "./ImagePreview";
 
 // Run the installed RN memoization algorithm; static transforms are not native graph keys.
 const require = createRequire(import.meta.url);
@@ -121,9 +122,9 @@ function children(node: ReactNode): any[] {
   if (!isValidElement<{ children?: ReactNode }>(node)) return [];
   return [node, ...children(node.props.children)];
 }
-function render(close: () => void, aspectRatio = 0.5) {
+function render(close: () => void, aspectRatio = 0.5, gallery?: PreviewGallery) {
   hooks.cursor = 0;
-  return children(ImagePreview({ children: "image", aspectRatio, onClose: close }));
+  return children(ImagePreview({ children: "image", aspectRatio, onClose: close, gallery }));
 }
 function touches(distance: number, x = 200, y = 400) {
   return {
@@ -150,6 +151,101 @@ beforeEach(() => {
 afterEach(() => {
   unmount();
   vi.useRealTimers();
+});
+
+describe("letter gallery gestures", () => {
+  function setup(index = 1, count = 3) {
+    const close = vi.fn();
+    const onChange = vi.fn();
+    const tree = render(close, 0.5, { index, count, onChange });
+    const viewport = tree.find((node) => node.props.testID === "image-preview-viewport");
+    viewport.props.onLayout({ nativeEvent: { layout: { width: 400, height: 800 } } });
+    function swipe(dx: number, dy = 0, distance = 0) {
+      viewport.props.onTouchStart(touches(distance));
+      hooks.pan.onPanResponderGrant(touches(distance));
+      hooks.pan.onPanResponderMove(touches(distance, 200 + dx, 400 + dy));
+      viewport.props.onTouchEnd({ nativeEvent: { touches: [] } });
+      hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+      vi.advanceTimersByTime(1000);
+    }
+    return { close, onChange, tree, viewport, swipe };
+  }
+  it.each([
+    [-130, 2],
+    [130, 0],
+  ])("swipes from the selected image (dx=%s)", (dx, next) => {
+    const { swipe, close, onChange } = setup();
+    swipe(dx);
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith(next);
+    expect(close).not.toHaveBeenCalled();
+    expect(hooks.slots[0]).toEqual({ zoom: 1, x: 0, y: 0 });
+  });
+  it("supports successive swipes without recreating the modal or stale page callbacks", () => {
+    const { swipe, close, onChange } = setup(0, 4);
+    swipe(-130);
+    swipe(-130);
+    swipe(130);
+    expect(onChange.mock.calls).toEqual([[1], [2], [1]]);
+    expect(close).not.toHaveBeenCalled();
+  });
+  it.each([
+    [0, 3, 130],
+    [2, 3, -130],
+    [0, 1, -130],
+    [0, 1, 130],
+  ])("does not dismiss or wrap at a gallery edge (index=%s,count=%s,dx=%s)", (index, count, dx) => {
+    const { swipe, close, onChange } = setup(index, count);
+    swipe(dx);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+  it("returns short horizontal and vertical drags without dismissing", () => {
+    const { swipe, close, onChange } = setup();
+    swipe(-40);
+    swipe(0, -40);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+  it.each([-200, 200])("still dismisses a vertical single-finger drag (dy=%s)", (dy) => {
+    const { swipe, close, onChange } = setup();
+    swipe(20, dy);
+    expect(close).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it("never switches or dismisses for two-finger translation", () => {
+    const { swipe, close, onChange } = setup();
+    swipe(-180, 200, 100);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+  it("pans a zoomed image without switching and resets zoom on accessible page change", () => {
+    const { viewport, swipe, close, onChange } = setup();
+    viewport.props.onTouchStart(touches(100));
+    hooks.pan.onPanResponderGrant(touches(100));
+    hooks.pan.onPanResponderMove(touches(300));
+    viewport.props.onTouchEnd({ nativeEvent: { touches: [] } });
+    hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+    swipe(-180);
+    expect(hooks.slots[0]).toEqual({ zoom: 3, x: -180, y: 0 });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+    viewport.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith(2);
+    expect(hooks.slots[0]).toEqual({ zoom: 1, x: 0, y: 0 });
+  });
+  it("retains tap-to-dismiss while displaying the current page count", () => {
+    const { viewport, tree, close, onChange } = setup();
+    expect(tree.find((node) => node.type === "Text").props.children).toEqual([2, " / ", 3]);
+    viewport.props.onTouchStart(touches(0));
+    hooks.pan.onPanResponderGrant(touches(0));
+    viewport.props.onTouchEnd({ nativeEvent: { touches: [] } });
+    hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+    vi.advanceTimersByTime(350);
+    expect(close).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 describe("preview lifecycle with persistent hook state", () => {

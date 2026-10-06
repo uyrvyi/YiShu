@@ -1,0 +1,13 @@
+{
+  "cityCount": 370,
+  "missingMappingsOrShapes": [],
+  "sourceCoordinatesOutsideCity": [],
+  "displayCoordinatesOutsideCity": [],
+  "geometry": "snapshot_pass",
+  "releaseApproval": "pending",
+  "inputSha256": {
+    "apps/mobile/src/regions/data/pca-current.json": "930bd3c5a0171679d246bd8c64ccb7059b4ad0b6f67c28a1dd252345daab2fc9",
+    "data/graphs/china-v3/station_nodes.json": "744db9593393a1e57ed0b980c223127bf7bb22f33fc6dc95b3684e9d8817698e",
+    "data/graphs/china-v3/region_station_map.json": "824b59ae903b72a5c55b96bea5987c71a6b2f97c3f360759da812812b7334e07"
+  }
+}

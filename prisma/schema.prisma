@@ -135,6 +135,15 @@ model User {
   mediaAssets    MediaAsset[]
   avatarId       String? @unique
   avatar         MediaAsset? @relation("UserAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+  encryptionIdentity EncryptionIdentity?
+}
+
+model EncryptionIdentity {
+  userId BigInt @id
+  keyId String @unique
+  registration Json
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // 拉黑关系（对应规范 §10）
@@ -184,6 +193,8 @@ model Letter {
   encryptedContent String
   contentIv        String
   contentAuthTag   String
+  contentVersion String @default("server-v1")
+  e2ee Json?
 
   // 区域快照（规范 §53）
   originProvince  String
@@ -208,7 +219,7 @@ model Letter {
   simulationSeed String
 
   sentAt     DateTime?
-  writtenAt  DateTime @default(now())
+  writtenAt  DateTime? @default(now())
   deliveredAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -236,6 +247,7 @@ model MediaAsset {
   id        String @id
   ownerId   BigInt
   purpose   String
+  contentVersion String @default("server-v1")
   mimeType  String
   byteSize  Int
   width     Int

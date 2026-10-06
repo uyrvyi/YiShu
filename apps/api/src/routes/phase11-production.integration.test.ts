@@ -43,6 +43,58 @@ describe("Phase 11 production configuration gate", () => {
       })
     ).toThrow("production_rate_limit_redis_required");
   });
+  it("rejects old letter/image uploads before parsing and rejects spoofed plaintext protocol claims", async () => {
+    const redis = createAuthRateLimitRedis(config.REDIS_URL);
+    clients.push(redis);
+    await redis.connect();
+    const findUnique = vi.fn(async ({ where }: { where: { uid: string } }) => ({
+      id: 1n,
+      uid: where.uid,
+    }));
+    const app = buildApp(config, {
+      prisma: {
+        user: { findUnique },
+        letter: { findUnique: async () => null },
+      } as unknown as PrismaClient,
+      rateLimitRedis: redis,
+      rateLimitNamespace: `yishu-test-production-${randomUUID()}-`,
+      loggerStream: { write: () => {} },
+    });
+    apps.push(app);
+    await app.ready();
+    const authorization = `Bearer ${app.jwt.sign({ sub: "12345678" })}`;
+    const outdated = await app.inject({
+      method: "POST",
+      url: "/api/v1/letters",
+      headers: { authorization, "content-type": "application/json" },
+      payload: "not JSON",
+    });
+    expect(outdated.statusCode).toBe(409);
+    expect(outdated.json().error).toBe("e2ee_required");
+    expect(findUnique).not.toHaveBeenCalled();
+    const image = await app.inject({
+      method: "POST",
+      url: "/api/v1/media/images",
+      headers: { authorization, "content-type": "multipart/form-data" },
+      payload: "not multipart",
+    });
+    expect(image.statusCode).toBe(409);
+    expect(image.json().error).toBe("e2ee_required");
+    expect(findUnique).not.toHaveBeenCalled();
+    const spoofed = await app.inject({
+      method: "POST",
+      url: "/api/v1/letters",
+      headers: { authorization, "x-yishu-content-protocol": "yishu-e2ee-v1" },
+      payload: {
+        recipient: "23456789",
+        content: "plaintext",
+        transportType: "HAND_CARRY",
+        clientRequestId: randomUUID(),
+      },
+    });
+    expect(spoofed.statusCode).toBe(409);
+    expect(spoofed.json().error).toBe("e2ee_required");
+  });
 
   it("starts a production-mode TCP server with safe health, auth and not-found responses", async () => {
     const redis = createAuthRateLimitRedis(config.REDIS_URL);

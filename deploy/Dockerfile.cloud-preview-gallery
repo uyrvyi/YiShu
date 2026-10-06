@@ -1,0 +1,8 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261005-upload-feedback
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/app/letters/ /workspace/apps/mobile/app/letters/
+COPY --chown=node:node apps/mobile/src/media/ImagePreview.tsx /workspace/apps/mobile/src/media/ImagePreview.tsx
+COPY --chown=node:node apps/mobile/src/media/PrivateImage.tsx /workspace/apps/mobile/src/media/PrivateImage.tsx
+COPY --chown=node:node apps/mobile/src/media/privateImageCache.ts /workspace/apps/mobile/src/media/privateImageCache.ts
+COPY --chown=node:node apps/mobile/src/map/localMapHtml.ts /workspace/apps/mobile/src/map/localMapHtml.ts
+COPY --chown=node:node gallery-patch.json /workspace/gallery-patch.json

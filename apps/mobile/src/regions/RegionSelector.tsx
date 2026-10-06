@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { Check, ChevronDown, LocateFixed, X } from "lucide-react-native";
-import { FormInput } from "../ui/controls";
+import { FormInput, KeyboardFrame } from "../ui/controls";
 import { C, UI } from "../ui/theme";
 import {
   changeRegion,
@@ -144,7 +144,7 @@ export function RegionSelector({
         animationType="slide"
         onRequestClose={() => setOpen(null)}
       >
-        <View style={styles.backdrop}>
+        <KeyboardFrame style={styles.backdrop} keyboardVerticalOffset={0}>
           <View style={styles.sheet} accessibilityViewIsModal>
             <View style={styles.sheetHeader}>
               <Text style={styles.title}>选择{open ? labels[open] : "地区"}</Text>
@@ -168,6 +168,7 @@ export function RegionSelector({
               data={options}
               keyExtractor={(item) => item.code}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               style={styles.list}
               ListEmptyComponent={<Text style={styles.empty}>未找到该地区</Text>}
               renderItem={({ item }) => (
@@ -183,7 +184,7 @@ export function RegionSelector({
               )}
             />
           </View>
-        </View>
+        </KeyboardFrame>
       </Modal>
     </View>
   );
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 19, fontWeight: "600", color: C.ink },
   close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  list: { flexGrow: 1, marginTop: 10 },
+  list: { flexGrow: 1, flexShrink: 1, minHeight: 0, marginTop: 10 },
   option: {
     flexDirection: "row",
     minHeight: 56,

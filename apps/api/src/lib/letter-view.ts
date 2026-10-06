@@ -15,6 +15,7 @@ import type {
   TransportType,
 } from "@yishu/shared";
 import { toPublicLetterStatus } from "@yishu/shared";
+import { E2EE_VERSION, encryptedLetterSchema, type EncryptedLetter } from "@yishu/shared/e2ee";
 
 export const DELIVERED: LetterStatus = "DELIVERED";
 export const CREATED: LetterStatus = "CREATED";
@@ -40,6 +41,8 @@ export interface LetterView {
   content: string | null;
   writtenAt: string | null;
   images: MediaView[];
+  contentVersion?: string;
+  e2ee?: EncryptedLetter | null;
   /** 发送者身份快照。 */
   sender: { account: string; uid: string; nickname: string };
   /** 收件人身份快照。 */
@@ -86,8 +89,14 @@ function baseView(l: LetterWithImages, content: string | null, canRead: boolean)
     deliveredAt: l.deliveredAt ? l.deliveredAt.toISOString() : null,
     createdAt: l.createdAt.toISOString(),
     content,
-    writtenAt: canRead ? (l.writtenAt ?? l.createdAt).toISOString() : null,
-    images: canRead ? (l.images ?? []).map(toMediaView) : [],
+    writtenAt:
+      canRead && l.contentVersion !== E2EE_VERSION
+        ? (l.writtenAt ?? l.createdAt).toISOString()
+        : null,
+    images: canRead && l.contentVersion !== E2EE_VERSION ? (l.images ?? []).map(toMediaView) : [],
+    ...(l.contentVersion === E2EE_VERSION
+      ? { contentVersion: E2EE_VERSION, e2ee: canRead ? encryptedLetterSchema.parse(l.e2ee) : null }
+      : {}),
     sender: {
       account: l.senderAccountSnapshot,
       uid: l.senderUidSnapshot,

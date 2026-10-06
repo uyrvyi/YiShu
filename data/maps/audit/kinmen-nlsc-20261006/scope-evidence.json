@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "inspectedOn": "2026-10-06",
+  "status": "scope_candidate_not_runtime_approved",
+  "runtimeIdentity": {
+    "province": "福建省",
+    "city": "泉州市",
+    "district": "金门县",
+    "code": "350527",
+    "officialCodesUrl": "https://mzt.fujian.gov.cn/gk/tzgg/202607/t20260710_7176497.htm",
+    "officialCodesFile": ".local/regions/fujian-202606-codes.html",
+    "officialCodesSha256": "577efb4e280099b818ca1418de02d4f98612e1b4aba88c8c030c0596c4c01b74",
+    "effectiveThrough": "2026-06-30"
+  },
+  "mainlandScopeEvidence": {
+    "url": "https://www.quanzhou.gov.cn/zfb/zjqz/xsqgk/201709/t20170906_527728.htm",
+    "file": ".local/regions/quanzhou-kinmen-scope-20261006.html",
+    "sha256": "e7a522220c11c7379b40bdb730b0ba083cbadf0fa5577cf03424d73fb969892f",
+    "publishedOn": "2024-04-17",
+    "provider": "泉州市民政局",
+    "countyAreaKm2InText": 151.656,
+    "namedIslands": ["金门岛", "小金门岛（烈屿）", "大担岛", "二担岛", "东碇岛", "北碇岛"],
+    "limitation": "Text says twelve islands but does not supply their complete polygons or explicitly enumerate exclusions. Do not equate textual land area with GIS boundary polygon area."
+  },
+  "countyHistoryEvidence": {
+    "url": "https://cabkc.kinmen.gov.tw/uploads/files/202304/4a8881b5-2912-4e6f-8b95-cd8ae020b0e2.pdf",
+    "file": ".local/regions/kinmen-county-guide.pdf",
+    "sha256": "c46250d9b09bc78343f0c146ddc16c673b7c24950bfb123319b2a4b6def0d291",
+    "pdfPage": 13,
+    "printedPage": 213,
+    "heading": "行政區域：管轄政區與村社",
+    "manualScopeTranscription": {
+      "fiveMainTowns": ["金城鎮", "金沙鎮", "金湖鎮", "金寧鄉", "烈嶼鄉"],
+      "separatelyAdministered": "烏坵鄉",
+      "historicalParent": "莆田縣"
+    },
+    "limitation": "Historical county gazetteer; an upload directory date is not proof of current administrative boundaries. It does not itself certify a 350527 polygon."
+  },
+  "remainingChecks": [
+    "Confirm applicable complete county scope, including islands, using boundary evidence rather than only a historical description.",
+    "Reconcile source county code 09020 and business code 350527 without relabelling an OSM object or silently expanding parent boundaries.",
+    "Verify public-map release requirements independently of the NLSC open-data licence."
+  ],
+  "runtimeFilesChanged": false
+}

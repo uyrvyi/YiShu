@@ -2,7 +2,36 @@
 
 ## 当前入口与证据（2026-10-05）
 
-- 当前预览为 `yishu-cloud-preview:preview-20261005-upload-feedback`，ID `sha256:0ccef398af4d9efce6d91cbec148ebce777549877db03aa235bd9d655d250e64`。经用户确认，仅叠加写信页和头像裁切组件：成功不弹窗，上传失败/部分失败仍弹窗；头像保存成功直接关闭裁切。相册选择、缩略图、进度、删除确认、图片手势和业务权限不改。
+入口：[服务器 HTTPS Expo Go 预览](https://8.136.121.71/expo)。在 iPhone Safari 点击“打开 Expo Go”，进入 `exps://8.136.121.71:443`。不再使用旧 `.exp.direct` 地址，不要求与 Mac 同一 Wi-Fi；服务运行在服务器，Mac 关机不停止它。手机仍使用现有 `uyrvyi` Expo Go 账号。HTTPS 对应的 `exps` 用法见 [Expo 官方链接说明](https://docs.expo.dev/linking/into-your-app/)。
+
+- 当前镜像为 `yishu-cloud-preview:preview-20261005-gallery-preload`，ID `sha256:2739035517bdf5ccab26a0985a5def5948331323fd5de6826172b9051addd9a9`。补丁归档 SHA-256 `e7e50c93f57489cd8fce3ba58541c5adb6e29a76036173dd52bba531566b6662`，六个运行源码、Dockerfile 和源哈希清单，不含凭据、后端配置或用户图片。服务器无网络源哈希核对和只读非 root iOS 导出通过（3338 模块、约 15 MB）。
+- 同一封信的图片在正文可见后整组并发预加载，缩略图与全屏复用已获取的数据；左右切换和关闭后重开不重复请求。缓存只属于当前信件组件，不落盘，组件卸载或切换账号后清理，并忽略旧请求结果。未送达收件人的正文/图片权限保持不变。已缓存图片仍需由原生组件解码，不承诺任何情况下都零显示延迟。
+- 短路线自动适配最多放大到手动上限减三档：在线瓦片初始上限 12、手动仍可到 15；离线底图初始上限 10、手动仍可到 13。长路线仍优先完整展示，地图刷新不覆盖用户手动缩放。路线、时长、地区选择及运输事实权限不变。
+- 经用户授权，预览改为内部 LAN 启动并设置 `EXPO_PACKAGER_PROXY_URL=https://8.136.121.71`，由现有 Caddy TCP 443 提供 HTTPS。关闭懒加载，网关支持 gzip，Metro 按客户端协商也可返回 Brotli；只允许读取 Expo 清单、固定入口代码包和指定图片/字体媒体资源。`/open`、`/_expo/open`、`/inspector`、`/json/list`、`/message`、`/symbolicate`、环境文件和令牌路径返回 404，预览 POST 返回 404。公网不提供热更新/调试控制；新发布后从新入口重新打开或 Reload。这个代理环境变量按当前安装的 SDK 57 CLI 实际行为验证，升级 CLI 后必须重新核对 URL 生成与资源路径。
+- `DIRECT_PREVIEW_RELEASE_PASS`、服务器及 Mac 两端 `EXPO_PREVIEW_HTTP_PASS` 通过：SDK 57、owner uyrvyi、签名头和证书链提供、HTTPS 实际 iOS 开发代码包 20,951,131 字符、生产 API、所有已有功能和新图片预加载/缩放限制均核对通过。浏览器实际显示“驿书 / 打开 Expo Go”，链接目标为 `exps://8.136.121.71:443`。检查签名头/证书链存在不替代 Expo Go 的真机信任验证；真机手势与 Mac 关机后重新加载仍待用户复验。
+- 容器 running/healthy、重启次数 0、`unless-stopped`、非 root、Docker init、只读根目录、无宿主端口，仅连接 `yishu-cloud-preview_default`。网关额外加入该预览网络，预览不加入后端或数据库网络、不挂载生产数据；网关仍只有 TCP 443，TLS 账户和证书卷保留。API、Worker、PostgreSQL、Redis、地图容器的镜像与启动时间一致，`BUSINESS_CONTAINERS_UNCHANGED_PASS`；业务健康与地图地名 HTTPS 200。采样可用内存约 1747 MiB，不作为耐久门禁。
+- 直连前新旧镜像均发生 ngrok `remote gone away` / `failed to start tunnel`，已停止无限重试。本次不依赖 ngrok，也未购买隧道服务。首轮直连检查误把被 CLI 省略的 `lazy` 参数视为未关闭，自动回退；核对安装 CLI 只在 `lazy=true` 时加参数后修正检查，再次发布通过。Docker 工具容器外网 TLS 检查曾连接重置，随后使用 Mac 的内置 Node 运行同一检查通过，不把失败的工具容器检查算作 PASS。
+- 本机移动端 377 项测试（36 文件）、TypeScript、格式及 `git diff --check` 通过。数据库没有迁移，区县起运规则未启用，旧信件不改，APK 未更新。本次不记 Final Gate / 真机 PASS。
+- 额外核对 SDK 57 原生资源：32 个内置图片尺寸文件与应用 PNG 图标读取通过，实际协商代码包压缩为 `br`。仅允许当前 React Native 0.86.3 / Expo Router 57.0.24 的三个已安装资源目录，原始查询参数结构与解码后的路径同时校验；越界、非图片/字体文件和重复 `unstable_path` 均返回 404。`DIRECT_ASSETS_RELEASE_PASS` 与 `PREVIEW_AND_BUSINESS_UNCHANGED_PASS`；此次只强制重建网关，预览和业务容器均不重启。首次 Compose 未重建正在运行的网关，资源检查失败后回退，随后明确使用 `--force-recreate` 发布通过；不把首轮失败计入 PASS。
+
+### 直连回退
+
+`deploy/release-direct-preview.sh` 仅更新预览和网关，先验证 Caddy，再预热代码，公网验证失败自动恢复网关。当前备份后缀为 `before-direct-https-20261005-r2`，四份备份分别位于 `/opt/yishu-preview/preview.env`、同目录预览 Compose、`/opt/yishu/docker-compose.cloud.yml` 和 `/opt/yishu/deploy/Caddyfile.cloud` 的同后缀文件。原始首轮备份也保留。不删除证书、账号凭据卷或旧镜像。
+
+手工回退需恢复上述四份配置，仅用 `sh /opt/yishu/scripts/cloud.sh up -d --no-deps --force-recreate --wait caddy` 重建网关，并停止当前预览。旧 ngrok 服务未验证恢复可用，不自动启动旧隧道循环；需要重新核对后才能恢复。数据库、API、Worker、地图和 APK 不回滚。
+
+仅回退原生图片路径补充时，恢复 `/opt/yishu/deploy/Caddyfile.cloud.before-direct-package-assets-20261005-r2`，使用同一条强制重建 caddy 命令；不要重启预览或业务。该回退保留 HTTPS 直连，但会再次阻断上述内置图片，仅用于应急；后续应修复并重新核对资源。独立补充脚本为 `deploy/release-direct-assets.sh`。
+
+### 图片切换补丁（上一版历史记录）
+
+- 当前预览为 `yishu-cloud-preview:preview-20261005-gallery`，ID `sha256:1dff0d609b4b1b3a9ba4cf9ed3a34d699919eefaa674bb72d0ad518a0fcb4d26`。经用户确认，仅叠加信件详情、写信页与两个图片预览组件。同一封信内原始大小左右滑动上一张/下一张，首尾不循环、不退出；放大后单指平移，双指始终只缩放/平移。单击关闭与原始大小纵向拖动退出保留，多图显示序号。写信草稿同样支持切换，不修改正文/图片权限。
+- 归档 SHA-256 `da50f51c6b866981ed9f67593356894cbb6e745fd7c0f9631f607745a960ec2a`，恰好四个运行源码、Dockerfile 和哈希清单，无配置、凭据或用户照片。服务器无网络构建、逐项源哈希检查 `GALLERY_SOURCE_PASS`、只读非 root 隔离 iOS 导出通过（3337 模块、约 15 MB）。仅重建预览并通过 `GALLERY_RELEASE_PASS`；healthy、init、只读、无宿主端口。
+- 本机移动端 368 项测试、TypeScript 与格式检查通过，覆盖连续左右切换、首尾回弹、双指/放大后平移不切页不关闭、重开从选中图开始、草稿及已寄信图片列表。API、Worker、PostgreSQL、Redis、Caddy 和地图服务的镜像及启动时间一致，`BUSINESS_CONTAINERS_UNCHANGED_PASS`。不部署区县起运规则、不迁移数据库、不更新 APK。回退备份 `/opt/yishu-preview/preview.env.before-gallery-20261005`，恢复后仅重建 preview，旧镜像和凭据卷保留。
+- 服务器预热 `NATIONAL_MAP_PREWARM_PASS`（20,914,285 字符），公网全部已有标志加 `--letter-gallery` 检查 `EXPO_PREVIEW_HTTP_PASS`（20,914,319 字符），SDK 57、owner uyrvyi、签名、证书链、生产 API、地图与已有图片功能核对通过。当前入口仍为 [iPhone Expo Go 预览](https://eu9qlby-uyrvyi-8081.exp.direct/_expo/loading?platform=ios)。公网业务健康正常；真机左右切换、缩放和平移待用户复验，不把 HTTP / 导出 / 健康检查记为真机 PASS。Reload 前先处理未发送的草稿。
+
+### 上传提示补丁（上一版）
+
+- 上一版预览为 `yishu-cloud-preview:preview-20261005-upload-feedback`，ID `sha256:0ccef398af4d9efce6d91cbec148ebce777549877db03aa235bd9d655d250e64`。经用户确认，仅叠加写信页和头像裁切组件：成功不弹窗，上传失败/部分失败仍弹窗；头像保存成功直接关闭裁切。相册选择、缩略图、进度、删除确认、图片手势和业务权限不改。
 - 补丁归档 SHA-256 `45f20c2e3f740e725ab90332907517df6000ff78bc69e5d11f09810d125a28ae`，只含两个运行源码、Dockerfile 和哈希清单，不含环境变量、凭据或用户照片。服务器离线源哈希核对通过 `UPLOAD_FEEDBACK_SOURCE_PASS`，只读、非 root、无网络隔离 iOS 导出通过（3337 模块、约 15 MB）；随后仅重建预览，通过 `UPLOAD_FEEDBACK_RELEASE_PASS`，healthy、init、只读、无宿主端口。
 - 预览前后 API、Worker、PostgreSQL、Redis、Caddy 和地图服务的镜像及启动时间一致，`BUSINESS_CONTAINERS_UNCHANGED_PASS`；公网 HTTPS 业务健康正常。数据库没有迁移，新区县运输规则未启用，APK 未重打。配置备份 `/opt/yishu-preview/preview.env.before-upload-feedback-20261005`，回退时恢复此备份并仅重建 preview；旧全国底图镜像与凭据卷保留。
 - 本机移动端 353 项、类型检查、6 项起运集成测试通过。卡片按用户最新决定保留市级展示，不包含 district 展示补丁。区县起运业务与端点审核按用户确认须完成后一起上线，未审核候选库不包含在此预览补丁。
@@ -72,9 +101,9 @@
 
 服务器预览只提供移动端前端代码，业务请求仍访问 `https://8.136.121.71`。它不是 API 部署或 APK 更新，也不是生产发行渠道。
 
-独立 Compose 项目 `yishu-cloud-preview`，目录 `/opt/yishu-preview`。不加入生产网络，不挂载数据库、Redis、媒体卷或宿主 Docker Socket；不复制后端 `.env`、证书、FCM 服务端私钥或备份。匿名隧道虽能提供 HTTP 资源，但不能据此认定已登录的 Expo Go 可以打开项目。服务器 CLI 需要匹配手机账号；配置登录会话或令牌前必须取得用户授权，不得擅自复制本机凭据。当前已按授权配置，启动命令从私有文件读取令牌；文件不存在或为空时停止启动，不静默退回匿名预览。
+独立 Compose 项目 `yishu-cloud-preview`，目录 `/opt/yishu-preview`。预览容器不加入后端网络，仅网关加入专用预览网络；不挂载数据库、Redis、媒体卷或宿主 Docker Socket，不复制后端 `.env`、证书、FCM 服务端私钥或备份。服务器 CLI 需要匹配手机账号；配置登录会话或令牌前必须取得用户授权，不得擅自复制本机凭据。当前已按授权配置，启动命令从私有文件读取令牌；文件不存在或为空时停止启动，不静默退回匿名预览。
 
-`Dockerfile.cloud-preview.dockerignore` 使用允许列表；镜像只含移动端、共享类型及所需依赖。运行用户为 `node`，根文件系统只读，禁用新增权限，CPU 上限 0.75 核、内存上限 1280 MiB，Metro 单 Worker、Node 堆上限 768 MiB。无宿主端口映射，公网由 Expo 隧道提供。
+`Dockerfile.cloud-preview.dockerignore` 使用允许列表；镜像只含移动端、共享类型及所需依赖。运行用户为 `node`，根文件系统只读，禁用新增权限，CPU 上限 0.75 核、内存上限 1280 MiB，Metro 单 Worker、Node 堆上限 768 MiB。无宿主端口映射，公网由现有 HTTPS 网关提供，不启动 ngrok。
 
 ## 构建和发布
 

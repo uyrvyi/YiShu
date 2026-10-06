@@ -18,6 +18,8 @@ import { pushRoutes } from "./routes/push.js";
 import { estimateRoutes } from "./routes/estimates.js";
 import { mediaRoutes } from "./routes/media.js";
 import { MediaError } from "./lib/media.js";
+import { InvalidTransportRegionError } from "./lib/district-transport-validation.js";
+import { encryptionRoutes } from "./routes/encryption.js";
 
 /**
  * buildApp 所需依赖（便于测试注入）。
@@ -155,7 +157,7 @@ export function buildApp(
   // 统一安全错误处理：输入错误保留 4xx，其余返回通用 500（不泄漏内部信息）。
   app.setErrorHandler((err, _req, reply) => {
     const code = (err as { code?: string }).code;
-    if (err instanceof MediaError) {
+    if (err instanceof MediaError || err instanceof InvalidTransportRegionError) {
       return reply.code(err.statusCode).send({ error: err.code });
     }
     if (code === "FST_REQ_FILE_TOO_LARGE") {
@@ -205,6 +207,7 @@ export function buildApp(
   void app.register(pushRoutes, { prefix: API_PREFIX });
   void app.register(estimateRoutes, { prefix: API_PREFIX });
   void app.register(mediaRoutes, { prefix: API_PREFIX });
+  void app.register(encryptionRoutes, { prefix: API_PREFIX });
 
   return app;
 }

@@ -1,0 +1,5 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261005-e2ee-reviewed-r1
+FROM ${PREVIEW_BASE_IMAGE}
+ARG PATCH_SOURCE=apps/mobile/src/e2ee/client.ts
+COPY --chown=node:node ${PATCH_SOURCE} /workspace/${PATCH_SOURCE}
+COPY --chown=node:node e2ee-image-patch.json /workspace/e2ee-image-patch.json

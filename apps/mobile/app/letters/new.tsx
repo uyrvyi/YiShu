@@ -4,9 +4,7 @@ import {
   Alert,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -47,7 +45,13 @@ import { PrivateAvatar } from "../../src/media/PrivateImage";
 import { ImagePreview } from "../../src/media/ImagePreview";
 import { createDraftMediaLifecycle } from "../../src/media/draftMediaLifecycle";
 import { UploadProgressRing } from "../../src/media/UploadProgressRing";
-import { ActionButton, FormInput, Notice, ScreenHeader } from "../../src/ui/controls";
+import {
+  ActionButton,
+  FormInput,
+  KeyboardFrame,
+  Notice,
+  ScreenHeader,
+} from "../../src/ui/controls";
 import { problemMessage, TRANSPORT_LABELS } from "../../src/ui/presentation";
 import { C, UI } from "../../src/ui/theme";
 import { formatEstimatedDuration, TRANSPORT_DESCRIPTIONS } from "../../src/ui/transport";
@@ -66,6 +70,9 @@ interface DraftUpload {
 type PreparedUpload = { job: DraftUpload } | { failure: unknown };
 
 export default function NewLetterScreen() {
+  const pageScroll = useRef<ScrollView>(null);
+  const bodyFocused = useRef(false);
+  const bodyTop = useRef(0);
   const idempotencyKey = useRef(`cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   const requestSequence = useRef(0);
   const sending = useRef(false);
@@ -96,10 +103,19 @@ export default function NewLetterScreen() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [uploads, setUploads] = useState<DraftUpload[]>([]);
+  const [bodyHeight, setBodyHeight] = useState(220);
   const recipientUid = recipient?.uid;
   const previewImage = images.find((image) => image.localUri === previewUri);
+  const previewItems = [...images, ...uploads];
+  const previewIndex = previewItems.findIndex((image) => image.localUri === previewUri);
   const selectedEstimate = estimates?.find((estimate) => estimate.transportType === transportType);
   const draftLocked = busy || !!pendingTrackingNo || createRequest.current !== null;
+
+  function revealBody(animated = false) {
+    if (bodyFocused.current) {
+      pageScroll.current?.scrollTo({ y: Math.max(0, bodyTop.current - 16), animated });
+    }
+  }
 
   useEffect(() => {
     const lifecycle = draftMedia.current!;
@@ -356,6 +372,9 @@ export default function NewLetterScreen() {
             clientRequestId: idempotencyKey.current,
             writtenAt: writtenAt.current ?? new Date().toISOString(),
             imageIds: images.map((image) => image.id),
+            encryptedImages: images.flatMap((image) =>
+              image.encryption ? [image.encryption] : []
+            ),
           };
         }
         const letter = await getApi().createLetter(createRequest.current);
@@ -367,6 +386,25 @@ export default function NewLetterScreen() {
       router.replace(`/letters/${trackingNo}`);
     } catch (failure) {
       // A timeout may have committed: retry the identical request rather than create a duplicate.
+      const encryptionCode =
+        failure instanceof LetterApiError
+          ? failure.code
+          : failure instanceof Error
+            ? failure.message
+            : "";
+      if (!created && encryptionCode.startsWith("e2ee_")) {
+        createRequest.current = null;
+        idempotencyKey.current = `cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        Alert.alert("暂时无法加密寄信", problemMessage(failure), [
+          { text: "取消", style: "cancel" },
+          {
+            text: "加密设置",
+            onPress: () =>
+              router.push({ pathname: "/encryption", params: { uid: recipient?.uid } }),
+          },
+        ]);
+        return;
+      }
       if (
         !created &&
         failure instanceof LetterApiError &&
@@ -387,14 +425,18 @@ export default function NewLetterScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.keyboard}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <KeyboardFrame>
         <ScrollView
+          ref={pageScroll}
+          style={styles.scroll}
           contentContainerStyle={styles.page}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          onLayout={({ nativeEvent }) => {
+            // Keep the complete editor inside the keyboard-reduced viewport.
+            setBodyHeight(Math.max(80, Math.min(220, nativeEvent.layout.height - 32)));
+            revealBody();
+          }}
         >
           <ScreenHeader
             title="写信"
@@ -468,17 +510,32 @@ export default function NewLetterScreen() {
             </View>
           ) : null}
           <Text style={styles.section}>正文</Text>
-          <FormInput
-            style={styles.bodyInput}
-            placeholder="写下想说的话"
-            placeholderTextColor={C.muted}
-            value={content}
-            onChangeText={changeContent}
-            multiline
-            textAlignVertical="top"
-            accessibilityLabel="信件正文"
-            editable={!draftLocked}
-          />
+          <View
+            onLayout={({ nativeEvent }) => {
+              bodyTop.current = nativeEvent.layout.y;
+              revealBody();
+            }}
+          >
+            <FormInput
+              style={[styles.bodyInput, { height: bodyHeight }]}
+              placeholder="写下想说的话"
+              placeholderTextColor={C.muted}
+              value={content}
+              onChangeText={changeContent}
+              onFocus={() => {
+                bodyFocused.current = true;
+                revealBody(true);
+              }}
+              onBlur={() => {
+                bodyFocused.current = false;
+              }}
+              multiline
+              scrollEnabled
+              textAlignVertical="top"
+              accessibilityLabel="信件正文"
+              editable={!draftLocked}
+            />
+          </View>
           <Text style={[styles.counter, contentLength > MAX_CONTENT && styles.overLimit]}>
             {contentLength} / {MAX_CONTENT}
           </Text>
@@ -676,11 +733,16 @@ export default function NewLetterScreen() {
             )}
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardFrame>
       {previewUri ? (
         <ImagePreview
           aspectRatio={previewImage ? previewImage.width / previewImage.height : 1}
           onClose={() => setPreviewUri(null)}
+          gallery={{
+            index: previewIndex,
+            count: previewItems.length,
+            onChange: (next) => setPreviewUri(previewItems[next].localUri),
+          }}
         >
           <Image
             source={{ uri: previewUri }}
@@ -740,7 +802,7 @@ export default function NewLetterScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.surface },
-  keyboard: { flex: 1 },
+  scroll: { flex: 1 },
   page: {
     width: "100%",
     maxWidth: 600,
@@ -782,7 +844,6 @@ const styles = StyleSheet.create({
   recipientName: { color: C.ink, fontSize: 15, fontWeight: "600", lineHeight: 23 },
   recipientMeta: { color: C.muted, fontSize: 12, lineHeight: 19, marginTop: 5 },
   bodyInput: {
-    minHeight: 220,
     paddingVertical: 16,
     fontSize: 16,
     lineHeight: 28,

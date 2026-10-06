@@ -2,6 +2,8 @@ import type { PrismaClient } from "@yishu/db";
 import type { SimulationClock } from "@yishu/simulation";
 import { advanceJourneyWithinTransaction } from "@yishu/domain";
 import { resolveStationForRegion } from "./stationGraph.js";
+import { assertDistrictTransportRegion } from "./district-transport-validation.js";
+import { createJourneyWithinTransaction } from "./journey.js";
 
 interface ProfileUpdate {
   nickname?: string;
@@ -39,11 +41,19 @@ export async function updateProfile(
           select: { id: true },
         });
         for (const candidate of letters) {
-          const journey = await tx.journey.findUnique({ where: { letterId: candidate.id } });
+          let journey = await tx.journey.findUnique({ where: { letterId: candidate.id } });
+          if (!journey) {
+            const original = await tx.letter.findUniqueOrThrow({ where: { id: candidate.id } });
+            // Freeze and advance the original address before recording a 1.1 destination edit.
+            if (original.rulesVersion === "1.1" && original.status === "CREATED")
+              journey = (await createJourneyWithinTransaction(tx, original)).journey;
+          }
           // Catch up old transport before enqueueing the new destination. Lock order is Journey -> Letter.
           if (journey) await advanceJourneyWithinTransaction(tx, candidate.id, fixedClock);
           const letter = await tx.letter.findUniqueOrThrow({ where: { id: candidate.id } });
           if (terminal.has(letter.status)) continue;
+          if (letter.rulesVersion === "1.1")
+            assertDistrictTransportRegion(region, letter.graphVersion, "destination");
           const destinationNodeId = resolveStationForRegion(region, letter.graphVersion);
           if (journey) {
             const updated = await tx.journey.findUniqueOrThrow({ where: { id: journey.id } });

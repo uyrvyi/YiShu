@@ -5,6 +5,7 @@ import { API_BASE_URL } from "../config/api";
 import { createAuthenticatedFetch } from "./authenticatedFetch";
 import { imageUploadFetch } from "./imageUploadFetch";
 import { clearPushToken, readPushToken, savePushToken } from "../push/tokenStorage";
+import { createEncryptionClient } from "../e2ee/client";
 
 /**
  * 共享 API / Session 单例。
@@ -32,6 +33,7 @@ export const subscribeSession = (listener: () => void) => {
   };
 };
 function sessionChanged(): void {
+  encryptionClient.reset();
   sessionVersion++;
   sessionListeners.forEach((fn) => fn());
 }
@@ -149,6 +151,11 @@ export async function registerDeviceForSession(
 }
 
 let apiSingleton: LetterApi | null = null;
+export const encryptionClient = createEncryptionClient(
+  () => getApi(),
+  API_BASE_URL,
+  getSessionVersion
+);
 
 /** 获取共享 Letter API 单例。 */
 export function getApi(): LetterApi {
@@ -157,6 +164,8 @@ export function getApi(): LetterApi {
       baseUrl: API_BASE_URL,
       getAccessToken,
       fetchImpl: authenticatedFetch,
+      encryption: encryptionClient,
+      getSessionVersion,
     });
   }
   return apiSingleton;

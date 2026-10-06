@@ -17,6 +17,56 @@
 }
 (cloud_api) {
     header Alt-Svc clear
+    @expoEntry path /expo /_expo/loading
+    handle @expoEntry {
+        header Content-Type "text/html; charset=utf-8"
+        header Cache-Control "no-store"
+        header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
+        respond `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YiShu Expo Go</title><style>body{font:17px system-ui;margin:0;padding:48px 24px;background:#f5f7f8;color:#172b29}main{max-width:420px;margin:auto}h1{font-size:28px}a{display:block;padding:18px;text-align:center;background:#146b57;color:white;border-radius:20px;text-decoration:none}</style><main><h1>&#39551;&#20070;</h1><a href="exps://{$CLOUD_PUBLIC_IP}:443">&#25171;&#24320; Expo Go</a></main></html>` 200
+    }
+    @expoManifest {
+        method GET HEAD
+        path / /manifest /index.exp
+        header_regexp Expo-Platform ^(ios|android)$
+    }
+    @expoBundle {
+        method GET HEAD
+        path /apps/mobile/node_modules/expo-router/entry.bundle
+    }
+    @expoAssets {
+        method GET HEAD
+        path_regexp expoAsset ^/assets/.*\.(png|jpg|jpeg|gif|webp|avif|ttf|otf|woff|woff2|mp4|mp3|wav)$
+    }
+    @expoPackageAssets {
+        method GET HEAD
+        path /assets/
+        expression `{http.request.uri.query}.matches('^unstable_path=[A-Za-z0-9._%+@/-]+&platform=(ios|android)&hash=[a-f0-9]{32}$') && {http.request.uri.query.unstable_path}.matches('^[.]/[.][.]/[.][.]/node_modules/[.]pnpm/(react-native@0[.]86[.]3_[A-Za-z0-9_@+.-]+/node_modules/react-native/Libraries/LogBox/UI/LogBoxImages|expo-router@57[.]0[.]24_[A-Za-z0-9_@+.-]+/node_modules/expo-router/assets(/react-navigation/elements)?)/[A-Za-z0-9_-]+(@[1-9]x)?[.](png|ttf|otf)$')`
+    }
+    handle @expoManifest {
+        reverse_proxy preview:8081 {
+            header_up -Cookie
+            header_up -Authorization
+        }
+    }
+    handle @expoBundle {
+        encode gzip
+        reverse_proxy preview:8081 {
+            header_up -Cookie
+            header_up -Authorization
+        }
+    }
+    handle @expoAssets {
+        reverse_proxy preview:8081 {
+            header_up -Cookie
+            header_up -Authorization
+        }
+    }
+    handle @expoPackageAssets {
+        reverse_proxy preview:8081 {
+            header_up -Cookie
+            header_up -Authorization
+        }
+    }
     handle /maps/national-20261003-v2/* {
         reverse_proxy map-tiles:4180 {
             header_up -Cookie

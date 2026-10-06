@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { AuthExpiredError } from "../api/authenticatedFetch";
 import { createPoller } from "./poller";
+import { getSessionVersion, subscribeSession } from "../api";
 
 const refreshListeners = new Set<() => void>();
 export function refetchVisibleScreens(): void {
@@ -10,8 +11,12 @@ export function refetchVisibleScreens(): void {
 }
 
 export function usePolling<T>(load: () => Promise<T>, intervalMs: number) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const version = useSyncExternalStore(subscribeSession, getSessionVersion, getSessionVersion);
+  const [snapshot, setSnapshot] = useState<{
+    version: number;
+    data: T | null;
+    error: string | null;
+  }>({ version, data: null, error: null });
   const focused = useRef(false);
   const router = useRouter();
   const activate = useRef<() => void>(() => {});
@@ -31,11 +36,15 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs: number) {
       intervalMs,
       load,
       value: (value: T) => {
-        setData(value);
-        setError(null);
+        if (version === getSessionVersion()) setSnapshot({ version, data: value, error: null });
       },
       error: (failure: unknown) => {
-        setError(failure instanceof Error ? failure.message : "request_failed");
+        if (version !== getSessionVersion()) return;
+        setSnapshot({
+          version,
+          data: null,
+          error: failure instanceof Error ? failure.message : "request_failed",
+        });
         if (failure instanceof AuthExpiredError) router.replace("/");
       },
     });
@@ -57,6 +66,12 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs: number) {
       activate.current = () => {};
       refreshNow.current = async () => {};
     };
-  }, [load, intervalMs, router]);
-  return { data, error, refresh: () => refreshNow.current() };
+  }, [load, intervalMs, router, version]);
+  // Mask synchronously during render, before effect cleanup can run on an account change.
+  const current = snapshot.version === version && version === getSessionVersion();
+  return {
+    data: current ? snapshot.data : null,
+    error: current ? snapshot.error : null,
+    refresh: () => refreshNow.current(),
+  };
 }

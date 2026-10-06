@@ -1,13 +1,53 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardAvoidingViewProps,
+  type TextInputProps,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, CircleAlert, Info, type LucideIcon } from "lucide-react-native";
 import { C, UI } from "./theme";
 
-export function FormInput({ style, onFocus, onBlur, editable, ...props }: TextInputProps) {
+export function KeyboardFrame({
+  children,
+  style,
+  keyboardVerticalOffset,
+  nativeInsets = false,
+  ...props
+}: KeyboardAvoidingViewProps & { nativeInsets?: boolean }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <KeyboardAvoidingView
+      {...props}
+      enabled={!(nativeInsets && Platform.OS === "ios")}
+      style={[styles.flex, style]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={keyboardVerticalOffset ?? insets.top}
+    >
+      {children}
+    </KeyboardAvoidingView>
+  );
+}
+
+export function FormInput({
+  ref,
+  style,
+  onFocus,
+  onBlur,
+  editable,
+  ...props
+}: TextInputProps & { ref?: Ref<TextInput> }) {
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
+      ref={ref}
       placeholderTextColor={C.muted}
       selectionColor={C.green}
       {...props}
@@ -116,6 +156,7 @@ export function Notice({
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   input: {
     minHeight: UI.controlHeight,
     borderWidth: 1,

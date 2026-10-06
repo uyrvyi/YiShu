@@ -12,23 +12,31 @@ import {
   STAGED_MEDIA_TTL_MS,
   toMediaView,
   writeEncryptedMedia,
+  writeOpaqueMedia,
+  readOpaqueMedia,
 } from "../lib/media.js";
 import { toUserPublicView } from "../lib/user-view.js";
+import { E2EE_VERSION } from "@yishu/shared/e2ee";
 
 const idSchema = z.object({ id: z.string().uuid() });
 
 export async function mediaRoutes(app: FastifyInstance): Promise<void> {
   await app.register(multipart, {
-    limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 0, parts: 1 },
+    limits: { fileSize: MAX_IMAGE_BYTES + 40, files: 1, fields: 0, parts: 1 },
   });
 
   async function upload(
     req: FastifyRequest,
     reply: FastifyReply,
-    purpose: "LETTER_IMAGE" | "AVATAR"
+    purpose: "LETTER_IMAGE" | "AVATAR",
+    opaque = false
   ) {
     const user = await app.prisma.user.findUnique({ where: { uid: req.user.sub } });
     if (!user) return reply.code(401).send({ error: "unauthorized" });
+    const identity = await app.prisma.encryptionIdentity.findUnique({ where: { userId: user.id } });
+    if (opaque && !identity) return reply.code(409).send({ error: "e2ee_not_ready" });
+    if (!opaque && purpose === "LETTER_IMAGE" && identity)
+      return reply.code(409).send({ error: "e2ee_required" });
     const pendingWhere = {
       ownerId: user.id,
       letterId: null,
@@ -46,10 +54,13 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     }
     if (!buffer) throw new MediaError("invalid_image", 415);
     const imageBuffer = buffer;
-    const dimensions = await inspectImage(buffer);
+    const dimensions = opaque
+      ? { mimeType: "application/octet-stream", width: 1, height: 1 }
+      : await inspectImage(buffer);
     const id = randomUUID();
     const directory = app.config.MEDIA_STORAGE_DIR;
-    await writeEncryptedMedia(directory, id, buffer, app.config.CONTENT_ENCRYPTION_KEY);
+    if (opaque) await writeOpaqueMedia(directory, id, buffer);
+    else await writeEncryptedMedia(directory, id, buffer, app.config.CONTENT_ENCRYPTION_KEY);
     const result = await app.prisma
       .$transaction(async (tx) => {
         // Serialize upload, claim, deletion and avatar replacement for this owner.
@@ -67,7 +78,14 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
         });
         if (staged >= 36) throw new MediaError("too_many_pending_images", 429);
         const asset = await tx.mediaAsset.create({
-          data: { id, ownerId: user.id, purpose, ...dimensions, byteSize: imageBuffer.length },
+          data: {
+            id,
+            ownerId: user.id,
+            purpose,
+            contentVersion: opaque ? E2EE_VERSION : "server-v1",
+            ...dimensions,
+            byteSize: imageBuffer.length,
+          },
         });
         if (purpose === "AVATAR") {
           const previous = await tx.user.findUniqueOrThrow({
@@ -108,7 +126,23 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     onRequest: [app.authenticate],
     config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
   };
-  app.post("/media/images", uploadOptions, (req, reply) => upload(req, reply, "LETTER_IMAGE"));
+  app.post(
+    "/media/images",
+    {
+      ...uploadOptions,
+      onRequest: [
+        app.authenticate,
+        async (_req: FastifyRequest, reply: FastifyReply) => {
+          if (app.config.NODE_ENV === "production")
+            return reply.code(409).send({ error: "e2ee_required" });
+        },
+      ],
+    },
+    (req, reply) => upload(req, reply, "LETTER_IMAGE")
+  );
+  app.post("/media/encrypted-images", uploadOptions, (req, reply) =>
+    upload(req, reply, "LETTER_IMAGE", true)
+  );
   app.post("/users/me/avatar", uploadOptions, (req, reply) => upload(req, reply, "AVATAR"));
 
   app.get("/media/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -128,6 +162,14 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
             (asset.letter.recipientId === user.id && asset.letter.status === "DELIVERED")
           : asset.ownerId === user.id));
     if (!readable || !asset) return reply.code(404).send({ error: "media_not_found" });
+    if (asset.contentVersion === E2EE_VERSION) {
+      const bytes = await readOpaqueMedia(app.config.MEDIA_STORAGE_DIR, asset.id);
+      return reply
+        .header("Cache-Control", "private, no-store")
+        .header("X-Content-Type-Options", "nosniff")
+        .type("application/octet-stream")
+        .send(bytes);
+    }
     const original = await readEncryptedMedia(
       app.config.MEDIA_STORAGE_DIR,
       id,

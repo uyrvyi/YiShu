@@ -26,7 +26,7 @@ import { formatFactTime } from "../../src/map/presentation";
 import { HOME_POLL_MS } from "../../src/refresh/poller";
 import { usePolling } from "../../src/refresh/usePolling";
 import { BottomNav, useBottomNavContentInset } from "../../src/ui/BottomNav";
-import { Notice } from "../../src/ui/controls";
+import { KeyboardFrame, Notice } from "../../src/ui/controls";
 import { isTerminal, statusCopy, statusTone, TRANSPORT_LABELS } from "../../src/ui/presentation";
 import { C, UI } from "../../src/ui/theme";
 
@@ -79,161 +79,170 @@ export default function LettersScreen() {
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}>
-      <FlatList
-        contentContainerStyle={[styles.list, { paddingBottom: bottomInset }]}
-        data={visible}
-        keyExtractor={(row) => row.letter.trackingNo}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={C.green}
-            onRefresh={() => {
-              setRefreshing(true);
-              void refresh().finally(() => setRefreshing(false));
-            }}
-          />
-        }
-        ListHeaderComponent={
-          <>
-            <View style={styles.header}>
-              <View>
-                <Text accessibilityRole="header" style={styles.title}>
-                  驿书
-                </Text>
-                <Text style={styles.brand}>我的信件</Text>
-              </View>
-              {inTransit !== null ? (
-                <View style={styles.inTransit}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.inTransitText}>在途 {inTransit}</Text>
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.search}>
-              <Search size={19} color={C.muted} />
-              <TextInput
-                style={styles.searchInput}
-                value={query}
-                onChangeText={setQuery}
-                placeholder="运单号或联系人"
-                placeholderTextColor={C.muted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                accessibilityLabel="搜索信件"
-              />
-              {query ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="清除搜索"
-                  style={styles.clearSearch}
-                  onPress={() => setQuery("")}
-                >
-                  <X size={17} color={C.muted} />
-                </Pressable>
-              ) : null}
-            </View>
-            <View style={styles.filters}>
-              {(
-                [
-                  ["all", "全部"],
-                  ["received", "我收到的"],
-                  ["sent", "我寄出的"],
-                ] as const
-              ).map(([key, label]) => (
-                <Pressable
-                  key={key}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: filter === key }}
-                  onPress={() => setFilter(key)}
-                  style={({ pressed }) => [
-                    styles.filter,
-                    filter === key && styles.filterActive,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>
-                    {label}
+      <KeyboardFrame nativeInsets>
+        <FlatList
+          automaticallyAdjustKeyboardInsets
+          style={styles.flex}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomInset }]}
+          data={visible}
+          keyExtractor={(row) => row.letter.trackingNo}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={C.green}
+              onRefresh={() => {
+                setRefreshing(true);
+                void refresh().finally(() => setRefreshing(false));
+              }}
+            />
+          }
+          ListHeaderComponent={
+            <>
+              <View style={styles.header}>
+                <View>
+                  <Text accessibilityRole="header" style={styles.title}>
+                    驿书
                   </Text>
-                </Pressable>
-              ))}
-            </View>
-            {error ? (
-              <View style={styles.error}>
-                <Notice>信件暂时无法更新，请下拉重试</Notice>
+                  <Text style={styles.brand}>我的信件</Text>
+                </View>
+                {inTransit !== null ? (
+                  <View style={styles.inTransit}>
+                    <View style={styles.liveDot} />
+                    <Text style={styles.inTransitText}>在途 {inTransit}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-            {!data && !error ? <ActivityIndicator color={C.green} style={styles.loading} /> : null}
-          </>
-        }
-        ListEmptyComponent={
-          data ? (
-            <View style={styles.empty}>
-              <PackageSearch size={30} color={C.muted} />
-              <Text style={styles.emptyText}>{term ? "没有找到匹配的信件" : "这里还没有信件"}</Text>
-            </View>
-          ) : null
-        }
-        renderItem={({ item }) => {
-          const peer = item.direction === "sent" ? item.letter.recipient : item.letter.sender;
-          const DirectionIcon = item.direction === "sent" ? ArrowUpRight : ArrowDownLeft;
-          return (
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`${peer.nickname}，${statusCopy(item.letter.status)}`}
-              onPress={() => router.push(`/letters/${item.letter.trackingNo}`)}
-            >
-              <View style={styles.rowTop}>
-                <View style={styles.peer}>
-                  <View
-                    style={[
-                      styles.direction,
-                      item.direction === "received" && styles.directionReceived,
+              <View style={styles.search}>
+                <Search size={19} color={C.muted} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="运单号或联系人"
+                  placeholderTextColor={C.muted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessibilityLabel="搜索信件"
+                />
+                {query ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="清除搜索"
+                    style={styles.clearSearch}
+                    onPress={() => setQuery("")}
+                  >
+                    <X size={17} color={C.muted} />
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.filters}>
+                {(
+                  [
+                    ["all", "全部"],
+                    ["received", "我收到的"],
+                    ["sent", "我寄出的"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <Pressable
+                    key={key}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: filter === key }}
+                    onPress={() => setFilter(key)}
+                    style={({ pressed }) => [
+                      styles.filter,
+                      filter === key && styles.filterActive,
+                      pressed && styles.pressed,
                     ]}
                   >
-                    <DirectionIcon
-                      size={20}
-                      strokeWidth={1.8}
-                      color={item.direction === "sent" ? C.green : C.blue}
-                    />
-                  </View>
-                  <View style={styles.peerText}>
-                    <Text style={styles.peerName} numberOfLines={1}>
-                      {peer.nickname}
+                    <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>
+                      {label}
                     </Text>
-                    <Text style={styles.directionLabel}>
-                      {item.direction === "sent" ? "寄给" : "来自"}
-                    </Text>
-                  </View>
+                  </Pressable>
+                ))}
+              </View>
+              {error ? (
+                <View style={styles.error}>
+                  <Notice>信件暂时无法更新，请下拉重试</Notice>
                 </View>
-                <Text
-                  style={[styles.status, { color: C[statusTone(item.letter.status)] }]}
-                  numberOfLines={2}
-                >
-                  {statusCopy(item.letter.status)}
+              ) : null}
+              {!data && !error ? (
+                <ActivityIndicator color={C.green} style={styles.loading} />
+              ) : null}
+            </>
+          }
+          ListEmptyComponent={
+            data ? (
+              <View style={styles.empty}>
+                <PackageSearch size={30} color={C.muted} />
+                <Text style={styles.emptyText}>
+                  {term ? "没有找到匹配的信件" : "这里还没有信件"}
                 </Text>
               </View>
-              <View style={styles.route}>
-                <Text style={styles.city} numberOfLines={1}>
-                  {item.letter.origin.city}
-                </Text>
-                <ArrowRight size={16} color={C.muted} strokeWidth={1.5} />
-                <Text style={styles.city} numberOfLines={1}>
-                  {item.letter.target.city}
-                </Text>
-              </View>
-              <View style={styles.rowBottom}>
-                <Text style={styles.meta} numberOfLines={1}>
-                  {TRANSPORT_LABELS[item.letter.currentTransport]} ·{" "}
-                  {formatFactTime(item.letter.createdAt)}
-                </Text>
-                <ChevronRight size={17} color={C.muted} />
-              </View>
-            </Pressable>
-          );
-        }}
-      />
+            ) : null
+          }
+          renderItem={({ item }) => {
+            const peer = item.direction === "sent" ? item.letter.recipient : item.letter.sender;
+            const DirectionIcon = item.direction === "sent" ? ArrowUpRight : ArrowDownLeft;
+            return (
+              <Pressable
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`${peer.nickname}，${statusCopy(item.letter.status)}`}
+                onPress={() => router.push(`/letters/${item.letter.trackingNo}`)}
+              >
+                <View style={styles.rowTop}>
+                  <View style={styles.peer}>
+                    <View
+                      style={[
+                        styles.direction,
+                        item.direction === "received" && styles.directionReceived,
+                      ]}
+                    >
+                      <DirectionIcon
+                        size={20}
+                        strokeWidth={1.8}
+                        color={item.direction === "sent" ? C.green : C.blue}
+                      />
+                    </View>
+                    <View style={styles.peerText}>
+                      <Text style={styles.peerName} numberOfLines={1}>
+                        {peer.nickname}
+                      </Text>
+                      <Text style={styles.directionLabel}>
+                        {item.direction === "sent" ? "寄给" : "来自"}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[styles.status, { color: C[statusTone(item.letter.status)] }]}
+                    numberOfLines={2}
+                  >
+                    {statusCopy(item.letter.status)}
+                  </Text>
+                </View>
+                <View style={styles.route}>
+                  <Text style={styles.city} numberOfLines={1}>
+                    {item.letter.origin.city}
+                  </Text>
+                  <ArrowRight size={16} color={C.muted} strokeWidth={1.5} />
+                  <Text style={styles.city} numberOfLines={1}>
+                    {item.letter.target.city}
+                  </Text>
+                </View>
+                <View style={styles.rowBottom}>
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {TRANSPORT_LABELS[item.letter.currentTransport]} ·{" "}
+                    {formatFactTime(item.letter.createdAt)}
+                  </Text>
+                  <ChevronRight size={17} color={C.muted} />
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      </KeyboardFrame>
       <BottomNav active="letters" />
     </SafeAreaView>
   );
@@ -241,6 +250,7 @@ export default function LettersScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
+  flex: { flex: 1 },
   list: {
     flexGrow: 1,
     paddingHorizontal: UI.gutter,

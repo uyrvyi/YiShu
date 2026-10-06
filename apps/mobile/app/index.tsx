@@ -2,8 +2,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +18,7 @@ import {
   restoreSession,
   subscribeSession,
 } from "../src/api";
-import { ActionButton, FormInput } from "../src/ui/controls";
+import { ActionButton, FormInput, KeyboardFrame } from "../src/ui/controls";
 import { problemMessage } from "../src/ui/presentation";
 import { C, UI } from "../src/ui/theme";
 import { RegionSelector } from "../src/regions/RegionSelector";
@@ -130,11 +128,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.keyboard}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <KeyboardFrame nativeInsets>
         <ScrollView
+          automaticallyAdjustKeyboardInsets
+          style={styles.keyboard}
           contentContainerStyle={styles.page}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -235,7 +232,7 @@ export default function HomeScreen() {
             />
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardFrame>
     </SafeAreaView>
   );
 }

@@ -4,6 +4,7 @@ import {
   Modal,
   PanResponder,
   StyleSheet,
+  Text,
   View,
   type GestureResponderEvent,
 } from "react-native";
@@ -19,6 +20,12 @@ import {
 
 const DOUBLE_TAP_MS = 350;
 const DRAG_THRESHOLD = 12;
+
+export interface PreviewGallery {
+  index: number;
+  count: number;
+  onChange: (index: number) => void;
+}
 
 function touchGeometry(event: GestureResponderEvent) {
   const [a, b] = event.nativeEvent.touches;
@@ -36,10 +43,12 @@ export function ImagePreview({
   children,
   aspectRatio,
   onClose,
+  gallery,
 }: {
   children: ReactNode;
   aspectRatio: number;
   onClose: () => void;
+  gallery?: PreviewGallery;
 }) {
   const [position, setPosition] = useState(ORIGINAL_PREVIEW);
   const current = useRef(ORIGINAL_PREVIEW);
@@ -53,6 +62,8 @@ export function ImagePreview({
   const dismissY = useRef(new Animated.Value(0)).current;
   const close = useRef(onClose);
   close.current = onClose;
+  const pages = useRef(gallery);
+  pages.current = gallery;
   const ratio = useRef(aspectRatio);
   ratio.current = aspectRatio;
   const closed = useRef(false);
@@ -71,6 +82,9 @@ export function ImagePreview({
     touch: NonNullable<ReturnType<typeof touchGeometry>>;
     dragDistance: number;
     multiTouch: boolean;
+    axis: "horizontal" | "vertical" | null;
+    dx: number;
+    dy: number;
   } | null>(null);
 
   function cancelTap() {
@@ -179,6 +193,20 @@ export function ImagePreview({
     close.current();
   }
 
+  function changePage(index: number) {
+    const page = pages.current;
+    if (!page || index < 0 || index >= page.count || index === page.index) {
+      resetDismiss(true);
+      return;
+    }
+    cancelTap();
+    lastTap.current = null;
+    gesture.current = null;
+    update(ORIGINAL_PREVIEW);
+    pages.current = { ...page, index };
+    page.onChange(index);
+  }
+
   function toggleZoom(x: number, y: number) {
     cancelTap();
     lastTap.current = null;
@@ -230,6 +258,9 @@ export function ImagePreview({
       touch,
       dragDistance: 0,
       multiTouch: touchSession.current.multiTouch || touch.count > 1,
+      axis: null,
+      dx: 0,
+      dy: 0,
     };
   }
 
@@ -249,6 +280,9 @@ export function ImagePreview({
     start.touch = touch;
     start.position = current.current;
     start.dragDistance = 0;
+    start.axis = null;
+    start.dx = 0;
+    start.dy = 0;
     start.multiTouch ||= touch.count > 1;
     cancelTap();
     lastTap.current = null;
@@ -341,9 +375,17 @@ export function ImagePreview({
               y: start.position.y + dy,
             });
           } else if (start.moved && !start.multiTouch) {
+            start.dx = dx;
+            start.dy = dy;
             start.dragDistance = Math.hypot(dx, dy);
-            dismissX.setValue(dx);
-            dismissY.setValue(dy);
+            if (pages.current) {
+              start.axis ??= Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+              dismissX.setValue(start.axis === "horizontal" ? dx : 0);
+              dismissY.setValue(start.axis === "vertical" ? dy : 0);
+            } else {
+              dismissX.setValue(dx);
+              dismissY.setValue(dy);
+            }
           }
         },
         onPanResponderRelease: (event) => {
@@ -366,6 +408,20 @@ export function ImagePreview({
           }
           if (!start || start.moved || Date.now() - start.startedAt > 400) {
             lastTap.current = null;
+            if (pages.current && start?.position.zoom === 1) {
+              if (start.axis === "horizontal") {
+                const threshold = Math.max(56, Math.min(120, viewport.current.width * 0.2));
+                if (Math.abs(start.dx) >= threshold) {
+                  changePage(pages.current.index + (start.dx < 0 ? 1 : -1));
+                } else resetDismiss(true);
+              } else if (
+                start.axis === "vertical" &&
+                Math.abs(start.dy) >= previewDismissDistance(viewport.current.height)
+              ) {
+                requestClose();
+              } else resetDismiss(true);
+              return;
+            }
             if (
               start?.position.zoom === 1 &&
               !start.multiTouch &&
@@ -434,9 +490,17 @@ export function ImagePreview({
         accessibilityActions={[
           { name: "dismiss", label: "关闭预览" },
           { name: "activate", label: position.zoom > 1 ? "恢复图片大小" : "放大图片" },
+          ...(gallery && gallery.index > 0 ? [{ name: "decrement", label: "上一张" }] : []),
+          ...(gallery && gallery.index < gallery.count - 1
+            ? [{ name: "increment", label: "下一张" }]
+            : []),
         ]}
         onAccessibilityAction={(event) => {
           if (event.nativeEvent.actionName === "dismiss") requestClose();
+          if (event.nativeEvent.actionName === "increment" && pages.current)
+            changePage(pages.current.index + 1);
+          if (event.nativeEvent.actionName === "decrement" && pages.current)
+            changePage(pages.current.index - 1);
           if (event.nativeEvent.actionName === "activate") {
             const { width, height } = viewport.current;
             toggleZoom(width / 2, height / 2);
@@ -473,6 +537,13 @@ export function ImagePreview({
         >
           {children}
         </Animated.View>
+        {gallery && gallery.count > 1 ? (
+          <View pointerEvents="none" style={styles.pageIndicator}>
+            <Text style={styles.pageText} accessibilityLiveRegion="polite">
+              {gallery.index + 1} / {gallery.count}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </Modal>
   );
@@ -481,4 +552,6 @@ export function ImagePreview({
 const styles = StyleSheet.create({
   viewport: { flex: 1, backgroundColor: "#111315", overflow: "hidden" },
   image: { width: "100%", height: "100%" },
+  pageIndicator: { position: "absolute", bottom: 48, alignSelf: "center" },
+  pageText: { color: "#ffffff", fontSize: 14 },
 });

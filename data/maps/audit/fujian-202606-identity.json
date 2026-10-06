@@ -1,0 +1,1362 @@
+{
+  "schemaVersion": 1,
+  "inspectedOn": "2026-10-06",
+  "effectiveThrough": "2026-06-30",
+  "source": {
+    "url": "https://mzt.fujian.gov.cn/gk/tzgg/202607/t20260710_7176497.htm",
+    "sha256": "577efb4e280099b818ca1418de02d4f98612e1b4aba88c8c030c0596c4c01b74"
+  },
+  "candidateSha256": "930bd3c5a0171679d246bd8c64ccb7059b4ad0b6f67c28a1dd252345daab2fc9",
+  "officialCities": 9,
+  "officialCounties": 84,
+  "matchedCounties": 84,
+  "checks": [
+    {
+      "code": "350102",
+      "officialName": "鼓楼区",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "鼓楼区",
+        "code": "350102",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350103",
+      "officialName": "台江区",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "台江区",
+        "code": "350103",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350104",
+      "officialName": "仓山区",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "仓山区",
+        "code": "350104",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350105",
+      "officialName": "马尾区",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "马尾区",
+        "code": "350105",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350111",
+      "officialName": "晋安区",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "晋安区",
+        "code": "350111",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350112",
+      "officialName": "长乐区",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "长乐区",
+        "code": "350112",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350121",
+      "officialName": "闽侯县",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "闽侯县",
+        "code": "350121",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350122",
+      "officialName": "连江县",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "连江县",
+        "code": "350122",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350123",
+      "officialName": "罗源县",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "罗源县",
+        "code": "350123",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350124",
+      "officialName": "闽清县",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "闽清县",
+        "code": "350124",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350125",
+      "officialName": "永泰县",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "永泰县",
+        "code": "350125",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350128",
+      "officialName": "平潭县",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "平潭县",
+        "code": "350128",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350181",
+      "officialName": "福清市",
+      "officialCity": "福州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "福州市",
+        "cityCode": "3501",
+        "district": "福清市",
+        "code": "350181",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350203",
+      "officialName": "思明区",
+      "officialCity": "厦门市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "厦门市",
+        "cityCode": "3502",
+        "district": "思明区",
+        "code": "350203",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350205",
+      "officialName": "海沧区",
+      "officialCity": "厦门市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "厦门市",
+        "cityCode": "3502",
+        "district": "海沧区",
+        "code": "350205",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350206",
+      "officialName": "湖里区",
+      "officialCity": "厦门市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "厦门市",
+        "cityCode": "3502",
+        "district": "湖里区",
+        "code": "350206",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350211",
+      "officialName": "集美区",
+      "officialCity": "厦门市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "厦门市",
+        "cityCode": "3502",
+        "district": "集美区",
+        "code": "350211",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350212",
+      "officialName": "同安区",
+      "officialCity": "厦门市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "厦门市",
+        "cityCode": "3502",
+        "district": "同安区",
+        "code": "350212",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350213",
+      "officialName": "翔安区",
+      "officialCity": "厦门市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "厦门市",
+        "cityCode": "3502",
+        "district": "翔安区",
+        "code": "350213",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350302",
+      "officialName": "城厢区",
+      "officialCity": "莆田市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "莆田市",
+        "cityCode": "3503",
+        "district": "城厢区",
+        "code": "350302",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350303",
+      "officialName": "涵江区",
+      "officialCity": "莆田市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "莆田市",
+        "cityCode": "3503",
+        "district": "涵江区",
+        "code": "350303",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350304",
+      "officialName": "荔城区",
+      "officialCity": "莆田市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "莆田市",
+        "cityCode": "3503",
+        "district": "荔城区",
+        "code": "350304",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350305",
+      "officialName": "秀屿区",
+      "officialCity": "莆田市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "莆田市",
+        "cityCode": "3503",
+        "district": "秀屿区",
+        "code": "350305",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350322",
+      "officialName": "仙游县",
+      "officialCity": "莆田市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "莆田市",
+        "cityCode": "3503",
+        "district": "仙游县",
+        "code": "350322",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350404",
+      "officialName": "三元区",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "三元区",
+        "code": "350404",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350405",
+      "officialName": "沙县区",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "沙县区",
+        "code": "350405",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350421",
+      "officialName": "明溪县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "明溪县",
+        "code": "350421",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350423",
+      "officialName": "清流县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "清流县",
+        "code": "350423",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350424",
+      "officialName": "宁化县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "宁化县",
+        "code": "350424",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350425",
+      "officialName": "大田县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "大田县",
+        "code": "350425",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350426",
+      "officialName": "尤溪县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "尤溪县",
+        "code": "350426",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350428",
+      "officialName": "将乐县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "将乐县",
+        "code": "350428",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350429",
+      "officialName": "泰宁县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "泰宁县",
+        "code": "350429",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350430",
+      "officialName": "建宁县",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "建宁县",
+        "code": "350430",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350481",
+      "officialName": "永安市",
+      "officialCity": "三明市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "三明市",
+        "cityCode": "3504",
+        "district": "永安市",
+        "code": "350481",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350502",
+      "officialName": "鲤城区",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "鲤城区",
+        "code": "350502",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350503",
+      "officialName": "丰泽区",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "丰泽区",
+        "code": "350503",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350504",
+      "officialName": "洛江区",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "洛江区",
+        "code": "350504",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350505",
+      "officialName": "泉港区",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "泉港区",
+        "code": "350505",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350521",
+      "officialName": "惠安县",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "惠安县",
+        "code": "350521",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350524",
+      "officialName": "安溪县",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "安溪县",
+        "code": "350524",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350525",
+      "officialName": "永春县",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "永春县",
+        "code": "350525",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350526",
+      "officialName": "德化县",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "德化县",
+        "code": "350526",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350527",
+      "officialName": "金门县",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "金门县",
+        "code": "350527",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350581",
+      "officialName": "石狮市",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "石狮市",
+        "code": "350581",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350582",
+      "officialName": "晋江市",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "晋江市",
+        "code": "350582",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350583",
+      "officialName": "南安市",
+      "officialCity": "泉州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "泉州市",
+        "cityCode": "3505",
+        "district": "南安市",
+        "code": "350583",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350602",
+      "officialName": "芗城区",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "芗城区",
+        "code": "350602",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350603",
+      "officialName": "龙文区",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "龙文区",
+        "code": "350603",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350604",
+      "officialName": "龙海区",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "龙海区",
+        "code": "350604",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350605",
+      "officialName": "长泰区",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "长泰区",
+        "code": "350605",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350622",
+      "officialName": "云霄县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "云霄县",
+        "code": "350622",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350623",
+      "officialName": "漳浦县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "漳浦县",
+        "code": "350623",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350624",
+      "officialName": "诏安县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "诏安县",
+        "code": "350624",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350626",
+      "officialName": "东山县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "东山县",
+        "code": "350626",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350627",
+      "officialName": "南靖县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "南靖县",
+        "code": "350627",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350628",
+      "officialName": "平和县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "平和县",
+        "code": "350628",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350629",
+      "officialName": "华安县",
+      "officialCity": "漳州市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "漳州市",
+        "cityCode": "3506",
+        "district": "华安县",
+        "code": "350629",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350702",
+      "officialName": "延平区",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "延平区",
+        "code": "350702",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350703",
+      "officialName": "建阳区",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "建阳区",
+        "code": "350703",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350721",
+      "officialName": "顺昌县",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "顺昌县",
+        "code": "350721",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350722",
+      "officialName": "浦城县",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "浦城县",
+        "code": "350722",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350723",
+      "officialName": "光泽县",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "光泽县",
+        "code": "350723",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350724",
+      "officialName": "松溪县",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "松溪县",
+        "code": "350724",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350725",
+      "officialName": "政和县",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "政和县",
+        "code": "350725",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350781",
+      "officialName": "邵武市",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "邵武市",
+        "code": "350781",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350782",
+      "officialName": "武夷山市",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "武夷山市",
+        "code": "350782",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350783",
+      "officialName": "建瓯市",
+      "officialCity": "南平市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "南平市",
+        "cityCode": "3507",
+        "district": "建瓯市",
+        "code": "350783",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350802",
+      "officialName": "新罗区",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "新罗区",
+        "code": "350802",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350803",
+      "officialName": "永定区",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "永定区",
+        "code": "350803",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350821",
+      "officialName": "长汀县",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "长汀县",
+        "code": "350821",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350823",
+      "officialName": "上杭县",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "上杭县",
+        "code": "350823",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350824",
+      "officialName": "武平县",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "武平县",
+        "code": "350824",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350825",
+      "officialName": "连城县",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "连城县",
+        "code": "350825",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350881",
+      "officialName": "漳平市",
+      "officialCity": "龙岩市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "龙岩市",
+        "cityCode": "3508",
+        "district": "漳平市",
+        "code": "350881",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350902",
+      "officialName": "蕉城区",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "蕉城区",
+        "code": "350902",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350921",
+      "officialName": "霞浦县",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "霞浦县",
+        "code": "350921",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350922",
+      "officialName": "古田县",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "古田县",
+        "code": "350922",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350923",
+      "officialName": "屏南县",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "屏南县",
+        "code": "350923",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350924",
+      "officialName": "寿宁县",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "寿宁县",
+        "code": "350924",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350925",
+      "officialName": "周宁县",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "周宁县",
+        "code": "350925",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350926",
+      "officialName": "柘荣县",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "柘荣县",
+        "code": "350926",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350981",
+      "officialName": "福安市",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "福安市",
+        "code": "350981",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    },
+    {
+      "code": "350982",
+      "officialName": "福鼎市",
+      "officialCity": "宁德市",
+      "candidate": {
+        "province": "福建省",
+        "provinceCode": "35",
+        "city": "宁德市",
+        "cityCode": "3509",
+        "district": "福鼎市",
+        "code": "350982",
+        "kind": "county",
+        "directProvince": false
+      },
+      "result": "match"
+    }
+  ],
+  "identityComparison": "PASS",
+  "scope": "Fujian names, codes and city parents through 2026-06-30 only; not geometry, later changes, national completeness or publication approval.",
+  "runtimeFilesChanged": false
+}

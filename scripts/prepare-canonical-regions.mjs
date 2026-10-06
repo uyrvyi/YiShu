@@ -34,13 +34,25 @@ const data = raw.filter((p) => Number(p.code.slice(0, 2)) <= 65).map((province) 
     return { code: city.code.slice(0, 4), name: city.name, children };
   }),
 }));
+const changesBytes = await readFile(new URL("data/maps/division-changes-2026.json", root));
+const changes = JSON.parse(changesBytes);
+assert.equal(changes.version, 1);
+assert.equal(changes.nationalChangesComplete, false);
+for (const addition of changes.additions) {
+  const province = data.find((p) => p.code === addition.provinceCode);
+  const city = province?.children.find((c) => c.code === addition.cityCode);
+  assert.ok(city, `new_county_parent_missing:${addition.code}`);
+  assert.ok(!city.children.some((d) => d.code === addition.code), "duplicate_new_county");
+  city.children.push({ code: addition.code, name: addition.name });
+  city.children.sort((a, b) => a.code.localeCompare(b.code));
+}
 assert.equal(data.length, 31);
 const entries = data.flatMap((province) => province.children.flatMap((city) =>
   city.children.map((district) => ({ province: province.name,
     city: municipalities.has(province.code) ? province.name :
       city.name.endsWith("直辖县级行政区划") ? district.name : city.name,
     district: district.name, code: district.code, kind: district.kind ?? "county" }))));
-assert.equal(entries.filter((entry) => entry.kind === "county").length, 2845);
+assert.equal(entries.filter((entry) => entry.kind === "county").length, 2847);
 assert.equal(entries.filter((entry) => entry.kind === "city").length, 4);
 assert.equal(new Set(entries.map((entry) => entry.code)).size, entries.length);
 assert.ok(entries.every((entry) => /^\d{6}$/.test(entry.code)));
@@ -55,9 +67,11 @@ const retainedLegacy = JSON.parse(legacyBytes).flatMap((p) => p.children.flatMap
 })))).filter((entry) => !selectedKeys.has([entry.province, entry.city, entry.district].join("/")));
 const output = Buffer.from(JSON.stringify(data));
 const metadata = {
-  revision: "mainland-county-20251231-r1", sourceUrl, commit, sourceSha256: sha256(bytes),
-  outputSha256: sha256(output), sourceCutoff: "2024-12-31", changesCutoff: "2025-12-31",
-  license: "MIT", provinces: 31, countyEntries: 2845, citiesWithoutDistricts: 4,
+  revision: "mainland-county-20261006-draft-r2", sourceUrl, commit, sourceSha256: sha256(bytes),
+  outputSha256: sha256(output), sourceCutoff: "2024-12-31", changesCutoff: "2026-06-30",
+  nationalChangesComplete: false, officialChangesSha256: sha256(changesBytes),
+  officialAdditions: changes.additions,
+  license: "MIT", provinces: 31, countyEntries: 2847, citiesWithoutDistricts: 4,
   patches: [{ remove: ["500105", "500112"], add: { code: "500157", name: "两江新区" },
     source: "https://mzj.cq.gov.cn/zwgk_218/zfxxgkml/tzgg/202512/t20251205_15215632.html" },
   { remove: ["460321", "460322", "460323"], reason: "statistical island groups are not county-level divisions; retain 西沙区/南沙区" }],

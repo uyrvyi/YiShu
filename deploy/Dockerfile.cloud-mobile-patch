@@ -1,0 +1,4 @@
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261005-keyboard-all-r4
+FROM ${PREVIEW_BASE_IMAGE}
+COPY --chown=node:node apps/mobile/ /workspace/apps/mobile/
+COPY --chown=node:node e2ee-image-patch.json /workspace/e2ee-image-patch.json
