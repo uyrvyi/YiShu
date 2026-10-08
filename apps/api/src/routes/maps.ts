@@ -79,6 +79,7 @@ export async function mapRoutes(app: FastifyInstance): Promise<void> {
           journey?.destinationNodeId,
         ];
         visibleView = withDistrictConnections(view, {
+          graphVersion: letter.graphVersion,
           origin: {
             province: letter.originProvince,
             city: letter.originCity,

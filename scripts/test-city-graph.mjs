@@ -68,3 +68,9 @@ test("new graph stays unregistered and production default remains unchanged", as
   assert.equal(registry.defaultVersion, "china-v2");
   assert.ok(!registry.versions.includes("china-v3"));
 });
+
+test("stored candidate runtime graph assets exactly match the source-bound preparation", async () => {
+  assert.deepEqual(await json("data/graphs/china-v3/station_nodes.json"), prepared.nodes);
+  assert.deepEqual(await json("data/graphs/china-v3/route_edges.json"), prepared.edges);
+  assert.deepEqual(await json("data/graphs/china-v3/region_station_map.json"), prepared.map);
+});

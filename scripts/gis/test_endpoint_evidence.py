@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from shapely import to_wkb
 from shapely.geometry import LineString, box
@@ -17,6 +18,14 @@ from test_endpoint_release import area
 
 
 class EvidenceTests(unittest.TestCase):
+    def setUp(self):
+        selected = [{"code": "130606", "province": "P", "city": "C", "district": "D"}]
+        original = [{"code": f"9{i:05d}", "province": "P", "city": "C", "district": "D", "originalReason": "unverified"}
+                    for i in range(347)]
+        binding = patch("check_endpoint_evidence.load_expected_inputs", return_value=(selected, original, {}))
+        binding.start()
+        self.addCleanup(binding.stop)
+
     def test_cache_rejects_version_source_duplicates_invalid_shape_and_outside_point(self):
         record = {"osmId": "r1", "geometryWkb": to_wkb(box(0, 0, 1, 1), hex=True), "point": [0.5, 0.5]}
         data = {"version": CACHE_VERSION, "sourceSha256": SOURCE_SHA256, "areas": [record],

@@ -1,6 +1,7 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadConfig, requireTestDatabaseUrl } from "@yishu/config";
+import { loadConfig, requireTestDatabaseUrl, resolveRepoRoot } from "@yishu/config";
 import { createPrismaClient, type PrismaClient } from "@yishu/db";
 import { advanceJourneyToNow, materializeVisibleTimeline } from "@yishu/domain";
 import { resetStationGraphCache } from "../lib/stationGraph.js";
@@ -9,7 +10,7 @@ import { TRANSPORT_TYPES, type TransportType } from "@yishu/shared";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
 
-// The real registry stays frozen; only this isolated test process selects the draft.
+// The real assets stay frozen; only this isolated test process selects the candidate bundle.
 vi.mock("node:fs", async (importOriginal) => {
   const fs = await importOriginal<typeof import("node:fs")>();
   return {
@@ -33,6 +34,14 @@ const HOUR = 3600000;
 const origin = { province: "安徽省", city: "滁州市", district: "琅琊区" };
 const localTarget = { ...origin, district: "南谯区" };
 const distantTarget = { province: "上海市", city: "上海市", district: "浦东新区" };
+const candidateRegions = JSON.parse(
+  readFileSync(path.join(resolveRepoRoot(), "data/regions/canonical-candidate.json"), "utf8")
+) as { regions: Array<typeof origin & { code: string }> };
+function candidateRegion(code: string): typeof origin {
+  const region = candidateRegions.regions.find((row) => row.code === code);
+  if (!region) throw new Error(`missing_candidate_region:${code}`);
+  return { province: region.province, city: region.city, district: region.district };
+}
 
 describe("candidate graph with district collection rule 1.1", () => {
   let prisma: PrismaClient;
@@ -165,6 +174,80 @@ describe("candidate graph with district collection rule 1.1", () => {
     ).toEqual(new Date(T0 + 9 * HOUR));
     expect((await map(letter.trackingNo, recipient.token)).delivery.state).toBe("COMPLETED");
   });
+
+  it.each([
+    { name: "Shanghai Huangpu to Pudong", from: "310101", to: "310115" },
+    { name: "Hangzhou Shangcheng to Yuhang", from: "330102", to: "330110" },
+    { name: "Chongqing Liangjiang to Yongchuan", from: "500157", to: "500118" },
+    { name: "direct-admin Caohu local mail", from: "659013", to: "659013" },
+  ])(
+    "$name: candidate endpoints retain both timed segments and content gates",
+    async ({ from, to }) => {
+      const originRegion = candidateRegion(from);
+      const targetRegion = candidateRegion(to);
+      for (const [owner, region] of [
+        [sender, originRegion],
+        [recipient, targetRegion],
+      ] as const) {
+        const profile = await app.inject({
+          method: "PATCH",
+          url: "/api/v1/users/me",
+          headers: auth(owner.token),
+          payload: { region },
+        });
+        expect(profile.statusCode).toBe(200);
+      }
+      const letter = await send();
+      expect(letter).toMatchObject({ graphVersion: "china-v3", rulesVersion: "1.1" });
+      expect(letter.journey!.originNodeId).toBe(letter.journey!.destinationNodeId);
+      expect(letter.journey!.originStationReadyAtSim).toEqual(new Date(T0 + 3 * HOUR));
+      const sent = await map(letter.trackingNo);
+      expect(sent.districtLocationsUnavailable).toEqual([]);
+      expect(sent.collection).toMatchObject({
+        from: originRegion,
+        to: { city: originRegion.city },
+        state: "IN_PROGRESS",
+      });
+      expect(sent.delivery).toMatchObject({
+        from: { city: targetRegion.city },
+        to: targetRegion,
+        state: "PLANNED",
+      });
+      for (const connection of [sent.collection, sent.delivery]) {
+        expect(
+          Math.max(
+            Math.abs(connection.from.x - connection.to.x),
+            Math.abs(connection.from.y - connection.to.y)
+          )
+        ).toBeGreaterThanOrEqual(0.000002);
+      }
+      const before = await map(letter.trackingNo, recipient.token);
+      expect(before.collection).toBeNull();
+      expect(before.delivery).toBeNull();
+      expect(before.remainingPath).toEqual([]);
+      const detail = async () =>
+        app.inject({
+          url: `/api/v1/letters/${letter.trackingNo}`,
+          headers: auth(recipient.token),
+        });
+      expect((await detail()).json().letter.content).toBeNull();
+      clock.advanceTo(T0 + 3 * HOUR);
+      await advanceJourneyToNow(prisma, letter.id, clock);
+      const dispatching = await map(letter.trackingNo);
+      expect(dispatching.collection.state).toBe("COMPLETED");
+      expect(dispatching.delivery.state).toBe("IN_PROGRESS");
+      expect((await detail()).json().letter.content).toBeNull();
+      clock.advanceTo(T0 + 9 * HOUR);
+      await advanceJourneyToNow(prisma, letter.id, clock);
+      expect(
+        (await prisma.letter.findUniqueOrThrow({ where: { id: letter.id } })).deliveredAt
+      ).toEqual(new Date(T0 + 9 * HOUR));
+      const received = await map(letter.trackingNo, recipient.token);
+      expect(received.delivery).toMatchObject({ to: targetRegion, state: "COMPLETED" });
+      expect(received.remainingPath).toEqual([]);
+      expect((await detail()).json().letter.content).toBe("candidate private body");
+    }
+  );
 
   it("starts intercity mail at the local hub after collection, not at the province capital", async () => {
     await prisma.user.update({ where: { id: recipient.id }, data: distantTarget });
@@ -411,12 +494,18 @@ describe("candidate graph with district collection rule 1.1", () => {
     ["destination", { ...localTarget, district: "不存在区" }],
     ["destination", { province: "重庆市", city: "重庆市", district: "江北区" }],
     ["destination", { province: "福建省", city: "泉州市", district: "金门县" }],
+    ["destination", { province: "海南省", city: "三沙市", district: "南沙区" }],
   ] as const)(
     "rejects an unavailable %s endpoint before creating mail or estimates",
     async (endpoint, region) => {
       const owner = endpoint === "origin" ? sender : recipient;
       await prisma.user.update({ where: { id: owner.id }, data: region });
-      const expectedError = { error: `${endpoint}_region_unavailable` };
+      const expectedError = {
+        error:
+          region.district === "金门县" || region.city === "三沙市"
+            ? "region_service_unavailable"
+            : `${endpoint}_region_unavailable`,
+      };
       const estimate = await app.inject({
         method: "POST",
         url: "/api/v1/transport-estimates",

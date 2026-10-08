@@ -1,4 +1,5 @@
-import data from "./data/pca-code.json";
+import data from "./data/pca-current.json";
+import { UNAVAILABLE_PROVINCES } from "@yishu/shared";
 
 export interface Region {
   province: string;
@@ -11,6 +12,10 @@ export interface RegionNode {
   children?: RegionNode[];
 }
 export const provinces: RegionNode[] = data;
+export const provinceOptions: RegionNode[] = [
+  ...provinces,
+  ...UNAVAILABLE_PROVINCES.filter((region) => !provinces.some((item) => item.code === region.code)),
+];
 const municipalities = new Set(["11", "12", "31", "50"]);
 const normalize = (name: string) =>
   name.trim().replace(/(?:壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区|省|市)$/u, "");

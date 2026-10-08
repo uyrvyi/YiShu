@@ -108,6 +108,15 @@ describe("letters integration", () => {
     expect(res.json().error).toBe("user_not_found");
   });
 
+  it("自己的账号或 UID 均不能寄信，拒绝时不创建记录", async () => {
+    for (const recipient of [alice.account.toUpperCase(), alice.uid]) {
+      const res = await createLetter(recipient, "self", "HORSE_RELAY", "cr-self");
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("cannot_send_to_self");
+    }
+    expect(await prisma.letter.count({ where: { clientRequestId: "cr-self" } })).toBe(0);
+  });
+
   it("clientRequestId 幂等：重复请求返回原 Letter，不重复创建", async () => {
     const r1 = await createLetter("bobby", "idempotent content", "HORSE_RELAY", "cr-idem");
     const r2 = await createLetter("bobby", "idempotent content", "HORSE_RELAY", "cr-idem");

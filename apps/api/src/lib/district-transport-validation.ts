@@ -57,7 +57,7 @@ export function assertDistrictTransportRegion(
       throw new Error("invalid_transport_region_catalog");
     regionKeys = keys;
   }
-  if (!regionKeys.has(keyOf(region)) || !districtPoint(region))
+  if (!regionKeys.has(keyOf(region)) || !districtPoint(region, graphVersion))
     throw new InvalidTransportRegionError(endpoint);
   try {
     const station = getStationNode(resolveStationForRegion(region, graphVersion), graphVersion);

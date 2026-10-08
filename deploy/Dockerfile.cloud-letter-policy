@@ -1,0 +1,3 @@
+ARG POLICY_BASE_IMAGE=yishu-server:transport-1.1-20261006-r1
+FROM ${POLICY_BASE_IMAGE}
+COPY apps/api/dist/routes/letters.js /workspace/apps/api/dist/routes/letters.js

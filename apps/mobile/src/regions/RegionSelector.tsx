@@ -10,13 +10,14 @@ import {
   View,
 } from "react-native";
 import { Check, ChevronDown, LocateFixed, X } from "lucide-react-native";
+import { isRegionServiceUnavailable, REGION_SERVICE_UNAVAILABLE_MESSAGE } from "@yishu/shared";
 import { FormInput, KeyboardFrame } from "../ui/controls";
 import { C, UI } from "../ui/theme";
 import {
   changeRegion,
   citiesFor,
   districtsFor,
-  provinces,
+  provinceOptions,
   type Region,
   type RegionNode,
 } from "./regions";
@@ -54,13 +55,21 @@ export function RegionSelector({
       const result = await locateRegion();
       if (version !== generation.current || latest.current.disabled) return;
       if ("region" in result) {
+        if (isRegionServiceUnavailable(result.region)) {
+          Alert.alert("暂未开通服务", REGION_SERVICE_UNAVAILABLE_MESSAGE);
+          return;
+        }
         latest.current.onChange(result.region);
         if (result.partial || showResult)
           Alert.alert("定位完成", result.partial ? "已定位，请补选区县" : "已预选所在地区");
       } else
         Alert.alert(
           "定位未完成",
-          result.error === "denied" ? "未授权定位，请手动选择" : "定位暂不可用，请手动选择"
+          result.error === "denied"
+            ? "未授权定位，请手动选择"
+            : result.error === "unsupported"
+              ? REGION_SERVICE_UNAVAILABLE_MESSAGE
+              : "定位暂不可用，请手动选择"
         );
     } catch {
       if (version === generation.current) Alert.alert("定位未完成", "定位暂不可用，请手动选择");
@@ -79,6 +88,10 @@ export function RegionSelector({
 
   function select(node: RegionNode) {
     if (!open || disabled) return;
+    if (isRegionServiceUnavailable({ ...changeRegion(value, open, node.name), code: node.code })) {
+      Alert.alert("暂未开通服务", REGION_SERVICE_UNAVAILABLE_MESSAGE);
+      return;
+    }
     generation.current++;
     setLocating(false);
     onChange(changeRegion(value, open, node.name));
@@ -87,7 +100,7 @@ export function RegionSelector({
   }
   const options = (
     open === "province"
-      ? provinces
+      ? provinceOptions
       : open === "city"
         ? citiesFor(value.province)
         : districtsFor(value)
@@ -179,6 +192,12 @@ export function RegionSelector({
                   onPress={() => select(item)}
                 >
                   <Text style={styles.optionText}>{item.name}</Text>
+                  {isRegionServiceUnavailable({
+                    [open ?? "province"]: item.name,
+                    code: item.code,
+                  }) ? (
+                    <Text style={styles.unavailable}>暂未开通服务</Text>
+                  ) : null}
                   {open && value[open] === item.name ? <Check size={20} color={C.green} /> : null}
                 </Pressable>
               )}
@@ -212,6 +231,7 @@ const styles = StyleSheet.create({
   locate: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44 },
   locationText: { color: C.green, fontSize: 13 },
   notice: { fontSize: 12, color: C.muted, flex: 1, lineHeight: 18 },
+  unavailable: { fontSize: 12, color: C.muted, flexShrink: 1, lineHeight: 18 },
   backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#20262970" },
   sheet: {
     maxHeight: "78%",

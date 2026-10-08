@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Modal,
@@ -11,6 +11,7 @@ import {
 import {
   constrainPreview,
   ORIGINAL_PREVIEW,
+  PINCH_DISMISS_ZOOM,
   previewFrame,
   pinchPreview,
   previewDismissDistance,
@@ -20,11 +21,14 @@ import {
 
 const DOUBLE_TAP_MS = 350;
 const DRAG_THRESHOLD = 12;
+const PAGE_GAP = 16;
+const PAGE_DURATION = 220;
 
 export interface PreviewGallery {
   index: number;
   count: number;
   onChange: (index: number) => void;
+  renderPage?: (index: number) => ReactNode;
 }
 
 function touchGeometry(event: GestureResponderEvent) {
@@ -51,6 +55,7 @@ export function ImagePreview({
   gallery?: PreviewGallery;
 }) {
   const [position, setPosition] = useState(ORIGINAL_PREVIEW);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const current = useRef(ORIGINAL_PREVIEW);
   const viewport = useRef({ width: 0, height: 0 });
   const viewportView = useRef<View>(null);
@@ -64,6 +69,9 @@ export function ImagePreview({
   close.current = onClose;
   const pages = useRef(gallery);
   pages.current = gallery;
+  const paging = useRef(false);
+  const displayedIndex = useRef(gallery?.index);
+  const firstIndex = useRef(gallery?.index ?? 0);
   const ratio = useRef(aspectRatio);
   ratio.current = aspectRatio;
   const closed = useRef(false);
@@ -93,16 +101,23 @@ export function ImagePreview({
     pendingTap.current = null;
   }
 
+  function pageOffset(index = pages.current?.index ?? firstIndex.current) {
+    return pages.current
+      ? (firstIndex.current - index) * (viewport.current.width + PAGE_GAP)
+      : 0;
+  }
+
   function resetDismiss(animate = false) {
     for (const offset of [dismissX, dismissY]) {
+      const value = offset === dismissX ? pageOffset() : 0;
       offset.stopAnimation();
       if (animate) {
         Animated.timing(offset, {
-          toValue: 0,
+          toValue: value,
           duration: 180,
           useNativeDriver: true,
         }).start();
-      } else offset.setValue(0);
+      } else offset.setValue(value);
     }
   }
 
@@ -121,6 +136,7 @@ export function ImagePreview({
   }
 
   function trackTouchStart(event: GestureResponderEvent) {
+    if (paging.current) return;
     const session = touchSession.current;
     const count = event.nativeEvent.touches.length;
     if (count === 0) return;
@@ -135,6 +151,7 @@ export function ImagePreview({
   }
 
   function trackTouches(event: GestureResponderEvent) {
+    if (paging.current) return;
     touchSession.current.tracked = true;
     touchSession.current.active = event.nativeEvent.touches.length;
     observeMultiTouch(event);
@@ -194,6 +211,7 @@ export function ImagePreview({
   }
 
   function changePage(index: number) {
+    if (paging.current || closed.current) return;
     const page = pages.current;
     if (!page || index < 0 || index >= page.count || index === page.index) {
       resetDismiss(true);
@@ -202,10 +220,36 @@ export function ImagePreview({
     cancelTap();
     lastTap.current = null;
     gesture.current = null;
-    update(ORIGINAL_PREVIEW);
-    pages.current = { ...page, index };
-    page.onChange(index);
+    // Keep both pictures mounted until the incoming picture reaches the center.
+    if (current.current.zoom !== 1) update(ORIGINAL_PREVIEW);
+    paging.current = true;
+    dismissX.stopAnimation();
+    Animated.timing(dismissX, {
+      toValue: pageOffset(index),
+      duration: PAGE_DURATION,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished || closed.current) {
+        paging.current = false;
+        if (!closed.current) resetDismiss(true);
+        return;
+      }
+      pages.current = { ...page, index };
+      page.onChange(index);
+      if (!page.renderPage) {
+        paging.current = false;
+        update(ORIGINAL_PREVIEW);
+      }
+    });
   }
+
+  useLayoutEffect(() => {
+    if (displayedIndex.current === gallery?.index) return;
+    displayedIndex.current = gallery?.index;
+    paging.current = false;
+    // The strip keeps its completed offset; page coordinates never change roles.
+    update(ORIGINAL_PREVIEW);
+  }, [gallery?.index]);
 
   function toggleZoom(x: number, y: number) {
     cancelTap();
@@ -229,6 +273,7 @@ export function ImagePreview({
   }
 
   function beginGesture(event: GestureResponderEvent, recovered = false) {
+    if (paging.current || closed.current) return;
     cancelTap();
     scale.stopAnimation();
     resetDismiss();
@@ -265,6 +310,7 @@ export function ImagePreview({
   }
 
   function rebaseTouches(event: GestureResponderEvent) {
+    if (paging.current) return;
     if (touchSession.current.tracked)
       touchSession.current.active = event.nativeEvent.touches.length;
     observeMultiTouch(event);
@@ -309,20 +355,20 @@ export function ImagePreview({
       PanResponder.create({
         onStartShouldSetPanResponder: (event) => {
           trackTouchStart(event);
-          return !closed.current;
+          return !closed.current && !paging.current;
         },
         onMoveShouldSetPanResponder: (event) => {
           trackTouches(event);
-          return !closed.current;
+          return !closed.current && !paging.current;
         },
         // Preserve retry buttons for one finger; the viewer owns multi-touch gestures.
         onStartShouldSetPanResponderCapture: (event) => {
           trackTouchStart(event);
-          return !closed.current && event.nativeEvent.touches.length > 1;
+          return !closed.current && !paging.current && event.nativeEvent.touches.length > 1;
         },
         onMoveShouldSetPanResponderCapture: (event) => {
           trackTouches(event);
-          return !closed.current && event.nativeEvent.touches.length > 1;
+          return !closed.current && !paging.current && event.nativeEvent.touches.length > 1;
         },
         onPanResponderTerminationRequest: () => gesture.current === null,
         onPanResponderGrant: (event) => {
@@ -331,6 +377,7 @@ export function ImagePreview({
         onPanResponderStart: rebaseTouches,
         onPanResponderEnd: rebaseTouches,
         onPanResponderMove: (event) => {
+          if (paging.current) return;
           observeMultiTouch(event);
           const start = gesture.current;
           const touch = touchGeometry(event);
@@ -380,7 +427,13 @@ export function ImagePreview({
             start.dragDistance = Math.hypot(dx, dy);
             if (pages.current) {
               start.axis ??= Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
-              dismissX.setValue(start.axis === "horizontal" ? dx : 0);
+              const stride = viewport.current.width + PAGE_GAP;
+              const atEdge = dx > 0 ? pages.current.index === 0 : pages.current.index === pages.current.count - 1;
+              dismissX.setValue(
+                pageOffset() + (start.axis === "horizontal"
+                  ? Math.max(-stride, Math.min(stride, dx * (atEdge ? 0.3 : 1)))
+                  : 0)
+              );
               dismissY.setValue(start.axis === "vertical" ? dy : 0);
             } else {
               dismissX.setValue(dx);
@@ -389,6 +442,7 @@ export function ImagePreview({
           }
         },
         onPanResponderRelease: (event) => {
+          if (paging.current) return;
           if (touchSession.current.tracked)
             touchSession.current.active = event.nativeEvent.touches.length;
           observeMultiTouch(event);
@@ -396,6 +450,7 @@ export function ImagePreview({
           gesture.current = null;
           const protectedTouch =
             start?.multiTouch || touchSession.current.multiTouch || touchSession.current.cancelled;
+          const cancelled = touchSession.current.cancelled;
           if (!touchSession.current.tracked) {
             touchSession.current.multiTouch = false;
             touchSession.current.cancelled = false;
@@ -403,7 +458,11 @@ export function ImagePreview({
           if (protectedTouch) {
             cancelTap();
             lastTap.current = null;
-            resetDismiss(true);
+            if (!cancelled && current.current.zoom <= PINCH_DISMISS_ZOOM) {
+              requestClose();
+            } else if (current.current.zoom < 1) {
+              update(ORIGINAL_PREVIEW, true);
+            } else resetDismiss(true);
             return;
           }
           if (!start || start.moved || Date.now() - start.startedAt > 400) {
@@ -465,12 +524,14 @@ export function ImagePreview({
           gesture.current = null;
           lastTap.current = null;
           cancelTap();
-          resetDismiss(true);
+          if (current.current.zoom < 1) update(ORIGINAL_PREVIEW, true);
+          else resetDismiss(true);
         },
       }),
     [scale, panX, panY, dismissX, dismissY]
   );
 
+  const renderPage = gallery?.renderPage;
   return (
     <Modal
       visible
@@ -510,6 +571,7 @@ export function ImagePreview({
           const { width, height } = event.nativeEvent.layout;
           if (width === viewport.current.width && height === viewport.current.height) return;
           viewport.current = { width, height };
+          setViewportWidth(width);
           viewportView.current?.measureInWindow((x, y) => {
             origin.current = { x, y };
           });
@@ -521,22 +583,37 @@ export function ImagePreview({
         onTouchEnd={trackTouches}
         onTouchCancel={cancelTouches}
       >
-        <Animated.View
-          style={[
-            styles.image,
-            {
-              transform: [
-                { translateX: panX },
-                { translateY: panY },
-                { translateX: dismissX },
-                { translateY: dismissY },
-                { scale },
-              ],
-            },
-          ]}
-        >
-          {children}
-        </Animated.View>
+        {[0, -1, 1].map((direction) => {
+          const index = (gallery?.index ?? 0) + direction;
+          const selected = direction === 0;
+          if (!selected && (!gallery || !renderPage || position.zoom !== 1 || viewportWidth <= 0 || index < 0 || index >= gallery.count))
+            return null;
+          return (
+            <Animated.View
+              key={`page-${index}`}
+              pointerEvents={selected ? "auto" : "none"}
+              accessible={false}
+              accessibilityElementsHidden={!selected}
+              importantForAccessibility={selected ? "auto" : "no-hide-descendants"}
+              testID={selected ? "image-preview-current" : `image-preview-neighbor-${direction}`}
+              style={[
+                styles.image,
+                {
+                  left: (index - firstIndex.current) * (viewportWidth + PAGE_GAP),
+                  transform: [
+                    { translateX: panX },
+                    { translateY: panY },
+                    { translateX: dismissX },
+                    { translateY: dismissY },
+                    { scale },
+                  ],
+                },
+              ]}
+            >
+              {renderPage ? renderPage(index) : children}
+            </Animated.View>
+          );
+        })}
         {gallery && gallery.count > 1 ? (
           <View pointerEvents="none" style={styles.pageIndicator}>
             <Text style={styles.pageText} accessibilityLiveRegion="polite">
@@ -551,7 +628,7 @@ export function ImagePreview({
 
 const styles = StyleSheet.create({
   viewport: { flex: 1, backgroundColor: "#111315", overflow: "hidden" },
-  image: { width: "100%", height: "100%" },
+  image: { position: "absolute", top: 0, width: "100%", height: "100%" },
   pageIndicator: { position: "absolute", bottom: 48, alignSelf: "center" },
   pageText: { color: "#ffffff", fontSize: 14 },
 });

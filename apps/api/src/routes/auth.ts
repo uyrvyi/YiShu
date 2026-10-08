@@ -6,6 +6,7 @@ import { createUserWithUidRetry, MAX_UID_RETRY } from "../lib/register.js";
 import { generateRefreshToken, hashRefreshToken } from "../lib/tokens.js";
 import { toUserPublicView } from "../lib/user-view.js";
 import { loginSchema, refreshSchema, registerSchema } from "../schemas/auth.js";
+import { assertServiceRegion } from "../lib/service-area.js";
 
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
@@ -41,6 +42,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: AUTH_LIMITS.register } },
     async (req, reply) => {
       const body = registerSchema.parse(req.body);
+      assertServiceRegion(body);
       const passwordHash = await hashPassword(body.password);
 
       // UID 碰撞自动重试（规范 §4.2）；account 冲突明确报错。

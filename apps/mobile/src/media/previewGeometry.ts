@@ -1,5 +1,7 @@
 export const PREVIEW_ZOOM = 2.5;
 export const MAX_PREVIEW_ZOOM = 5;
+export const MIN_PREVIEW_ZOOM = 0.35;
+export const PINCH_DISMISS_ZOOM = 0.65;
 export const ORIGINAL_PREVIEW = { zoom: 1, x: 0, y: 0 };
 export type PreviewPosition = typeof ORIGINAL_PREVIEW;
 
@@ -19,7 +21,7 @@ export function constrainPreview(
   height: number,
   aspectRatio: number
 ): PreviewPosition {
-  const zoom = Math.max(1, Math.min(MAX_PREVIEW_ZOOM, position.zoom));
+  const zoom = Math.max(MIN_PREVIEW_ZOOM, Math.min(MAX_PREVIEW_ZOOM, position.zoom));
   const frame = previewFrame(width, height, aspectRatio);
   const maxX = Math.max(0, (frame.width * zoom - width) / 2);
   const maxY = Math.max(0, (frame.height * zoom - height) / 2);
@@ -39,7 +41,7 @@ export function pinchPreview(
   aspectRatio: number
 ) {
   const zoom = Math.max(
-    1,
+    MIN_PREVIEW_ZOOM,
     Math.min(
       MAX_PREVIEW_ZOOM,
       position.zoom * (initial.distance > 0 ? touch.distance / initial.distance : 1)

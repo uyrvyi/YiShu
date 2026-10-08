@@ -28,7 +28,7 @@ describe("full-screen preview geometry", () => {
       y: 0,
     });
   });
-  it("anchors pinch scaling to the fingers and limits zoom to 1-5", () => {
+  it("anchors pinch scaling to the fingers and permits shrinking below the fit scale", () => {
     const initial = { x: 100, y: 300, distance: 100 };
     expect(
       pinchPreview(ORIGINAL_PREVIEW, initial, { ...initial, distance: 200 }, 400, 800, 0.5)
@@ -49,7 +49,7 @@ describe("full-screen preview geometry", () => {
         800,
         0.5
       )
-    ).toEqual(ORIGINAL_PREVIEW);
+    ).toEqual({ zoom: 0.35, x: 0, y: 0 });
     expect(
       pinchPreview(ORIGINAL_PREVIEW, { ...initial, distance: 0 }, initial, 400, 800, 0.5).zoom
     ).toBe(1);

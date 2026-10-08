@@ -2,7 +2,93 @@
 
 日期：2026-10-06。结论：逐项审核已形成可复核证据，**不是全国端点放行或生产上线 PASS**。生产默认运单规则和图注册表均未修改。
 
-## 347 项逐项结论
+## 区县端点与本市驿站整包对照
+
+服务范围沿用已确认的 `service-scope-20261006-r2`。逐项联查发现 22 个区县代表点与新图本市驿站重合，计时的起运／派送段会退化成一个点。仅针对这些重合项改用同源区界的内部代表点，再按原校验器检查县区、所属市和省的包含关系。没有手工偏移坐标、改变源区界或修改市驿站；代表点仍不是用户的精确街道地址。
+
+最新几何证据为 `data/maps/audit/endpoint-release-distinct-20261006/`，候选端点为 `data/maps/district-anchors-1.1-candidate.json`，SHA 为 `7925324e2ffa6e1ff74767e0f905af89beb08ddaa2d5b87ad66b98602c433d44`。先前 r1/r2 审计原样保留。新增 `--city-graph` 会校验新图输入 SHA、全部本市映射及市几何；如果内部代表点仍重合或不在父区，直接失败，不伪造位移。
+
+`verify_transport_assets.py` 从入库的候选端点读取，不依赖私有 `.local` 文件，逐项联查手机地区清单、后端目录、CSV 源点和新图：2851 项目录、2849 项服务端点、370 个本市驿站，缺失、错配、重合均为 0，22 项明确记录代表点调整。校验包含来源、政策、新图节点／映射／边 SHA，及冻结的旧图、旧地区选择和旧运行端点。结果见 `data/maps/audit/transport-1.1-candidate-20261006.json`，状态仍为 candidate，不能替代完整发布门禁。
+
+- 实施方 Docker GIS 全量 96 项通过；新增回归覆盖同源代表点选择、源对象不变、父区检查、仍重合时拒绝，以及整包漏项、重复、身份／坐标／驿站错配和非数值坐标拒绝。
+- 新图测试 6 项通过，包含四种方式共 1480 条路线，以及存储的三个新图运行资产与来源绑定重建结果逐字段相同。
+- API 全量 436 项／44 文件通过，类型检查通过。新增 3 项测试只在隔离测试进程中加载候选端点并注册新图，调用真实读取与校验函数，逐项覆盖全部 2849 个端点的 origin／destination 角色、同市驿站归属和非重合连接；金门及三沙南沙区无伪造端点，默认图仍为 `china-v2`。
+- 上述不是服务器运行或真机结果，没有激活实际地区清单、端点或图注册表。最新普通证据检查通过且服务范围无缺失项；`--require-release` 实跑仍返回 `release_gate_not_passed`，现行界线与地图发布核验仍 pending。
+
+随后修复独立审查发现的两项制品校验问题：冻结的 `china-v2` 三文件完整清单及 SHA 改为固定基线，候选清单不得删项、增项或自行重签旧文件；图输入来源路径统一为仓库内相对路径，相同文件用绝对路径生成时不会改变来源身份。新增真实 `verify_files` 内存篡改回归覆盖四种清单绕过及三个旧文件分别变化，均拒绝且不修改磁盘。原有候选数据、旧运行资产与默认图没有改动。
+
+独立只读复核已关闭这两项 P2，限定范围内没有新增发现：Reviewer 断网 Docker GIS 96 项通过，8 种冻结基线篡改全部拒绝；相对、绝对及含 `..` 的等价路径来源一致，仓库外路径拒绝，规范化后的来源通过真实联查。实施方另用 `/workspace/data/graphs/china-v3` 绝对路径完成全源 CLI 重生成，隔离输出 `.local/maps/endpoint-release-pathcheck-20261006/` 的候选端点和证据 summary 与已保存版本逐字节相同，下游联查通过。该复核不等于整个版本 Final Gate、正式地图批准或生产验收。
+
+## 完整候选数据的实际业务联调
+
+此前新图寄信集成仅在测试进程中注册 `china-v3`，仍读取旧运行端点。本轮将该测试进程同时切换到完整候选端点，真实运行注册、资料更新、寄信、Journey 初始化、地图／正文读取及数据库推进。磁盘运行端点、手机下拉清单、注册表和默认图均未替换。
+
+- 目标集成文件 29 项通过。新增黄浦区到浦东新区、杭州上城区到余杭区、重庆两江新区到永川区、草湖市同址寄信四项：实际 PATCH 更新地区，寄信后起运与派送两段坐标均不重合；第 3 小时到本市驿站并开始派送，第 9 小时送达。收件人送达前没有未来连接、未来路径或正文，送达后取得目的区县及正文。
+- 原有跨市、四种方式一年期回放、延迟初始化改地址、60 封积压并发初始化及停服／无效端点回归也使用完整候选端点，不再只使用旧库；全量运行的积压变更约 366 毫秒，仍不代表生产任意规模性能。
+- 本轮 Docker 实跑 API 440 项／44 文件、移动端 441 项／43 文件、共享包 69 项、Worker 9 项通过；API／移动端类型检查及 API 编译通过。
+- 云端配置 3 项通过：缺省及显式 `1.0` 保持旧配置，显式 `1.1` 只改变 API 新信创建开关。该纯解析脚本依赖 Docker Compose CLI，工具容器内缺少 CLI 的首次执行未运行断言；改用桌面自带 Node 调用现有 Mac Docker CLI 后通过，无新增安装、服务启动或数据库操作。
+- 本轮 Workbench 只读核对生产七个服务均 healthy，API/Worker 仍是 `e2ee-20261005-reviewed-r1`，预览仍是 `preview-20261006-auto-e2ee-r5`；API 中 `NEW_LETTER_RULES_VERSION` 未设置，注册表仍为 v1/v2、默认 v2。实际 `--require-release` 再次返回 `release_gate_not_passed`；未停写、备份、部署或切流。
+
+这不是全端点真实寄信穷举或 iPhone 原生验收，也不是整个版本 Final Gate。
+
+独立只读复核未发现新的 P1/P2。在断网、只读代码挂载及独立临时 PostgreSQL 中，Reviewer 重跑目标文件 29/29 通过，临时实例已清理。未 mock API、Prisma 或推进逻辑；只替换该测试进程的候选端点和图注册表，真实读取 v3 节点／边。复跑前后六个资产及测试文件 SHA 不变，默认 v2 未注册 v3。四个新增例使用 PIGEON、非 E2EE 正文和 app.inject，不代表生产 E2EE、外部 HTTP、Worker 或真机结果；API 全量与类型检查属于实施方结果，不记为 Reviewer 复跑。
+
+复跑整包检查（无需原始 GIS 大文件）：
+
+```sh
+docker run --rm --init --network none -v "$PWD:/workspace" \
+  yishu-gis-nlsc:local python scripts/gis/verify_transport_assets.py
+docker exec yishu-next-version-tools-1 node --test scripts/test-city-graph.mjs
+docker exec yishu-next-version-tools-1 pnpm --filter @yishu/api exec vitest run \
+  src/lib/transport-assets-candidate.test.ts
+```
+
+重新生成候选端点需要已核验的原始快照；输出仍不覆盖运行资产：
+
+```sh
+docker run --rm --init --network none --memory 3g -v "$PWD:/workspace" \
+  yishu-gis-nlsc:local python scripts/gis/audit_endpoint_release.py \
+  --city-graph data/graphs/china-v3 \
+  --anchor-output data/maps/district-anchors-1.1-candidate.json \
+  --output .local/maps/endpoint-release-distinct-20261006 \
+  --evidence-output data/maps/audit/endpoint-release-distinct-20261006
+```
+
+## 服务范围修订后的最新结果
+
+用户确认港澳台、金门县及三沙南沙区暂不提供服务。最新 r2 证据为 `data/maps/audit/endpoint-release-service-scope-20261006-r2/`，业务与审计共用 `packages/shared/src/service-scope.json`，原范围审计、r1 审计及原 347 项输入均保留。
+
+- 原 347 项：137 项几何候选、207 项不在正式县级清单、2 项已撤销、1 项金门县暂不服务；金门没有坐标、来源几何或几何 PASS。
+- 全部目录 2851 项；服务范围内 2849 项均有候选几何，金门与三沙南沙区共 2 项明确停服，无伪造端点。服务范围几何为 `snapshot_pass`，全目录仍为 pending，不因业务排除而宣称全国全目录通过。广州南沙 `440115` 不受影响。
+- 普通 r2 证据检查返回 `auditEvidence=PASS`、`originalRows=347`、`pendingCodes=[]`；`--require-release` 实际返回 `release_gate_not_passed`。全国现行界线变更完整性、公开地图发布核验及最终放行仍为 pending。r1 原证据仍保留南沙待补，不改写旧结果。
+- 最新 Docker 复跑：GIS 76 项、API 433 项、移动端 441 项、共享包 69 项、Worker 9 项通过；共享包构建和 API／移动端类型检查通过。新增范围回归拒绝篡改范围证据或将不服务写成几何通过，并核对三沙／广州同名地区及旧“南沙群岛”入口。iOS Hermes 隔离导出 3371 模块、23 资源通过，不替代真机验收。
+- 最新独立限定复核关闭三项发现：删掉南沙后重签数量／SHA 的完整性绕过、原 347 表与可选表的几何结论不一致、混合简繁名称漏拦。Reviewer 独立 GIS 73 项、11 组篡改共 22 次拒绝、23 种名称归一化及 5 个误封反例通过。没有独立复跑 API 等全量及数据库竞态，不构成完整发布批准；详细边界见 [服务范围复核](SERVICE_AVAILABILITY.md)。
+- 随后 r2 范围增量独立复核未发现新增 P1/P2：Reviewer GIS 75 项、11 个拒绝／12 个允许案例、16 组政策篡改及真实证据 14 次篡改拒绝通过。两版 `--require-release` 均拒绝；实施方后来增加的真实 r2 回归不标为 Reviewer 已复跑。
+
+## 新取得的官方全国地区树
+
+从[民政部国家地名信息库](https://dmfw.mca.gov.cn/XzqhVersionPublish.html)正常浏览器页面保存完整 DOM。虽然当时只展开上海，页面加载的整棵省／市／县区树均已保存。原件为 `.local/regions/mca-query-shanghai-20261006.html`，SHA-256 `c6611ef7f3a0cd16b45005957f1733190104f2618653e99ba3947ab59beb0abb`；没有绕过访问限制。
+
+`verify_mca_tree.py` 对原件 SHA、保存来源、唯一树结构、代码重复、真实省市父区及无区县城市分类逐项校验：31 个内地省级地区、2851 个端点，与草案的代码、名称、所属省市、层级类型全部一致。包括金门的目录身份，但不为其开放业务。报告见 `data/maps/audit/mca-live-tree-20261006.json`，身份对照为 PASS；新增 10 项解析／对照回归通过。
+
+地区树来自公开 `xzqh/getList` 的 `code=0, trimCode=true, maxLevel=3` 数据。页面另一个代码查询表声明 `Xzqh20251231`，但地区树实际包含岑岭、草湖等 2026 年新增条目，不能将该表名当成树的有效日期。报告 `effectiveThrough=null`，只记录 2026-10-06 的取得时间。名称代码对照没有证明所有行政界线变更已核验，故全国变更及地图发布门禁仍 pending，运行清单和生产未替换。
+
+复跑：
+
+```sh
+docker run --rm --init --network none -v "$PWD:/workspace" \
+  yishu-gis-nlsc:local python scripts/gis/verify_mca_tree.py
+
+docker run --rm --init --network none -v "$PWD:/workspace:ro" \
+  yishu-gis-nlsc:local python scripts/gis/check_endpoint_evidence.py \
+  data/maps/audit/endpoint-release-service-scope-20261006-r2
+```
+
+普通证据检查 PASS 不是发布批准，必须另行通过 `--require-release`。
+
+以下为范围修订之前的历史快照，不代表当前金门业务状态。
+
+## 347 项原范围结论
 
 | 结论             | 数量 | 含义                                                               |
 | ---------------- | ---: | ------------------------------------------------------------------ |
@@ -123,7 +209,7 @@ docker run --rm --init --network none --memory 1g \
 
 最后一条只检查审计证据完整性。加 `--require-release` 将在上线门禁仍 pending 时拒绝放行，不能将它的普通 PASS 当作上线批准。
 
-## 剩余来源排查
+## 历史来源排查
 
 - 已取得[福建省自然资源厅 2026 年政务用图发布说明](https://zrzyt.fujian.gov.cn/zwgk/xwdt/zrzyyw/202604/t20260408_7120364.htm)。其中明确包含金门县，公开文件为 JPG；下载入口为[福建标准地图服务](https://bzdt.fjmap.net/)。原公告缓存 SHA：`3906ed92feef8f77fcda2c44d60c3509cba6df29b43ea5cc065d247e95071cf9`。公告证明有参考资料，不证明已取得符合本项目精度的矢量县界；没有从图片手描边界或套用审图号。
 - 福建标准地图页面可读取，但本次按其公开页面请求 GDB 目录超时，未取得并核验矢量文件。未将下载失败计作数据通过，也未改在线底图。
@@ -131,10 +217,14 @@ docker run --rm --init --network none --memory 1g \
 - 民政部国家地名信息库现行区划页面／公开树接口本次访问为 403，未取得全国现行原件；未绕过限制，也未将社区镜像视作官方版本证明。
 - 三沙南沙区仍无适用的同源完整区界；搜索中的广州南沙标准地图属于 `440115`，不能补 `460303`。
 
-以上均保持 pending。取得区界数据之后仍需检查适用口径、坐标系、来源许可和公开发布要求，不能仅因存在可下载图片便放行。
+上述是此前排查的历史结果。后续已取得官方全国地区树，详见前文；金门县和三沙南沙区经确认停服，其区界缺口只保留作未来开通条件，不再阻塞本次服务范围内的候选几何联查。全国界线现行性与公开发布核验仍单独记录，不能仅因资料可下载而放行。
 
-## 上线前尚未完成
+## 切流前历史待办
 
-补齐两项可靠区界、完成全国现行变更与公开地图发布要求核验，再完成端点库替换、地区列表兼容、图注册和新流程联调。随后执行独立审查、服务器备份及部署、新寄信和旧信对照、iPhone 真机复验。任何一步未完成，都不能启用生产 `1.1` 或标记最终上线 PASS。
+服务范围内候选端点、本市驿站和隔离新流程联调已完成，停服地区不要求本轮补齐区界。全国现行界线与本版本公开地图核验仍缺可绑定的资料，机器发布门禁尚未放行；用户确认已记录，不再追问，也未写成正式批准。前置放行后，仍须实际替换正式端点／手机地区清单、注册新图、完成最终发布审查、服务器配对备份与恢复验证、部署、新旧信对照及 iPhone 真机复验。任一步未完成，都不能标记整个版本最终上线 PASS。
 
 具体切流、备份与回滚边界见 [1.1 运单发布检查](TRANSPORT_1_1_RELEASE_CHECKLIST.md)。该清单尚未执行，不代表批准切换。
+
+## 2026-10-06 实际发布更新
+
+后续用户明确要求继续部署 1.1，并减少重复审查。本次没有重复全量审计或再派独立 Reviewer；完成运行库分版本选择和真实手机地区清单启用的聚焦测试后，执行服务器配对备份、全表与全部媒体恢复校验、新制品切流及 HTTPS 临时账号业务冒烟测试，均通过。新信现使用 1.1 / china-v3，旧信冻结资产与端点库保留。详见 [服务器发布记录](TRANSPORT_1_1_SERVER_RELEASE.md)。正式地图批准与界线现行性仍 unverified，真机最终结果仍 pending，未把此前资料或审查缺口改成 PASS。

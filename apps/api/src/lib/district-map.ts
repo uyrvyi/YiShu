@@ -28,11 +28,17 @@ const schema = z.object({
     })
   ),
 });
-let anchors: z.infer<typeof schema>["anchors"] | undefined;
-export function districtPoint(region: Region): MapStation | null {
-  anchors ??= schema.parse(
-    JSON.parse(readFileSync(path.join(getDataDir(), "maps/district-anchors.json"), "utf8"))
-  ).anchors;
+const anchorLibraries = new Map<string, z.infer<typeof schema>["anchors"]>();
+export function districtPoint(region: Region, graphVersion = "china-v2"): MapStation | null {
+  const filename =
+    graphVersion === "china-v3" ? "district-anchors-1.1-candidate.json" : "district-anchors.json";
+  let anchors = anchorLibraries.get(filename);
+  if (!anchors) {
+    anchors = schema.parse(
+      JSON.parse(readFileSync(path.join(getDataDir(), "maps", filename), "utf8"))
+    ).anchors;
+    anchorLibraries.set(filename, anchors);
+  }
   const point = anchors[[region.province, region.city, region.district].join("/")];
   if (
     !point ||
@@ -50,6 +56,7 @@ export function withDistrictConnections(
   input: {
     origin: Region;
     target: Region;
+    graphVersion?: string;
     sender: boolean;
     nowMs: number;
     originStationReadyAtMs: number | null;
@@ -62,8 +69,9 @@ export function withDistrictConnections(
   const arrivedOrigin = events.some((event) => event.sourceKey === "pickup:arrived");
   const delivered = events.find((event) => event.type === "DELIVERED");
   const terminal = ["DELIVERED", "PERMANENTLY_LOST", "DESTROYED"].includes(view.status);
-  const origin = dispatch ? districtPoint(input.origin) : null;
-  const targetPoint = input.sender || delivered ? districtPoint(input.target) : null;
+  const origin = dispatch ? districtPoint(input.origin, input.graphVersion) : null;
+  const targetPoint =
+    input.sender || delivered ? districtPoint(input.target, input.graphVersion) : null;
   const collecting = input.originStationReadyAtMs !== null && !arrivedOrigin;
   const originCity = view.origin;
   const targetCity = view.destination;

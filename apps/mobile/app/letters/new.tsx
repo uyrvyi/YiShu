@@ -5,6 +5,7 @@ import {
   Image,
   Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   Check,
   Clock3,
@@ -55,6 +56,7 @@ import {
 import { problemMessage, TRANSPORT_LABELS } from "../../src/ui/presentation";
 import { C, UI } from "../../src/ui/theme";
 import { formatEstimatedDuration, TRANSPORT_DESCRIPTIONS } from "../../src/ui/transport";
+import { SendLetterRitual } from "../../src/letters/LetterRitual";
 
 const MAX_CONTENT = 2000;
 interface DraftUpload {
@@ -76,6 +78,9 @@ export default function NewLetterScreen() {
   const idempotencyKey = useRef(`cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   const requestSequence = useRef(0);
   const sending = useRef(false);
+  const live = useRef(true);
+  const sendSession = useRef(getSessionVersion());
+  const afterSendDismiss = useRef<(() => void) | null>(null);
   const writtenAt = useRef<string | null>(null);
   const createRequest = useRef<CreateLetterInput | null>(null);
   const picking = useRef(false);
@@ -104,6 +109,7 @@ export default function NewLetterScreen() {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [uploads, setUploads] = useState<DraftUpload[]>([]);
   const [bodyHeight, setBodyHeight] = useState(220);
+  const [sendRitual, setSendRitual] = useState<{ trackingNo: string | null } | null>(null);
   const recipientUid = recipient?.uid;
   const previewImage = images.find((image) => image.localUri === previewUri);
   const previewItems = [...images, ...uploads];
@@ -119,8 +125,10 @@ export default function NewLetterScreen() {
 
   useEffect(() => {
     const lifecycle = draftMedia.current!;
+    live.current = true;
     lifecycle.activate();
     return () => {
+      live.current = false;
       // A failed response may already have bound these images to a letter.
       void lifecycle.dispose(createRequest.current !== null);
     };
@@ -332,12 +340,21 @@ export default function NewLetterScreen() {
       return;
     }
     const sequence = ++requestSequence.current;
+    const generation = getSessionVersion();
+    setRecipient(null);
     setSearching(true);
     try {
-      const result = await getApi().searchRecipient(query);
-      if (requestSequence.current === sequence) setRecipient(result);
+      const [result, currentUser] = await Promise.all([
+        getApi().searchRecipient(query), getApi().getCurrentUser(),
+      ]);
+      if (!live.current || generation !== getSessionVersion() || requestSequence.current !== sequence) return;
+      if (result.uid === currentUser.uid) {
+        Alert.alert("不能给自己寄信", "请选择其他收件人。");
+        return;
+      }
+      setRecipient(result);
     } catch (failure) {
-      if (requestSequence.current === sequence) {
+      if (live.current && generation === getSessionVersion() && requestSequence.current === sequence) {
         if (failure instanceof AuthExpiredError) router.replace("/");
         else Alert.alert("收件人未找到", problemMessage(failure));
       }
@@ -355,11 +372,21 @@ export default function NewLetterScreen() {
     )
       return;
     sending.current = true;
+    Keyboard.dismiss();
+    sendSession.current = getSessionVersion();
+    const generation = sendSession.current;
+    const current = () => live.current && generation === getSessionVersion();
+    const notify = (action: () => void) => {
+      if (Platform.OS === "ios") afterSendDismiss.current = () => { if (current()) action(); };
+      else action();
+    };
     requestSequence.current++;
     setSearching(false);
     setBusy(true);
     setConfirm(false);
+    setSendRitual({ trackingNo: null });
     let created = !!pendingTrackingNo;
+    let waitingForSeal = false;
     try {
       let trackingNo = pendingTrackingNo;
       if (!trackingNo) {
@@ -380,11 +407,16 @@ export default function NewLetterScreen() {
         const letter = await getApi().createLetter(createRequest.current);
         trackingNo = letter.trackingNo;
         created = true;
+        if (!current()) return;
         setPendingTrackingNo(trackingNo);
       }
       await getApi().initializeJourney(trackingNo);
-      router.replace(`/letters/${trackingNo}`);
+      if (!current()) return;
+      waitingForSeal = true;
+      setSendRitual({ trackingNo });
     } catch (failure) {
+      if (!current()) return;
+      setSendRitual(null);
       // A timeout may have committed: retry the identical request rather than create a duplicate.
       const encryptionCode =
         failure instanceof LetterApiError
@@ -395,14 +427,14 @@ export default function NewLetterScreen() {
       if (!created && encryptionCode.startsWith("e2ee_")) {
         createRequest.current = null;
         idempotencyKey.current = `cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-        Alert.alert("暂时无法加密寄信", problemMessage(failure), [
+        notify(() => Alert.alert("暂时无法加密寄信", problemMessage(failure), [
           { text: "取消", style: "cancel" },
           {
             text: "加密设置",
             onPress: () =>
               router.push({ pathname: "/encryption", params: { uid: recipient?.uid } }),
           },
-        ]);
+        ]));
         return;
       }
       if (
@@ -416,10 +448,13 @@ export default function NewLetterScreen() {
         idempotencyKey.current = `cr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       }
       if (failure instanceof AuthExpiredError) router.replace("/");
-      else Alert.alert(created ? "路线未建立" : "发送未完成", problemMessage(failure));
+      else notify(() => Alert.alert(created ? "路线未建立" : "发送未完成", problemMessage(failure)));
     } finally {
-      sending.current = false;
-      setBusy(false);
+      if (!waitingForSeal && current()) {
+        sending.current = false;
+        setBusy(false);
+        setSendRitual(null);
+      }
     }
   }
 
@@ -742,6 +777,17 @@ export default function NewLetterScreen() {
             index: previewIndex,
             count: previewItems.length,
             onChange: (next) => setPreviewUri(previewItems[next].localUri),
+            renderPage: (page) => (
+              <Image
+                source={{ uri: previewItems[page].localUri }}
+                resizeMode="contain"
+                style={styles.fullImage}
+                onError={() => {
+                  if (page === previewIndex)
+                    Alert.alert("图片无法预览", "请关闭后重试，或重新选择图片。");
+                }}
+              />
+            ),
           }}
         >
           <Image
@@ -753,12 +799,27 @@ export default function NewLetterScreen() {
         </ImagePreview>
       ) : null}
       <Modal
-        visible={confirm}
+        visible={confirm || sendRitual !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setConfirm(false)}
+        onRequestClose={() => { if (!sending.current) setConfirm(false); }}
+        onDismiss={() => {
+          const notify = afterSendDismiss.current;
+          afterSendDismiss.current = null;
+          notify?.();
+        }}
       >
-        <View style={styles.modalBackdrop}>
+        <SafeAreaProvider>
+        {sendRitual ? <SendLetterRitual
+          ready={sendRitual.trackingNo !== null}
+          onComplete={() => {
+            if (!sending.current || !live.current || sendSession.current !== getSessionVersion() || !sendRitual.trackingNo) return;
+            sending.current = false;
+            setBusy(false);
+            setSendRitual(null);
+            router.replace(`/letters/${sendRitual.trackingNo}`);
+          }}
+        /> : <View style={styles.modalBackdrop}>
           <View style={styles.modal} accessibilityViewIsModal>
             <ScrollView
               style={styles.modalScroll}
@@ -787,14 +848,15 @@ export default function NewLetterScreen() {
                 {content}
               </Text>
               <ActionButton
-                title={busy ? "寄送中…" : "确认寄出"}
+                title={busy ? "寄送中…" : "确认发送"}
                 icon={Send}
                 onPress={() => void send()}
                 disabled={busy}
               />
             </ScrollView>
           </View>
-        </View>
+        </View>}
+        </SafeAreaProvider>
       </Modal>
     </SafeAreaView>
   );

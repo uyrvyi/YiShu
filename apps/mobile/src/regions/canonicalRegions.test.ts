@@ -1,12 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import candidate from "./data/pca-current.json";
+import { describe, expect, it } from "vitest";
 import catalog from "../../../../data/regions/canonical-candidate.json";
 import { citiesFor, districtsFor, regionFromAddress, provinces } from "./regions";
 
-// Exercise the existing picker with the proposed data, without activating it in the app.
-vi.mock("./data/pca-code.json", () => ({ default: candidate }));
-
-describe("canonical region picker candidate", () => {
+describe("active canonical region picker", () => {
   it("exposes exactly the same 2851 region triples as the backend catalog", () => {
     const selected = provinces.flatMap((province) =>
       citiesFor(province.name).flatMap((city) =>

@@ -11,13 +11,17 @@ const hooks = vi.hoisted(() => ({
   pan: {} as Record<string, (...args: any[]) => any>,
   Value: class {
     value: number;
+    animation?: ReturnType<typeof setTimeout>;
     constructor(value: number) {
       this.value = value;
     }
     setValue = vi.fn((value: number) => {
       this.value = value;
     });
-    stopAnimation = vi.fn();
+    stopAnimation = vi.fn(() => {
+      if (this.animation) clearTimeout(this.animation);
+      this.animation = undefined;
+    });
   },
 }));
 vi.mock("react", async (original) => ({
@@ -47,6 +51,14 @@ vi.mock("react", async (original) => ({
       hooks.cleanup.push(factory());
     }
   },
+  useLayoutEffect(factory: () => void, dependencies: unknown[]) {
+    const index = hooks.cursor++;
+    const previous = hooks.slots[index] as unknown[] | undefined;
+    if (!previous || dependencies.some((value, i) => value !== previous[i])) {
+      hooks.slots[index] = dependencies;
+      factory();
+    }
+  },
 }));
 vi.mock("react-native", () => ({
   View: "View",
@@ -56,7 +68,15 @@ vi.mock("react-native", () => ({
   Animated: {
     View: "AnimatedView",
     Value: hooks.Value,
-    timing: () => ({ start: vi.fn() }),
+    timing: (value: InstanceType<typeof hooks.Value>, config: { toValue: number; duration: number }) => ({
+      start: (done?: (result: { finished: boolean }) => void) => {
+        value.animation = setTimeout(() => {
+          value.animation = undefined;
+          value.setValue(config.toValue);
+          done?.({ finished: true });
+        }, config.duration);
+      },
+    }),
   },
   PanResponder: {
     create: (config: typeof hooks.pan) => {
@@ -231,6 +251,7 @@ describe("letter gallery gestures", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
     viewport.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+    vi.advanceTimersByTime(220);
     expect(onChange).toHaveBeenCalledOnce();
     expect(onChange).toHaveBeenCalledWith(2);
     expect(hooks.slots[0]).toEqual({ zoom: 1, x: 0, y: 0 });
@@ -245,6 +266,101 @@ describe("letter gallery gestures", () => {
     vi.advanceTimersByTime(350);
     expect(close).toHaveBeenCalledOnce();
     expect(onChange).not.toHaveBeenCalled();
+  });
+  it("slides cached neighbors with the outgoing image and commits only after settling", () => {
+    const close = vi.fn();
+    const onChange = vi.fn();
+    const gallery = { index: 1, count: 3, onChange, renderPage: (index: number) => `picture-${index}` };
+    let tree = render(close, 0.5, gallery);
+    tree.find((node) => node.props.testID === "image-preview-viewport")
+      .props.onLayout({ nativeEvent: { layout: { width: 400, height: 800 } } });
+    tree = render(close, 0.5, gallery);
+    const transform = renderedTransform(tree);
+    const neighbors = tree.filter((node) => node.props.testID?.startsWith("image-preview-neighbor"));
+    expect(neighbors.map((node) => node.props.children)).toEqual(["picture-0", "picture-2"]);
+    expect(neighbors.map((node) => node.props.style[1].left)).toEqual([-416, 416]);
+    for (const neighbor of neighbors)
+      expect(neighbor.props.style[1].transform[2].translateX).toBe(transform[2].translateX);
+    hooks.pan.onPanResponderGrant(touches(0));
+    hooks.pan.onPanResponderMove(touches(0, 70));
+    expect(nativePixels(transform).x).toBe(-130);
+    hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+    expect(onChange).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(219);
+    expect(onChange).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onChange).toHaveBeenCalledWith(2);
+    expect(nativePixels(transform).x).toBe(-416);
+    const incoming = neighbors.find((node) => node.props.children === "picture-2");
+    const incomingKey = incoming.key;
+    const incomingNativeKey = createCompositeKeyForProps({ style: incoming.props.style }, null);
+    expect(incoming.props.style[1].left + nativePixels(incoming.props.style[1].transform).x).toBe(0);
+    tree = render(close, 0.5, { ...gallery, index: 2 });
+    const selected = tree.find((node) => node.props.testID === "image-preview-current");
+    expect(selected.key).toBe(incomingKey);
+    expect(selected.props.children).toBe(incoming.props.children);
+    expect(selected.props.style[1].left).toBe(incoming.props.style[1].left);
+    expect(areCompositeKeysEqual(incomingNativeKey, createCompositeKeyForProps({ style: selected.props.style }, null), null)).toBe(true);
+    expect(nativePixels(renderedTransform(tree))).toEqual({ zoom: 1, x: -416, y: 0 });
+    expect(selected.props.style[1].left + nativePixels(renderedTransform(tree)).x).toBe(0);
+    // Moving back keeps the previous page's coordinates and native graph, too.
+    const previous = tree.find((node) => node.props.testID === "image-preview-neighbor--1");
+    tree.find((node) => node.props.testID === "image-preview-viewport")
+      .props.onAccessibilityAction({ nativeEvent: { actionName: "decrement" } });
+    vi.advanceTimersByTime(220);
+    expect(previous.props.style[1].left + nativePixels(previous.props.style[1].transform).x).toBe(0);
+    tree = render(close, 0.5, gallery);
+    const returned = tree.find((node) => node.props.testID === "image-preview-current");
+    expect(returned.key).toBe(previous.key);
+    expect(returned.props.children).toBe(previous.props.children);
+    expect(returned.props.style[1].left + nativePixels(returned.props.style[1].transform).x).toBe(0);
+    expect(close).not.toHaveBeenCalled();
+  });
+  it("cannot change pages or schedule a close while a page is settling", () => {
+    const { viewport, close, onChange } = setup();
+    viewport.props.onAccessibilityAction({ nativeEvent: { actionName: "increment" } });
+    viewport.props.onAccessibilityAction({ nativeEvent: { actionName: "decrement" } });
+    hooks.pan.onPanResponderGrant(touches(0));
+    hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+    vi.advanceTimersByTime(1000);
+    expect(onChange.mock.calls).toEqual([[2]]);
+    expect(close).not.toHaveBeenCalled();
+  });
+});
+
+describe("pinch-to-dismiss", () => {
+  it.each([[0.5, true], [0.65, true], [0.8, false], [1.5, false]])(
+    "releases a pinch at scale %s (dismiss=%s)", (zoom, dismissed) => {
+      const close = vi.fn();
+      const viewport = render(close).find((node) => node.props.testID === "image-preview-viewport");
+      viewport.props.onLayout({ nativeEvent: { layout: { width: 400, height: 800 } } });
+      viewport.props.onTouchStart(touches(100));
+      hooks.pan.onPanResponderGrant(touches(100));
+      hooks.pan.onPanResponderMove(touches(100 * zoom));
+      expect((hooks.slots[0] as { zoom: number }).zoom).toBe(zoom);
+      expect(close).not.toHaveBeenCalled();
+      // Lifting fingers one at a time must preserve the final scale and protection.
+      hooks.pan.onPanResponderEnd(touches(0));
+      hooks.pan.onPanResponderMove(touches(0, 350));
+      viewport.props.onTouchEnd({ nativeEvent: { touches: [] } });
+      hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+      vi.advanceTimersByTime(1000);
+      expect(close).toHaveBeenCalledTimes(dismissed ? 1 : 0);
+      if (!dismissed) expect((hooks.slots[0] as { zoom: number }).zoom).toBe(Math.max(1, zoom));
+    }
+  );
+  it("returns a cancelled shrinking pinch without dismissing", () => {
+    const close = vi.fn();
+    const viewport = render(close).find((node) => node.props.testID === "image-preview-viewport");
+    viewport.props.onLayout({ nativeEvent: { layout: { width: 400, height: 800 } } });
+    viewport.props.onTouchStart(touches(100));
+    hooks.pan.onPanResponderGrant(touches(100));
+    hooks.pan.onPanResponderMove(touches(50));
+    viewport.props.onTouchCancel({ nativeEvent: { touches: [] } });
+    hooks.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
+    vi.advanceTimersByTime(1000);
+    expect(hooks.slots[0]).toEqual({ zoom: 1, x: 0, y: 0 });
+    expect(close).not.toHaveBeenCalled();
   });
 });
 

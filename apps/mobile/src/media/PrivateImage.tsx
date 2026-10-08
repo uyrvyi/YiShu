@@ -141,6 +141,15 @@ export function PrivateImages({ images }: { images: LetterImage[] }) {
             index,
             count: images.length,
             onChange: (next) => setActiveId(images[next].id),
+            renderPage: (page) => (
+              <ImagePixels
+                key={images[page].id}
+                id={images[page].id}
+                pixels={cache.read(images[page].id)}
+                onRetry={() => cache.retry(images[page].id)}
+                fullscreen
+              />
+            ),
           }}
         >
           <ImagePixels

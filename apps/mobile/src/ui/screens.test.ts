@@ -8,6 +8,9 @@ import type { RouteMapViewParsed } from "@yishu/shared";
 const harness = vi.hoisted(() => ({
   state: new Map<number, unknown>(),
   cursor: 0,
+  refCursor: 0,
+  refs: [] as unknown[],
+  persistentRefs: false,
   polls: [] as unknown[],
   pollCursor: 0,
   navigate: vi.fn(),
@@ -15,6 +18,12 @@ const harness = vi.hoisted(() => ({
   params: {} as Record<string, string>,
   deleteImage: vi.fn(),
   uploadImage: vi.fn(),
+  createLetter: vi.fn(),
+  initializeJourney: vi.fn(),
+  openLetter: vi.fn(),
+  getLetter: vi.fn(),
+  searchRecipient: vi.fn(),
+  getCurrentUser: vi.fn(),
   preparePreview: vi.fn(),
   optimizeImage: vi.fn(),
   encryptionStatus: vi.fn(),
@@ -46,8 +55,10 @@ vi.mock("react", async (importOriginal) => ({
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),
   useEffect: () => undefined,
-  useRef: (current: unknown) => ({ current }),
-  useSyncExternalStore: () => false,
+  useLayoutEffect: () => undefined,
+  useRef: (current: unknown) => harness.persistentRefs
+    ? (harness.refs[harness.refCursor++] ??= { current }) : ({ current }),
+  useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
 }));
 
 vi.mock("react-native", () => ({
@@ -70,7 +81,7 @@ vi.mock("react-native", () => ({
     }),
     timing: (_value: unknown, config: unknown) => {
       harness.animate(config);
-      return { start: vi.fn() };
+      return { start: (done?: (result: { finished: boolean }) => void) => done?.({ finished: true }) };
     },
   },
   PanResponder: {
@@ -99,6 +110,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
+  SafeAreaProvider: "SafeAreaProvider",
   useSafeAreaInsets: () => ({ top: 59, bottom: 34 }),
 }));
 vi.mock("expo-glass-effect", () => ({
@@ -193,7 +205,12 @@ vi.mock("../api", () => ({
     recover: harness.encryptionRecover,
     verifyContact: harness.encryptionVerify,
   },
-  getApi: () => ({ deleteStagedImage: harness.deleteImage, uploadImage: harness.uploadImage }),
+  getApi: () => ({
+    deleteStagedImage: harness.deleteImage, uploadImage: harness.uploadImage,
+    createLetter: harness.createLetter, initializeJourney: harness.initializeJourney,
+    openLetter: harness.openLetter, getLetter: harness.getLetter,
+    searchRecipient: harness.searchRecipient, getCurrentUser: harness.getCurrentUser,
+  }),
   getSessionVersion: () => 1,
   isAuthenticated: vi.fn(),
   subscribeSession: vi.fn(),
@@ -206,6 +223,7 @@ vi.mock("../refresh/usePolling", () => ({
   usePolling: () => ({ data: harness.polls[harness.pollCursor++], error: null, refresh: vi.fn() }),
 }));
 vi.mock("../map/InteractiveRouteMap", () => ({ InteractiveRouteMap: "InteractiveRouteMap" }));
+vi.mock("../letters/LetterRitual", () => ({ SendLetterRitual: "SendLetterRitual", ReadLetterRitual: "ReadLetterRitual" }));
 
 import LettersScreen from "../../app/letters/index";
 import LetterDetailScreen from "../../app/letters/[trackingNo]";
@@ -262,6 +280,7 @@ function press(node: Element) {
 }
 function rerender() {
   harness.cursor = 0;
+  harness.refCursor = 0;
   harness.pollCursor = 0;
 }
 
@@ -299,6 +318,8 @@ const map: RouteMapViewParsed = {
 
 beforeEach(() => {
   harness.state.clear();
+  harness.refs = [];
+  harness.persistentRefs = false;
   harness.polls = [];
   harness.params = {};
   rerender();
@@ -467,9 +488,9 @@ describe("移动端页面结构与交互", () => {
     expect(harness.state.get(0)).toEqual({ zoom: 2, x: 0, y: 0 });
     harness.pan.onPanResponderMove(pinch(600));
     expect(harness.state.get(0)).toEqual({ zoom: 5, x: 0, y: 0 });
-    harness.pan.onPanResponderMove(pinch(20));
+    harness.pan.onPanResponderMove(pinch(100));
     expect(harness.state.get(0)).toEqual({ zoom: 1, x: 0, y: 0 });
-    harness.pan.onPanResponderRelease(pinch(20));
+    harness.pan.onPanResponderRelease(pinch(100));
     vi.advanceTimersByTime(500);
     expect(close).not.toHaveBeenCalled();
   });
@@ -575,7 +596,7 @@ describe("移动端页面结构与交互", () => {
     preview(close);
     harness.pan.onPanResponderGrant(pinch(100));
     harness.pan.onPanResponderMove(pinch(200));
-    harness.pan.onPanResponderMove(pinch(50, 300, 600));
+    harness.pan.onPanResponderMove(pinch(100, 300, 600));
     harness.pan.onPanResponderEnd(touch());
     harness.pan.onPanResponderMove(touch(500, 700));
     harness.pan.onPanResponderRelease({ nativeEvent: { touches: [] } });
@@ -1335,6 +1356,8 @@ describe("移动端页面结构与交互", () => {
     tree = elements(LetterDetailScreen());
     expect(tree.some((node) => node.props.accessibilityLabel === "查看完整图片")).toBe(true);
     expect(text(tree).some((value) => value.startsWith("写于"))).toBe(true);
+    expect(text(tree)).toContain(letter.content);
+    expect(tree.some((node) => node.type === "ReadLetterRitual")).toBe(false);
   });
 
   it("物流默认显示最新三条，展开后显示全部，收起后恢复三条", () => {
@@ -1525,6 +1548,50 @@ describe("移动端页面结构与交互", () => {
       minHeight: 0,
     });
   });
+
+  it.each([
+    {
+      level: "province",
+      value: { province: "", city: "", district: "" },
+      item: { code: "81", name: "香港特别行政区" },
+    },
+    {
+      level: "district",
+      value: { province: "福建省", city: "泉州市", district: "" },
+      item: { code: "350527", name: "金门县" },
+    },
+    {
+      level: "district",
+      value: { province: "海南省", city: "三沙市", district: "" },
+      item: { code: "460303", name: "南沙区" },
+    },
+    {
+      level: "district",
+      value: { province: "海南省", city: "三沙市", district: "" },
+      item: { code: "460322", name: "南沙群岛" },
+    },
+  ])(
+    "unavailable $item.name is labelled and opens a popup without changing the region",
+    async ({ level, value, item }) => {
+      const { Alert } = await import("react-native");
+      const onChange = vi.fn();
+      harness.state.set(0, level);
+      const tree = elements(RegionSelector({ value, onChange }));
+      const list = tree.find((node) => node.type === "FlatList");
+      if (!list) throw new Error("Missing region list");
+      const renderItem = list.props.renderItem as (args: { item: typeof item }) => ReactNode;
+      const row = elements(renderItem({ item }));
+      expect(text(row)).toContain("暂未开通服务");
+      const option = row.find((node) => node.type === "Pressable");
+      if (!option) throw new Error("Missing region option");
+      press(option);
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "暂未开通服务",
+        "该地区暂未开通服务，请选择已开通地区。"
+      );
+      expect(onChange).not.toHaveBeenCalled();
+    }
+  );
 
   it("安卓键盘框使用高度避让，原生 iOS 模式不会禁用安卓避让", async () => {
     const { Platform } = await import("react-native");
@@ -1738,6 +1805,89 @@ describe("共用控件", () => {
     };
     expect(style.minHeight).toBe(UI.controlHeight);
     expect(style).toMatchObject({ borderRadius: 26, borderCurve: "continuous", shadowRadius: 10 });
+  });
+
+  it("寄信仪式在请求和路线完成前不导航，封口完成后只导航一次", async () => {
+    harness.persistentRefs = true;
+    harness.state.set(3, { uid: "87654321", nickname: "收件人", region: letter.target });
+    harness.state.set(5, "测试信纸");
+    harness.state.set(7, true);
+    let created!: (value: { trackingNo: string }) => void;
+    let routed!: () => void;
+    harness.createLetter.mockImplementation(() => new Promise((done) => { created = done; }));
+    harness.initializeJourney.mockImplementation(() => new Promise<void>((done) => { routed = done; }));
+    let tree = elements(NewLetterScreen());
+    const send = button(tree, "确认发送");
+    press(send); press(send);
+    expect(harness.createLetter).toHaveBeenCalledTimes(1);
+    created({ trackingNo: "YS-NEW" }); await Promise.resolve(); await Promise.resolve();
+    expect(harness.initializeJourney).toHaveBeenCalledWith("YS-NEW");
+    expect(harness.navigate).not.toHaveBeenCalled();
+    rerender(); tree = elements(NewLetterScreen());
+    expect(tree.find((node) => node.type === "SendLetterRitual")?.props.ready).toBe(false);
+    routed(); await Promise.resolve(); await Promise.resolve();
+    rerender(); tree = elements(NewLetterScreen());
+    const ritual = tree.find((node) => node.type === "SendLetterRitual")!;
+    expect(ritual.props.ready).toBe(true);
+    (ritual.props.onComplete as () => void)(); (ritual.props.onComplete as () => void)();
+    expect(harness.navigate).toHaveBeenCalledTimes(1);
+    expect(harness.navigate).toHaveBeenCalledWith("/letters/YS-NEW");
+  });
+
+  it("寄信仪式路线失败保留信件编号和草稿，重试不重复创建", async () => {
+    harness.persistentRefs = true;
+    harness.state.set(3, { uid: "87654321", nickname: "收件人", region: letter.target });
+    harness.state.set(5, "原来的草稿");
+    harness.state.set(7, true);
+    harness.createLetter.mockResolvedValue({ trackingNo: "YS-SAVED" });
+    harness.initializeJourney.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    press(button(elements(NewLetterScreen()), "确认发送"));
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(harness.state.get(9)).toBe("YS-SAVED");
+    expect(harness.state.get(5)).toBe("原来的草稿");
+    expect(harness.state.get(17)).toBeNull();
+    expect(harness.navigate).not.toHaveBeenCalled();
+    rerender();
+    const tree = elements(NewLetterScreen());
+    const retry = tree.find((node) => node.type === "Pressable" && String(node.props.accessibilityLabel).includes("重试"));
+    expect(retry).toBeDefined(); press(retry!);
+    await Promise.resolve(); await Promise.resolve();
+    expect(harness.createLetter).toHaveBeenCalledTimes(1);
+    expect(harness.initializeJourney).toHaveBeenCalledTimes(2);
+  });
+
+  it("查找自己时弹窗提醒，不保留收件人且不能寄出", async () => {
+    const { Alert } = await import("react-native");
+    harness.state.set(2, "12345678");
+    harness.state.set(3, { uid: "87654321", nickname: "原收件人", region: letter.target });
+    harness.searchRecipient.mockResolvedValue({ uid: "12345678" });
+    harness.getCurrentUser.mockResolvedValue({ uid: "12345678" });
+    const tree = elements(NewLetterScreen());
+    const find = tree.find((node) => node.type === "Pressable" && node.props.accessibilityLabel === "搜索收件人")!;
+    press(find);
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(Alert.alert).toHaveBeenCalledWith("不能给自己寄信", "请选择其他收件人。");
+    expect(harness.state.get(3)).toBeNull();
+    expect(harness.createLetter).not.toHaveBeenCalled();
+  });
+
+  it("拆开按钮只进入仪式，点击骑缝章才调用拆阅接口", async () => {
+    harness.polls = [{ letter: { ...letter, status: "DELIVERED", readState: "UNOPENED" }, timeline: facts }];
+    harness.openLetter.mockResolvedValue(undefined);
+    harness.getLetter.mockResolvedValue({ ...letter, status: "DELIVERED", readState: "OPENED" });
+    let tree = elements(LetterDetailScreen());
+    press(button(tree, "拆开"));
+    expect(harness.openLetter).not.toHaveBeenCalled();
+    rerender(); tree = elements(LetterDetailScreen());
+    const reader = tree.find((node) => node.type === "ReadLetterRitual")!;
+    await (reader.props.onOpen as () => Promise<unknown>)();
+    expect(harness.openLetter).toHaveBeenCalledWith("YS-TEST");
+    expect(harness.getLetter).toHaveBeenCalledWith("YS-TEST");
+    (reader.props.onComplete as (letter: LetterView) => void)({ ...letter, status: "DELIVERED", readState: "OPENED" });
+    rerender();
+    expect(elements(LetterDetailScreen()).some((node) => node.type === "ReadLetterRitual")).toBe(false);
+    rerender();
+    expect(text(elements(LetterDetailScreen()))).toContain(letter.content);
   });
 
   it("输入框聚焦显示绿色边框，且不改变尺寸", () => {

@@ -22,6 +22,7 @@ import { ActionButton, FormInput, KeyboardFrame } from "../src/ui/controls";
 import { problemMessage } from "../src/ui/presentation";
 import { C, UI } from "../src/ui/theme";
 import { RegionSelector } from "../src/regions/RegionSelector";
+import { isRegionServiceUnavailable, REGION_SERVICE_UNAVAILABLE_MESSAGE } from "@yishu/shared";
 
 function authMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -66,6 +67,10 @@ export default function HomeScreen() {
 
   async function submit() {
     if (busy) return;
+    if (mode === "register" && isRegionServiceUnavailable({ province, city, district })) {
+      showError(REGION_SERVICE_UNAVAILABLE_MESSAGE);
+      return;
+    }
     const normalized = account.trim();
     if (!/^[a-zA-Z0-9_]{4,24}$/.test(normalized) || /^\d{8}$/.test(normalized)) {
       showError("账号需为 4–24 位字母、数字或下划线，不能是 8 位纯数字");

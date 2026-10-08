@@ -20,6 +20,7 @@ import {
 import { materializeVisibleTimeline } from "../lib/timeline.js";
 import { projectNextStationEstimate } from "../lib/map-view.js";
 import { assertDistrictTransportRegion } from "../lib/district-transport-validation.js";
+import { assertServiceRegion } from "../lib/service-area.js";
 
 export async function estimateRoutes(app: FastifyInstance): Promise<void> {
   app.post(
@@ -46,6 +47,8 @@ export async function estimateRoutes(app: FastifyInstance): Promise<void> {
       });
       if (blocked) return reply.code(403).send({ error: "blocked_by_recipient" });
       try {
+        assertServiceRegion(sender);
+        assertServiceRegion(recipient);
         const graphVersion = getDefaultGraphVersion();
         if (app.config.NEW_LETTER_RULES_VERSION === "1.1") {
           assertDistrictTransportRegion(sender, graphVersion, "origin");

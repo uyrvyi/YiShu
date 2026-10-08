@@ -47,6 +47,10 @@ function makeAuthApiClient(baseUrl: string): ApiClient {
         body: JSON.stringify(input),
       });
       if (!res.ok) {
+        if (res.status === 422) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          if (body?.error === "region_service_unavailable") throw new Error(body.error);
+        }
         throw new Error(`register_failed:${res.status}`);
       }
       return (await res.json()) as {

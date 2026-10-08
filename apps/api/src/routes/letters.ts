@@ -32,6 +32,7 @@ import {
   InvalidTransportRegionError,
 } from "../lib/district-transport-validation.js";
 import { E2EE_VERSION, identityRegistrationSchema, verifyLetter } from "@yishu/shared/e2ee";
+import { assertServiceRegion, RegionServiceUnavailableError } from "../lib/service-area.js";
 
 interface LetterWithState extends Letter {
   recipientState?: RecipientState | null;
@@ -80,6 +81,9 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
       });
       if (!recipient) {
         return reply.code(404).send({ error: "user_not_found" });
+      }
+      if (recipient.id === sender.id) {
+        return reply.code(400).send({ error: "cannot_send_to_self" });
       }
 
       // 请求指纹（规范化 recipient UID + content + transportType，规范 §67）
@@ -181,6 +185,8 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
               const currentRecipient = await tx.user.findUniqueOrThrow({
                 where: { id: recipient.id },
               });
+              assertServiceRegion(currentSender);
+              assertServiceRegion(currentRecipient);
               const graphVersion = getDefaultGraphVersion();
               if (req.server.config.NEW_LETTER_RULES_VERSION === "1.1") {
                 assertDistrictTransportRegion(currentSender, graphVersion, "origin");
@@ -281,7 +287,11 @@ export async function letterRoutes(app: FastifyInstance): Promise<void> {
               }
               return { kind: "created" as const, value: original, existed: true };
             }
-            if (err instanceof InvalidTransportRegionError) throw err;
+            if (
+              err instanceof InvalidTransportRegionError ||
+              err instanceof RegionServiceUnavailableError
+            )
+              throw err;
             const fields = conflictFields(err);
             if (fields.includes("trackingNo")) {
               return { kind: "collision" as const };

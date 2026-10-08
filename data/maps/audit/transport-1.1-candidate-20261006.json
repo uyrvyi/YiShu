@@ -1,0 +1,48 @@
+{
+  "status": "candidate",
+  "verification": "selection_endpoint_city_hub_join_pass",
+  "summary": {
+    "selectedRegions": 2851,
+    "serviceableRegions": 2849,
+    "unavailableCodes": [
+      "350527",
+      "460303"
+    ],
+    "anchors": 2849,
+    "cityHubs": 370,
+    "distinctEndpointRepresentatives": 22,
+    "missingEndpointsOrHubs": 0,
+    "wrongIdentities": 0,
+    "coincidentEndpointHubPairs": 0
+  },
+  "inputSha256": {
+    "data/maps/audit/endpoint-release-distinct-20261006/summary.json": "766f0738df2aba666c08e8946db81f642e61a05111016ebcb4d7a8792554fe40",
+    "data/maps/audit/endpoint-release-distinct-20261006/selected-regions.csv": "48917bbd6f5cefe6ee69a856efd94da733f939cc99c8a6910a079ac05c8557f0",
+    "data/maps/district-anchors-1.1-candidate.json": "7925324e2ffa6e1ff74767e0f905af89beb08ddaa2d5b87ad66b98602c433d44",
+    "apps/mobile/src/regions/data/pca-current.json": "930bd3c5a0171679d246bd8c64ccb7059b4ad0b6f67c28a1dd252345daab2fc9",
+    "data/regions/canonical-candidate.json": "b7d0df53c51402346231bfe8a0944cddc5fdf4c7b3f2e34c0a72bd22a44ef8a4",
+    "data/graphs/china-v3/station_nodes.json": "744db9593393a1e57ed0b980c223127bf7bb22f33fc6dc95b3684e9d8817698e",
+    "data/graphs/china-v3/region_station_map.json": "824b59ae903b72a5c55b96bea5987c71a6b2f97c3f360759da812812b7334e07",
+    "data/graphs/china-v3/manifest.json": "4efe49d35441832aa8deadd7e6dede6ce8f04a0e3c568961fa948dd592a8f7e3",
+    "data/graphs/china-v3/route_edges.json": "117e2b04cc92274efab241eb8e6e6b23268aec677494ebafc00ce7c473e44ee4",
+    "data/graphs/china-v2/station_nodes.json": "64be6aa1348efebbabeaf6640f6dcde46eadb547416b1c3d592993bbf8041ca3",
+    "data/graphs/china-v2/route_edges.json": "c58306c6a16c893df63288b188b6d88e1ca9cc36278b2efe6f85ab7820bef50c",
+    "data/graphs/china-v2/region_station_map.json": "bb196ce39f18be922333af5d416ddc495d7e57b00fbe44013afebc0a333ec384",
+    "data/graphs/registry.json": "c439462f1eb736dc58372b51344fa083d3f006a7eef5126ed2874533289c8b28",
+    "packages/shared/src/service-scope.json": "1e2dd6d6e4a466b89492d66cc6c11adad71bb409c2a2f1649506169dc0a6c8f3",
+    "data/maps/district-anchors.json": "3a17cf5a08bf4f7e50f57e8d1c88dc7729060741ef1b2ada39ba2eb88cb041ad",
+    "apps/mobile/src/regions/data/pca-code.json": "83b7536f853ad16beb4d37b92890a3fd7bb9d33d4f37e7c8885fb948749a9bc4"
+  },
+  "serviceScope": "service-scope-20261006-r2",
+  "releaseApproval": "pending",
+  "releaseGates": {
+    "officialIdentity": "baseline_pass",
+    "allSelectedGeometry": "pending",
+    "currentDivisionChangesThrough20261006": "pending",
+    "mapPublicationApproval": "pending",
+    "release": "pending",
+    "allServiceableGeometry": "snapshot_pass"
+  },
+  "runtimeFilesChanged": false,
+  "limitations": "Snapshot data join only; not transport execution, official boundary certification, map approval, server deployment or device acceptance."
+}

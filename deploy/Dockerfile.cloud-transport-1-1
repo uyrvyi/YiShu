@@ -1,0 +1,12 @@
+ARG API_BASE_IMAGE=yishu-server:e2ee-20261005-reviewed-r1
+ARG PREVIEW_BASE_IMAGE=yishu-cloud-preview:preview-20261006-auto-e2ee-r5
+FROM ${API_BASE_IMAGE} AS api
+COPY --chown=65532:65532 apps/api/dist/ /workspace/apps/api/dist/
+COPY --chown=65532:65532 apps/worker/dist/ /workspace/apps/worker/dist/
+COPY --chown=65532:65532 packages/ /workspace/packages/
+COPY --chown=65532:65532 data/ /workspace/data/
+
+FROM ${PREVIEW_BASE_IMAGE} AS preview
+COPY --chown=node:node apps/mobile/ /workspace/apps/mobile/
+COPY --chown=node:node packages/shared/ /workspace/packages/shared/
+

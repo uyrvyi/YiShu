@@ -19,6 +19,7 @@ import { estimateRoutes } from "./routes/estimates.js";
 import { mediaRoutes } from "./routes/media.js";
 import { MediaError } from "./lib/media.js";
 import { InvalidTransportRegionError } from "./lib/district-transport-validation.js";
+import { RegionServiceUnavailableError } from "./lib/service-area.js";
 import { encryptionRoutes } from "./routes/encryption.js";
 
 /**
@@ -157,7 +158,11 @@ export function buildApp(
   // 统一安全错误处理：输入错误保留 4xx，其余返回通用 500（不泄漏内部信息）。
   app.setErrorHandler((err, _req, reply) => {
     const code = (err as { code?: string }).code;
-    if (err instanceof MediaError || err instanceof InvalidTransportRegionError) {
+    if (
+      err instanceof MediaError ||
+      err instanceof InvalidTransportRegionError ||
+      err instanceof RegionServiceUnavailableError
+    ) {
       return reply.code(err.statusCode).send({ error: err.code });
     }
     if (code === "FST_REQ_FILE_TOO_LARGE") {

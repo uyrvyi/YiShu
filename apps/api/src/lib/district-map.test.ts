@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { TimelineEvent } from "@yishu/db";
 import type { MapStation, RouteMapView } from "@yishu/shared";
-import { withDistrictConnections } from "./district-map.js";
+import { districtPoint, withDistrictConnections } from "./district-map.js";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { getDataDir } from "./stationGraph.js";
 const origin = { province: "上海市", city: "上海市", district: "黄浦区" };
 const target = { ...origin, district: "浦东新区" };
 const station: MapStation = {
@@ -57,6 +60,17 @@ const input = {
   stations: [station],
 };
 describe("district display projection", () => {
+  it("keeps old graph coordinates frozen while new mail uses the new endpoint library", () => {
+    for (const graphVersion of ["china-v1", "china-v2", "china-v3"]) {
+      const filename =
+        graphVersion === "china-v3"
+          ? "district-anchors-1.1-candidate.json"
+          : "district-anchors.json";
+      const library = JSON.parse(readFileSync(path.join(getDataDir(), "maps", filename), "utf8"));
+      const expected = library.anchors[`${origin.province}/${origin.city}/${origin.district}`];
+      expect(districtPoint(origin, graphVersion)).toMatchObject({ x: expected.x, y: expected.y });
+    }
+  });
   it("does not reveal a future pickup fact or recipient target", () => {
     const view = withDistrictConnections(base, {
       ...input,

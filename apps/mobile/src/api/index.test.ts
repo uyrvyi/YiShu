@@ -143,6 +143,25 @@ describe("shared api session", () => {
     expect(body.account).toBe("alice");
   });
 
+  it("preserves the unavailable-region error for the registration popup", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: "region_service_unavailable" }), { status: 422 })
+      );
+    await expect(
+      registerSession({
+        account: "denied",
+        password: "test-password",
+        nickname: "test",
+        province: "台湾省",
+        city: "台北市",
+        district: "中正区",
+      })
+    ).rejects.toThrow("region_service_unavailable");
+    expect(secureStore.size).toBe(0);
+  });
+
   it("logoutSession 调用 /auth/logout", async () => {
     const fetchMock = vi
       .fn()

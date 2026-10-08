@@ -1,4 +1,5 @@
 import type { TransportType } from "@yishu/shared";
+import { REGION_SERVICE_UNAVAILABLE, REGION_SERVICE_UNAVAILABLE_MESSAGE } from "@yishu/shared";
 import type { LetterView } from "../api/letterApi";
 import { LetterApiError } from "../api/letterApi";
 import { AuthExpiredError } from "../api/authenticatedFetch";
@@ -36,6 +37,11 @@ export function statusTone(status: LetterView["status"]): "green" | "muted" | "o
 }
 
 export function problemMessage(error: unknown): string {
+  if (
+    (error instanceof Error && error.message === REGION_SERVICE_UNAVAILABLE) ||
+    (error instanceof LetterApiError && error.code === REGION_SERVICE_UNAVAILABLE)
+  )
+    return REGION_SERVICE_UNAVAILABLE_MESSAGE;
   const encryptionMessages: Record<string, string> = {
     e2ee_setup_required: "本机加密尚未准备就绪，请检查网络后重试。",
     e2ee_recovery_required: "本机没有可用密钥，请使用恢复码恢复。账号密码不能代替恢复码。",
@@ -65,11 +71,14 @@ export function problemMessage(error: unknown): string {
   if (error instanceof LetterApiError) {
     const messages: Record<string, string> = {
       blocked_by_recipient: "无法寄送给这位收件人",
+      cannot_send_to_self: "不能给自己寄信，请选择其他收件人",
       user_not_found: "未找到该用户",
       letter_not_found: "信件不存在或无法查看",
       no_station_mapping: "当前地址暂时没有可用路线",
-      origin_region_unavailable: "你的所在地区暂不支持完整运输路线，请在“我的”中重新选择省、市、区县",
-      destination_region_unavailable: "收件人的地区暂不支持完整运输路线，请对方重新选择省、市、区县",
+      origin_region_unavailable:
+        "你的所在地区暂不支持完整运输路线，请在“我的”中重新选择省、市、区县",
+      destination_region_unavailable:
+        "收件人的地区暂不支持完整运输路线，请对方重新选择省、市、区县",
       unknown_graph_version: "路线数据暂时不可用",
       idempotency_conflict: "草稿已变更，请重新写信",
       not_delivered: "信件送达后才能拆阅",

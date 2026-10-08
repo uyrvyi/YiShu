@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { changeRegion, citiesFor, districtsFor, provinces, regionFromAddress } from "./regions";
+import {
+  changeRegion,
+  citiesFor,
+  districtsFor,
+  provinces,
+  provinceOptions,
+  regionFromAddress,
+} from "./regions";
 
 describe("province/city/district selection", () => {
+  it("shows unavailable province placeholders without adding serviceable subdivisions", () => {
+    expect(provinceOptions).toHaveLength(34);
+    for (const name of ["香港特别行政区", "澳门特别行政区", "台湾省"]) {
+      expect(provinceOptions.some((province) => province.name === name)).toBe(true);
+      expect(citiesFor(name)).toEqual([]);
+    }
+  });
   it("contains actual offline mainland data, including districts in every municipality", () => {
     expect(provinces).toHaveLength(31);
     for (const province of provinces) {

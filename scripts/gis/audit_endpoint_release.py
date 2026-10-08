@@ -16,6 +16,7 @@ from pathlib import Path
 from district_snapshot import SOURCE_SHA256, load_cache, source_digest
 from division_changes import apply_division_changes
 from endpoint_supplements import SUPPLEMENT_SHA256, apply_supplements
+from service_scope import load_service_scope, unavailable_codes
 
 MCA_URL = "https://www.mca.gov.cn/mzsj/xzqh/2025/202401xzqh.html"
 MCA_SHA256 = "d4669f6c81091287127147720bad0f3c3465e9e2a2dcc7e887893cc787a23431"
@@ -25,6 +26,12 @@ NO_DISTRICT_CITIES = {"441900", "442000", "460400", "620200"}
 CHONGQING_CODES_URL = "https://mzj.cq.gov.cn/zwgk_218/zfxxgkml/tzgg/202512/t20251205_15215632.html"
 CHONGQING_BOUNDARY_URL = "https://admin.cq.gov.cn/zwgk/zfxxgkml/szfwj/qtgw/202511/t20251107_15148513.html"
 NAME_FIELDS = {"name", "name:zh", "name:zh-Hans", "official_name", "official_name:zh", "official_name:zh-Hans"}
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def city_graph_input_hashes(paths, contents):
+    return {path.resolve().relative_to(ROOT).as_posix(): hashlib.sha256(content).hexdigest()
+            for path, content in zip(paths, contents, strict=True)}
 
 
 class TableParser(HTMLParser):
@@ -207,12 +214,41 @@ def verify_chongqing_patch(directory, official):
                      {"url": CHONGQING_BOUNDARY_URL, "sha256": hashlib.sha256(boundary_bytes).hexdigest()}]
 
 
-def build_report(original, regions, official, areas, unassembled, provenance):
+def distinct_endpoint_area(region, area, areas, city_hubs):
+    if area is None or city_hubs is None:
+        return area
+    hub = city_hubs.get(region["province"] + "/" + region["city"])
+    if hub is None:
+        raise ValueError("endpoint_city_hub_missing:" + region["code"])
+
+    def coincides(point):
+        x, y = (point.x + 180) / 360 * 1000, (90 - point.y) / 180 * 800
+        return abs(x - hub["mapX"]) < 0.000002 and abs(y - hub["mapY"]) < 0.000002
+
+    if not coincides(area["point"]):
+        return area
+    point = area["geometry"].representative_point()
+    if coincides(point):
+        raise ValueError("endpoint_representative_point_coincident:" + region["code"])
+    replacement = {**area, "point": point,
+                   "pointMethod": "district_interior_representative_point_distinct_from_city_hub"}
+    candidate, _ = geometry_check(region, [replacement if current is area else current for current in areas])
+    if candidate is not replacement:
+        raise ValueError("endpoint_representative_point_parent_check_failed:" + region["code"])
+    return replacement
+
+
+def build_report(original, regions, official, areas, unassembled, provenance, service_scope=None, city_hubs=None):
+    excluded = unavailable_codes(regions, service_scope)
+    if service_scope is not None:
+        provenance = {**provenance, "serviceScope": service_scope}
     selected = {r["code"]: r for r in regions}
     all_checks, anchors = [], {}
     for region in regions:
         identity = identity_check(region, official)
-        area, geometry = geometry_check(region, areas) if identity == "official_identity_match" else (None, "not_checked")
+        area, geometry = (None, "not_required_service_unavailable") if region["code"] in excluded else \
+            geometry_check(region, areas) if identity == "official_identity_match" else (None, "not_checked")
+        area = distinct_endpoint_area(region, area, areas, city_hubs)
         check = {**region, "identity": identity, "geometry": geometry,
                  "officialSource": provenance.get("officialAdditions", {}).get(region["code"], {}).get("announcementUrl",
                                    CHONGQING_CODES_URL if region["code"] == "500157" else MCA_URL),
@@ -234,13 +270,14 @@ def build_report(original, regions, official, areas, unassembled, provenance):
     for region in original:
         current = checks_by_code.get(region["code"])
         if current:
-            disposition = "geometry_candidate" if current["sourceEvidence"] else "geometry_pending"
+            disposition = "service_unavailable" if region["code"] in excluded else \
+                "geometry_candidate" if current["sourceEvidence"] else "geometry_pending"
             row = {**region, "disposition": disposition, "current": current}
         else:
             retired = region["code"] in {"500105", "500112"}
-            excluded = region["code"] not in official
+            absent_from_official = region["code"] not in official
             row = {**region, "disposition": "retired_official_division" if retired else
-                   "not_in_official_county_list" if excluded else "selection_omits_official_division",
+                   "not_in_official_county_list" if absent_from_official else "selection_omits_official_division",
                    "officialSource": CHONGQING_CODES_URL if retired else MCA_URL,
                    "officialName": official.get(region["code"]),
                    "relatedAreas": related_areas(region, areas)}
@@ -254,16 +291,20 @@ def build_report(original, regions, official, areas, unassembled, provenance):
     summary = {"originalBlocked": len(rows), "dispositions": dict(sorted(Counter(r["disposition"] for r in rows).items())),
                "selectedRegions": len(regions), "candidateRegions": len(anchors),
                "identityFailures": sum(c["identity"] != "official_identity_match" for c in all_checks),
-               "geometryFailures": dict(sorted(Counter(c["geometry"] for c in all_checks if not c["sourceEvidence"]).items())),
+               "geometryFailures": dict(sorted(Counter(c["geometry"] for c in all_checks if not c["sourceEvidence"] and c["code"] not in excluded).items())),
                "officialCountiesMissingFromSelection": missing_official,
                "selectedCountiesAbsentFromOfficialList": unsupported}
     report = {"provenance": provenance, "summary": summary, "original347": rows,
               "allSelectedChecks": all_checks,
               "gates": {"officialIdentity": "pending" if not regions or summary["identityFailures"] or missing_official or unsupported else "baseline_pass",
-                        "allSelectedGeometry": "pending" if not regions or len(anchors) != len(regions) else "snapshot_pass",
+                        "allSelectedGeometry": "pending" if not regions or len(anchors) != len(regions) - len(excluded) else "snapshot_pass",
                         "currentDivisionChangesThrough20261006": "pending",
                         "mapPublicationApproval": "pending", "release": "pending"},
               "runtimeFilesChanged": False}
+    if service_scope is not None:
+        summary.update(serviceableRegions=len(regions) - len(excluded), unavailableRegions=len(excluded))
+        report["gates"]["allServiceableGeometry"] = report["gates"]["allSelectedGeometry"]
+        report["gates"]["allSelectedGeometry"] = "snapshot_pass" if regions and len(anchors) == len(regions) else "pending"
     return report, anchors
 
 
@@ -271,7 +312,10 @@ def write_evidence(report, directory, report_bytes):
     directory.mkdir(parents=True, exist_ok=True)
     summary = {k: report[k] for k in ("provenance", "summary", "gates", "runtimeFilesChanged")}
     summary["fullReportSha256"] = hashlib.sha256(report_bytes).hexdigest()
-    summary["pendingRegions"] = [c for c in report["allSelectedChecks"] if not c["sourceEvidence"]]
+    excluded = unavailable_codes(report["allSelectedChecks"], report["provenance"].get("serviceScope"))
+    summary["pendingRegions"] = [c for c in report["allSelectedChecks"] if not c["sourceEvidence"] and c["code"] not in excluded]
+    if report["provenance"].get("serviceScope"):
+        summary["unavailableRegions"] = [c for c in report["allSelectedChecks"] if c["code"] in excluded]
     with (directory / "original-347.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
         writer.writerow(["code", "province", "city", "district", "originalReason", "disposition", "identity", "geometry", "officialSource", "osmId"])
@@ -308,6 +352,8 @@ def main():
     parser.add_argument("--supplement", type=Path, default=Path(".local/water-source/endpoint-supplements-20261003.osm.pbf"))
     parser.add_argument("--output", type=Path, default=Path(".local/maps/endpoint-release-audit-20261006"))
     parser.add_argument("--evidence-output", type=Path)
+    parser.add_argument("--city-graph", type=Path)
+    parser.add_argument("--anchor-output", type=Path)
     args = parser.parse_args()
     source_digest(args.source)
     mca = (args.official_directory / "mca-2024.html").read_bytes()
@@ -340,12 +386,39 @@ def main():
                   "supplementSha256": SUPPLEMENT_SHA256 if corrections_bytes else None,
                   "invalidAreas": invalid, "unassembledRelations": len(unassembled),
                   "limitations": "Official baseline plus evidenced patches; not certification of all 2026 changes, community boundary accuracy or map publication approval."}
-    report, anchors = build_report(original["unresolved"], regions, official, areas, unassembled, provenance)
+    city_hubs = None
+    if args.city_graph:
+        from station_candidates import verify_candidate_graph
+        graph_files = [args.city_graph / name for name in ("station_nodes.json", "region_station_map.json")]
+        graph_bytes = [path.read_bytes() for path in graph_files]
+        nodes, mapping = [json.loads(content) for content in graph_bytes]
+        manifest = json.loads((args.city_graph / "manifest.json").read_bytes())
+        if any(hashlib.sha256(content).hexdigest() != manifest["outputSha256"][path.name]
+               for path, content in zip(graph_files, graph_bytes)):
+            raise ValueError("endpoint_city_graph_integrity_failed")
+        if verify_candidate_graph(regions, areas, nodes, mapping)["geometry"] != "snapshot_pass":
+            raise ValueError("endpoint_city_graph_geometry_failed")
+        by_id = {node["id"]: node for node in nodes}
+        if len(by_id) != len(nodes) or mapping.get("provinceFallback") != "reject":
+            raise ValueError("endpoint_city_graph_mapping_invalid")
+        city_hubs = {}
+        for region in regions:
+            node = by_id.get(mapping["cities"].get(region["city"]))
+            if not node or node["city"] != region["city"] or node["province"] != region["province"]:
+                raise ValueError("endpoint_city_hub_identity_failed:" + region["code"])
+            city_hubs[region["province"] + "/" + region["city"]] = node
+        provenance["cityGraphInputSha256"] = city_graph_input_hashes(graph_files, graph_bytes)
+    report, anchors = build_report(original["unresolved"], regions, official, areas, unassembled, provenance,
+                                   load_service_scope(), city_hubs)
     args.output.mkdir(parents=True, exist_ok=True)
     report_bytes = (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode()
     (args.output / "audit.json").write_bytes(report_bytes)
-    (args.output / "candidate-anchors.json").write_text(json.dumps(
-        {"source": provenance, "anchors": anchors, "releaseApproval": "pending"}, ensure_ascii=False, separators=(",", ":")) + "\n")
+    anchor_bytes = (json.dumps({"source": report["provenance"], "anchors": anchors, "releaseApproval": "pending"},
+                               ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+    (args.output / "candidate-anchors.json").write_bytes(anchor_bytes)
+    if args.anchor_output:
+        args.anchor_output.parent.mkdir(parents=True, exist_ok=True)
+        args.anchor_output.write_bytes(anchor_bytes)
     write_evidence(report, args.output, report_bytes)
     if args.evidence_output:
         write_evidence(report, args.evidence_output, report_bytes)

@@ -4,6 +4,7 @@ import { advanceJourneyWithinTransaction } from "@yishu/domain";
 import { resolveStationForRegion } from "./stationGraph.js";
 import { assertDistrictTransportRegion } from "./district-transport-validation.js";
 import { createJourneyWithinTransaction } from "./journey.js";
+import { assertServiceRegion } from "./service-area.js";
 
 interface ProfileUpdate {
   nickname?: string;
@@ -30,6 +31,7 @@ export async function updateProfile(
           region.city !== current.city ||
           region.district !== current.district);
       if (regionChanged) {
+        assertServiceRegion(region);
         const now = clock.now();
         const fixedClock = { now: () => now } as SimulationClock;
         const letters = await tx.letter.findMany({

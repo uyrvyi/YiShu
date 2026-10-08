@@ -3,6 +3,7 @@
  */
 
 import { z } from "zod";
+export * from "./serviceAvailability.js";
 
 /** API 统一前缀（对应开发规范 §71）。 */
 export const API_PREFIX = "/api/v1";

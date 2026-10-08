@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,9 +10,12 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { ChevronRight, EyeOff, LockKeyhole, MailOpen } from "lucide-react-native";
-import { getApi } from "../../src/api";
+import { getApi, getSessionVersion, subscribeSession } from "../../src/api";
+import type { LetterView } from "../../src/api/letterApi";
+import { ReadLetterRitual } from "../../src/letters/LetterRitual";
+import { openReadableLetter, readableLetter } from "../../src/letters/ritual";
 import { AuthExpiredError } from "../../src/api/authenticatedFetch";
 import { formatFactTime } from "../../src/map/presentation";
 import { DETAIL_POLL_MS } from "../../src/refresh/poller";
@@ -19,11 +23,23 @@ import { usePolling } from "../../src/refresh/usePolling";
 import { ActionButton, Notice, ScreenHeader } from "../../src/ui/controls";
 import { bodyTextFor, isTerminal, problemMessage, statusCopy } from "../../src/ui/presentation";
 import { C, UI } from "../../src/ui/theme";
-import { PrivateImages } from "../../src/media/PrivateImage";
+import { LetterPaper, PaperReader, type PaperFrame } from "../../src/letters/LetterPaper";
 
 export default function LetterDetailScreen() {
   const { trackingNo } = useLocalSearchParams<{ trackingNo: string }>();
   const [busy, setBusy] = useState(false);
+  const [reader, setReader] = useState<{ letter: LetterView; session: number } | null>(null);
+  const [revealed, setRevealed] = useState<{ letter: LetterView; session: number } | null>(null);
+  const [paperReader, setPaperReader] = useState<{ letter: LetterView; session: number } | null>(null);
+  const [closePaper, setClosePaper] = useState(false);
+  const paper = useRef<View>(null);
+  const paperFrame = useRef<PaperFrame | undefined>(undefined);
+  function measurePaper() {
+    paper.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) paperFrame.current = { x, y, width, height };
+    });
+  }
+  const session = useSyncExternalStore(subscribeSession, getSessionVersion, getSessionVersion);
   const load = useCallback(async () => {
     const [letter, timeline] = await Promise.all([
       getApi().getLetter(trackingNo),
@@ -32,7 +48,8 @@ export default function LetterDetailScreen() {
     return { letter, timeline };
   }, [trackingNo]);
   const { data, error, refresh } = usePolling(load, DETAIL_POLL_MS);
-  const letter = data?.letter;
+  const letter = revealed?.session === session && revealed.letter.trackingNo === trackingNo && data?.letter.readState !== "OPENED"
+    ? revealed.letter : data?.letter;
   const latest = data?.timeline.at(-1);
   const recipientView = letter?.readState !== undefined;
   const bodyText = letter ? bodyTextFor(letter) : null;
@@ -69,7 +86,7 @@ export default function LetterDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page}>
+      <ScrollView contentContainerStyle={styles.page} onScroll={measurePaper} scrollEventThrottle={64}>
         <ScreenHeader
           title="信件详情"
           backLabel="返回查件"
@@ -132,16 +149,14 @@ export default function LetterDetailScreen() {
                   }}
                 />
               ) : null}
-              {bodyText !== null ? (
-                <>
-                  <Text selectable style={styles.body}>
-                    {bodyText}
-                  </Text>
-                  <PrivateImages images={letter.images ?? []} />
-                  {letter.writtenAt ? (
-                    <Text style={styles.writtenAt}>写于 {formatFactTime(letter.writtenAt)}</Text>
-                  ) : null}
-                </>
+              {bodyText !== null && !letter.decryptionError ? (
+                <View ref={paper} collapsable={false} onLayout={measurePaper}>
+                  <LetterPaper letter={letter} onPress={() => {
+                    measurePaper();
+                    setClosePaper(false);
+                    setPaperReader({ letter, session });
+                  }} />
+                </View>
               ) : (
                 <View style={styles.locked}>
                   <LockKeyhole size={19} color={C.muted} />
@@ -157,10 +172,10 @@ export default function LetterDetailScreen() {
               {recipientView && letter.status === "DELIVERED" && letter.readState !== "OPENED" ? (
                 <View style={styles.action}>
                   <ActionButton
-                    title={busy ? "拆阅中…" : "拆阅信件"}
+                    title="拆开"
                     icon={MailOpen}
                     disabled={busy}
-                    onPress={() => void act(() => getApi().openLetter(trackingNo))}
+                    onPress={() => setReader({ letter, session })}
                   />
                 </View>
               ) : null}
@@ -194,6 +209,40 @@ export default function LetterDetailScreen() {
           </>
         ) : null}
       </ScrollView>
+      {reader && reader.session === session && reader.letter.trackingNo === trackingNo ? (
+        <ReadLetterRitual
+          key={`${session}:${trackingNo}`}
+          letter={reader.letter}
+          onClose={() => { setReader(null); void refresh(); }}
+          getPaperTarget={() => paperFrame.current}
+          onRevealed={(result) => {
+            if (getSessionVersion() === session && result.trackingNo === trackingNo)
+              setRevealed({ letter: result, session });
+            measurePaper();
+          }}
+          onComplete={(result) => {
+            if (getSessionVersion() !== session || result.trackingNo !== trackingNo || !readableLetter(result)) return;
+            setRevealed({ letter: result, session });
+            setReader(null);
+            void refresh();
+          }}
+          onOpen={async () => {
+            const result = await openReadableLetter(trackingNo, getApi());
+            // Prepare the authorized destination while the envelope is still opaque.
+            if (getSessionVersion() === session && result.trackingNo === trackingNo)
+              setRevealed({ letter: result, session });
+            return result;
+          }}
+        />
+      ) : null}
+      {paperReader && paperReader.session === session && paperReader.letter.trackingNo === trackingNo ? (
+        <Modal visible transparent animationType="none" presentationStyle="overFullScreen" onRequestClose={() => setClosePaper(true)}>
+          <SafeAreaProvider>
+            <PaperReader key={`${session}:${trackingNo}`} letter={paperReader.letter} closeRequested={closePaper}
+              getTarget={() => paperFrame.current} onClose={() => setPaperReader(null)} />
+          </SafeAreaProvider>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -241,13 +290,6 @@ const styles = StyleSheet.create({
     borderColor: C.line,
   },
   heading: { color: C.muted, fontSize: 13, fontWeight: "600", marginBottom: 22 },
-  writtenAt: { color: C.muted, fontSize: 12, lineHeight: 20, marginTop: 20 },
-  body: {
-    color: C.ink,
-    fontSize: 17,
-    lineHeight: 32,
-    paddingBottom: 8,
-  },
   locked: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 20 },
   lockedText: { color: C.muted, flex: 1, fontSize: 15, lineHeight: 24 },
   action: { marginTop: 14 },

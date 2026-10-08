@@ -1,0 +1,241 @@
+{
+  "provenance": {
+    "official": {
+      "url": "https://www.mca.gov.cn/mzsj/xzqh/2025/202401xzqh.html",
+      "sha256": "d4669f6c81091287127147720bad0f3c3465e9e2a2dcc7e887893cc787a23431",
+      "baseline": "2024-12-31"
+    },
+    "officialPatches": [
+      {
+        "url": "https://mzj.cq.gov.cn/zwgk_218/zfxxgkml/tzgg/202512/t20251205_15215632.html",
+        "sha256": "c958092dbdfe7f58acc8bf53bbf8ccbe4c4d590f3391ffd6979eb5e110286d2c"
+      },
+      {
+        "url": "https://admin.cq.gov.cn/zwgk/zfxxgkml/szfwj/qtgw/202511/t20251107_15148513.html",
+        "sha256": "281411f7f7e8d52a6066c27e01c48c793a9589907ddf9a3e3973797d8e58890a"
+      }
+    ],
+    "osmSha256": "e280d98826f2efb2929703950ea2c294b61940b777cd848fd28f115b3a479b60",
+    "inventorySha256": "3a02a5e2aab404103993e4ac73ae7126bb73d346b55693723e1b2f5206d83156",
+    "regionsSha256": "930bd3c5a0171679d246bd8c64ccb7059b4ad0b6f67c28a1dd252345daab2fc9",
+    "originalAuditSha256": "d49e161f5893b3411fd7bea4e290a5ff653f0eee6cd12a988a6763e2fe520481",
+    "metadataCorrectionsSha256": "72ac2b3a1551dd0adc64c6faa466d477af5d483bca65ad8f347a53921680826e",
+    "officialChangesSha256": "de853538dd54747ef320dbf1963f2d5e912d3f1c48aafe3281ebbf5992375b51",
+    "officialAdditions": {
+      "653132": {
+        "code": "653132",
+        "name": "岑岭县",
+        "provinceCode": "65",
+        "cityCode": "6531",
+        "announcementUrl": "https://www.xinjiang.gov.cn/xinjiang/tzgg/202603/285e5d25b8ad4eae8df6b0f0efe847f6.shtml",
+        "announcementFile": "cenling-2026-announcement.html",
+        "announcementSha256": "89f468922d26153136d705375f2be7d87d6fd4185a9b7be00dedccbb59557b4c",
+        "requiredAnnouncementText": [
+          "设立岑岭县",
+          "喀什地区管辖",
+          "2026年3月26日"
+        ],
+        "codePageUrl": "https://mzt.xinjiang.gov.cn/xjmzt/c112990/202607/d4e25e9ed58e4371a1798d6e623ffc3d/images/20260730124558325041.png",
+        "codePageFile": "xinjiang-codes-41.png",
+        "codePageSha256": "0ec146b68fa485063be3660cfbc383ea146021f1fb5c38f98c93ac872f7bc441",
+        "manualTranscription": {
+          "page": 41,
+          "rows": [
+            733,
+            734,
+            735,
+            736
+          ],
+          "countyName": "岑岭县",
+          "countyCode": "653132"
+        }
+      },
+      "659013": {
+        "code": "659013",
+        "name": "草湖市",
+        "provinceCode": "65",
+        "cityCode": "6590",
+        "announcementUrl": "https://www.xinjiang.gov.cn/xinjiang/tzgg/202604/3691350b13064945947d8f78933ccb3e.shtml",
+        "announcementFile": "caohu-2026-announcement.html",
+        "announcementSha256": "65292967eed56ba575cf5ddfc490a4cd5c92c48ec17c8382a2111d4161783bd5",
+        "requiredAnnouncementText": [
+          "设立县级草湖市",
+          "草湖市由新疆维吾尔自治区直辖",
+          "2026年4月17日"
+        ],
+        "codePageUrl": "https://mzt.xinjiang.gov.cn/xjmzt/c112990/202607/d4e25e9ed58e4371a1798d6e623ffc3d/images/20260730124601827067.png",
+        "codePageFile": "xinjiang-codes-67.png",
+        "codePageSha256": "982e42d867c823275ce5782f2435fa07489160d97b85fde9822400af9f802319",
+        "manualTranscription": {
+          "page": 67,
+          "rows": [
+            1196,
+            1197,
+            1198,
+            1199,
+            1200,
+            1201,
+            1202,
+            1203,
+            1204,
+            1205
+          ],
+          "countyName": "草湖市",
+          "countyCode": "659013"
+        }
+      }
+    },
+    "supplementSha256": "40526d291894aaededae5bb81a16ba90128ebfc6701e50ca472a23c8406f1072",
+    "invalidAreas": [],
+    "unassembledRelations": 365,
+    "limitations": "Official baseline plus evidenced patches; not certification of all 2026 changes, community boundary accuracy or map publication approval.",
+    "serviceScope": {
+      "version": 1,
+      "revision": "service-scope-20261006",
+      "authority": "user_confirmed_service_availability",
+      "unavailableProvinces": [
+        {
+          "code": "71",
+          "name": "台湾省"
+        },
+        {
+          "code": "81",
+          "name": "香港特别行政区"
+        },
+        {
+          "code": "82",
+          "name": "澳门特别行政区"
+        }
+      ],
+      "unavailableDistricts": [
+        {
+          "code": "350527",
+          "name": "金门县"
+        }
+      ],
+      "sha256": "bb8e3ebd4173b08cc38dc682a516bbf378fea4250910783663662f72de4608d4"
+    }
+  },
+  "summary": {
+    "originalBlocked": 347,
+    "dispositions": {
+      "geometry_candidate": 137,
+      "not_in_official_county_list": 207,
+      "retired_official_division": 2,
+      "service_unavailable": 1
+    },
+    "selectedRegions": 2851,
+    "candidateRegions": 2849,
+    "identityFailures": 0,
+    "geometryFailures": {
+      "district_missing_or_ambiguous": 1
+    },
+    "officialCountiesMissingFromSelection": [],
+    "selectedCountiesAbsentFromOfficialList": [],
+    "serviceableRegions": 2850,
+    "unavailableRegions": 1
+  },
+  "gates": {
+    "officialIdentity": "baseline_pass",
+    "allSelectedGeometry": "pending",
+    "currentDivisionChangesThrough20261006": "pending",
+    "mapPublicationApproval": "pending",
+    "release": "pending",
+    "allServiceableGeometry": "pending"
+  },
+  "runtimeFilesChanged": false,
+  "fullReportSha256": "55d6f438362140cdf94f521a32571360173c32433b46d78cb1c5a0beace0f2e2",
+  "pendingRegions": [
+    {
+      "province": "海南省",
+      "provinceCode": "46",
+      "city": "三沙市",
+      "cityCode": "4603",
+      "district": "南沙区",
+      "code": "460303",
+      "kind": "county",
+      "directProvince": false,
+      "identity": "official_identity_match",
+      "geometry": "district_missing_or_ambiguous",
+      "officialSource": "https://www.mca.gov.cn/mzsj/xzqh/2025/202401xzqh.html",
+      "officialBaseline": "2024-12-31",
+      "sourceEvidence": null,
+      "relatedAreas": [
+        {
+          "osmId": "r3287345",
+          "code": "440115",
+          "name": "南沙区",
+          "sourceNames": [
+            "南沙区"
+          ],
+          "level": 6,
+          "bounds": [
+            113.2909472,
+            22.5607978,
+            113.7467764,
+            22.9115194
+          ],
+          "point": [
+            113.5199407,
+            22.8047523
+          ],
+          "pointMethod": "label",
+          "metadataCorrection": null,
+          "geometryAdapter": null,
+          "parentGeometryAdapter": null,
+          "url": "https://www.openstreetmap.org/relation/3287345"
+        }
+      ],
+      "unassembledRelations": []
+    }
+  ],
+  "unavailableRegions": [
+    {
+      "province": "福建省",
+      "provinceCode": "35",
+      "city": "泉州市",
+      "cityCode": "3505",
+      "district": "金门县",
+      "code": "350527",
+      "kind": "county",
+      "directProvince": false,
+      "identity": "official_identity_match",
+      "geometry": "not_required_service_unavailable",
+      "officialSource": "https://www.mca.gov.cn/mzsj/xzqh/2025/202401xzqh.html",
+      "officialBaseline": "2024-12-31",
+      "sourceEvidence": null,
+      "relatedAreas": [
+        {
+          "osmId": "r3339695",
+          "code": "",
+          "name": "金门县",
+          "sourceNames": [
+            "金門縣",
+            "金门县"
+          ],
+          "level": 4,
+          "bounds": [
+            118.1316667,
+            24.1152775,
+            119.5377778,
+            25.0552778
+          ],
+          "point": [
+            118.3186435,
+            24.4367638
+          ],
+          "pointMethod": "admin_centre",
+          "metadataCorrection": null,
+          "geometryAdapter": null,
+          "parentGeometryAdapter": null,
+          "url": "https://www.openstreetmap.org/relation/3339695"
+        }
+      ],
+      "unassembledRelations": []
+    }
+  ],
+  "tableSha256": {
+    "original-347.csv": "a9c074ab4579ff7a78ad6f91bfd87501a533c2ebab8c76b16d841e4609ab7cf7",
+    "selected-regions.csv": "7768212d0cb77ae0aa4d36dd7230358fd598c4e4776256e2baa940831d84cc9e"
+  }
+}

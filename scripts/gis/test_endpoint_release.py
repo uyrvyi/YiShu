@@ -1,10 +1,13 @@
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from shapely.geometry import Point, box
 
 from audit_endpoint_release import (MCA_SHA256, MCA_URL, SOURCE_SHA256,
                                     apply_metadata_corrections, build_report, flatten_regions,
-                                    geometry_check, identity_check, official_identities)
+                                    geometry_check, identity_check, official_identities, distinct_endpoint_area,
+                                    ROOT, city_graph_input_hashes)
 
 
 def area(level, name, code, geometry=None, tags=None):
@@ -15,6 +18,21 @@ def area(level, name, code, geometry=None, tags=None):
 
 
 class EndpointReleaseTests(unittest.TestCase):
+    def test_city_graph_provenance_is_identical_for_relative_and_absolute_paths(self):
+        names = ("station_nodes.json", "region_station_map.json")
+        relative = [Path("data/graphs/china-v3") / name for name in names]
+        absolute = [ROOT / path for path in relative]
+        contents = [path.read_bytes() for path in absolute]
+        with patch("os.getcwd", return_value=str(ROOT)):
+            self.assertEqual(city_graph_input_hashes(relative, contents),
+                             city_graph_input_hashes(absolute, contents))
+        self.assertEqual(set(city_graph_input_hashes(absolute, contents)),
+                         {path.as_posix() for path in relative})
+
+    def test_city_graph_provenance_rejects_paths_outside_repository(self):
+        with self.assertRaises(ValueError):
+            city_graph_input_hashes([ROOT.parent / "station_nodes.json"], [b"[]"])
+
     def setUp(self):
         self.region = {"code": "990101", "district": "District", "province": "Province",
                        "provinceCode": "99", "city": "City", "cityCode": "9901", "kind": "county"}
@@ -43,6 +61,59 @@ class EndpointReleaseTests(unittest.TestCase):
     def test_duplicate_code_is_not_resolved_by_choosing_the_nicer_name(self):
         self.areas.append(area(6, "Wrong district", "990101"))
         self.assertEqual(geometry_check(self.region, self.areas)[1], "code_name_conflict")
+
+    def hub_at(self, point):
+        return {"Province/City": {"mapX": (point.x + 180) / 360 * 1000,
+                                  "mapY": (90 - point.y) / 180 * 800}}
+
+    def test_coincident_endpoint_uses_same_county_interior_without_changing_source_area(self):
+        county = self.areas[2]
+        county.update(point=Point(2.1, 2.1), pointMethod="admin_centre")
+        original = county["point"]
+        selected = distinct_endpoint_area(self.region, county, self.areas, self.hub_at(original))
+        self.assertIsNot(selected, county)
+        self.assertIs(selected["geometry"], county["geometry"])
+        self.assertEqual(selected["osmId"], county["osmId"])
+        self.assertTrue(county["geometry"].covers(selected["point"]))
+        self.assertFalse(selected["point"].equals(original))
+        self.assertIs(county["point"], original)
+        self.assertEqual(county["pointMethod"], "admin_centre")
+        self.assertEqual(selected["pointMethod"], "district_interior_representative_point_distinct_from_city_hub")
+
+    def test_noncoincident_endpoint_and_legacy_audits_keep_original_point(self):
+        county = self.areas[2]
+        self.assertIs(distinct_endpoint_area(self.region, county, self.areas, self.hub_at(Point(1.1, 1.1))), county)
+        self.assertIs(distinct_endpoint_area(self.region, county, self.areas, None), county)
+        self.assertIsNone(distinct_endpoint_area(self.region, None, self.areas, {}))
+
+    def test_does_not_invent_an_offset_when_representative_point_also_coincides(self):
+        county = self.areas[2]
+        with self.assertRaisesRegex(ValueError, "representative_point_coincident"):
+            distinct_endpoint_area(self.region, county, self.areas, self.hub_at(county["point"]))
+
+    def test_representative_point_must_still_belong_to_real_parent_city(self):
+        county = self.areas[2]
+        county.update(point=Point(2.1, 2.1), pointMethod="admin_centre")
+        self.areas[1]["geometry"] = box(1, 1, 2.2, 2.2)
+        self.assertIsNotNone(geometry_check(self.region, self.areas)[0])
+        with self.assertRaisesRegex(ValueError, "representative_point_parent_check_failed"):
+            distinct_endpoint_area(self.region, county, self.areas, self.hub_at(county["point"]))
+
+    def test_missing_local_hub_is_rejected_instead_of_using_a_capital(self):
+        with self.assertRaisesRegex(ValueError, "endpoint_city_hub_missing"):
+            distinct_endpoint_area(self.region, self.areas[2], self.areas, {})
+
+    def test_report_anchor_and_geometry_evidence_share_the_adjusted_point(self):
+        county = self.areas[2]
+        county.update(point=Point(2.1, 2.1), pointMethod="admin_centre")
+        report, anchors = build_report([], [self.region], self.official, self.areas, [], {},
+                                       city_hubs=self.hub_at(county["point"]))
+        evidence = report["allSelectedChecks"][0]["sourceEvidence"]
+        anchor = anchors["Province/City/District"]
+        lng, lat = evidence["point"]
+        self.assertEqual(anchor["x"], round((lng + 180) / 360 * 1000, 6))
+        self.assertEqual(anchor["y"], round((90 - lat) / 180 * 800, 6))
+        self.assertEqual(evidence["pointMethod"], "district_interior_representative_point_distinct_from_city_hub")
 
     def test_wrong_code_is_not_silently_replaced_by_an_uncoded_shape(self):
         self.areas[2]["name"] = "Obsolete district"
