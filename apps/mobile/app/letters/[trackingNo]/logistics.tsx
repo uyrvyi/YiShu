@@ -19,13 +19,17 @@ import { DETAIL_POLL_MS } from "../../../src/refresh/poller";
 import { usePolling } from "../../../src/refresh/usePolling";
 import { ActionButton, Notice, ScreenHeader } from "../../../src/ui/controls";
 import { problemMessage, statusCopy, statusTone } from "../../../src/ui/presentation";
-import { C, UI } from "../../../src/ui/theme";
+import { type Colors, UI } from "../../../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../../../src/ui/ThemeProvider";
 import { MAP_COLORS } from "../../../src/map/theme";
 import { formatEstimatedDuration } from "../../../src/ui/transport";
 
 const INITIAL_FACTS = 3;
 
 export default function LogisticsScreen() {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const { trackingNo } = useLocalSearchParams<{ trackingNo: string }>();
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -235,7 +239,7 @@ export default function LogisticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.surface },
   page: {
     width: "100%",

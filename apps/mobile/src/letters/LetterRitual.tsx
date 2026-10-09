@@ -9,12 +9,12 @@ import { X } from "lucide-react-native";
 import { getSessionVersion, subscribeSession } from "../api";
 import type { LetterView } from "../api/letterApi";
 import { problemMessage } from "../ui/presentation";
-import { C } from "../ui/theme";
+import { C, type Colors } from "../ui/theme";
+import { useAppTheme, useThemedStyles } from "../ui/ThemeProvider";
 import { readableLetter, RITUAL_DURATION } from "./ritual";
 import { PaperReader, type PaperFrame } from "./LetterPaper";
 import { ENVELOPE_GEOMETRY as EG, envelopeLayout } from "./envelopeGeometry";
 
-const PAPER = "#FFFCF3";
 const ENVELOPE = "#E8D4AD";
 const WAX = "#923E48";
 
@@ -50,10 +50,12 @@ function useStageAnimation(value: Animated.Value, duration: number, enabled: boo
 }
 
 function PaperArt({ width, height }: { width: number; height: number }) {
+  const { colors: C } = useAppTheme();
+
   return <Svg width={width} height={height} viewBox="0 0 300 210">
-    <Rect x="1" y="1" width="298" height="208" rx="5" fill={PAPER} stroke="#D7C9AF" />
-    <SvgText x="25" y="43" fill={C.green} fontSize="18">驿书</SvgText>
-    {[70, 92, 114, 136, 158].map((y) => <Line key={y} x1="25" x2={y === 158 ? "190" : "272"} y1={y} y2={y} stroke="#DED6C5" />)}
+    <Rect x="1" y="1" width="298" height="208" rx="5" fill={C.paper} stroke={C.paperArtBorder} />
+    <SvgText x="25" y="43" fill={C.paperAccent} fontSize="18">驿书</SvgText>
+    {[70, 92, 114, 136, 158].map((y) => <Line key={y} x1="25" x2={y === 158 ? "190" : "272"} y1={y} y2={y} stroke={C.paperArtRule} />)}
   </Svg>;
 }
 
@@ -96,6 +98,8 @@ function Wax() {
 function EnvelopeScene({ insert, seal, width }: {
   insert?: Animated.Value; seal?: Animated.Value; width: number;
 }) {
+  const styles = useThemedStyles(createStyles);
+
   const { height, flapHeight, hingeY, sealLeft, sealTop } = envelopeLayout(width);
   return <View style={[styles.scene, { width, height: height + 100 }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
     <View style={[styles.envelope, { width, height }]}><EnvelopeArt width={width} /></View>
@@ -116,6 +120,8 @@ function EnvelopeScene({ insert, seal, width }: {
 }
 
 function OpeningEnvelope({ width, reveal }: { width: number; reveal: Animated.Value }) {
+  const styles = useThemedStyles(createStyles);
+
   const { height, flapHeight, hingeY } = envelopeLayout(width);
   return <View style={{ width, height }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
     <EnvelopeArt width={width} front />
@@ -128,6 +134,9 @@ function OpeningEnvelope({ width, reveal }: { width: number; reveal: Animated.Va
 }
 
 export function SendLetterRitual({ ready, onComplete }: { ready: boolean; onComplete: () => void }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const { width } = useWindowDimensions();
   const { reduceMotion, active } = usePresentation();
   const [inserted, setInserted] = useState(false);
@@ -152,6 +161,9 @@ export function ReadLetterRitual({ letter, onOpen, onClose, onComplete, onReveal
   letter: LetterView; onOpen: () => Promise<LetterView>; onClose: () => void; onComplete: (letter: LetterView) => void;
   onRevealed: (letter: LetterView) => void; getPaperTarget: () => PaperFrame | undefined;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const session = useSyncExternalStore(subscribeSession, getSessionVersion, getSessionVersion);
   const initialSession = useRef(session).current;
   const { reduceMotion, active } = usePresentation();
@@ -258,7 +270,7 @@ export function ReadLetterRitual({ letter, onOpen, onClose, onComplete, onReveal
   </Modal>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
   stage: { flex: 1, alignItems: "center", justifyContent: "center", gap: 24, paddingBottom: 60 },
   scene: { position: "relative" },

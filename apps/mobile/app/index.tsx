@@ -20,7 +20,8 @@ import {
 } from "../src/api";
 import { ActionButton, FormInput, KeyboardFrame } from "../src/ui/controls";
 import { problemMessage } from "../src/ui/presentation";
-import { C, UI } from "../src/ui/theme";
+import { type Colors, UI } from "../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../src/ui/ThemeProvider";
 import { RegionSelector } from "../src/regions/RegionSelector";
 import { isRegionServiceUnavailable, REGION_SERVICE_UNAVAILABLE_MESSAGE } from "@yishu/shared";
 
@@ -35,6 +36,9 @@ function authMessage(error: unknown): string {
 }
 
 export default function HomeScreen() {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const authed = useSyncExternalStore(subscribeSession, isAuthenticated, isAuthenticated);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -242,7 +246,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.surface },
   keyboard: { flex: 1 },
   loading: { flex: 1, backgroundColor: C.surface, justifyContent: "center" },

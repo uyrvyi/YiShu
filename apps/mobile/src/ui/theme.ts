@@ -12,7 +12,38 @@ export const C = {
   orangeSoft: "#FCF3E5",
   error: "#B44343",
   errorSoft: "#FCF0F0",
+  greenSolid: "#19745C",
+  onGreen: "#FFFFFF",
+  greenPressed: "#125B48",
+  backdrop: "#20262970",
+  shadow: "#202629",
+  softBorder: "#D9EAE1",
+  skeleton: "#E9EDF0",
+  inputCanvas: "#FAFBFC",
+  paperBackdrop: "rgba(26,32,28,0.22)",
+  paper: "#FFFCF3",
+  paperInk: "#202629",
+  paperMuted: "#647078",
+  paperRule: "#DDD6C5",
+  paperFooterRule: "#DDD5C5",
+  paperBorder: "#DCD2BD",
+  paperArtBorder: "#D7C9AF",
+  paperArtRule: "#DED6C5",
+  paperAccent: "#19745C",
 } as const;
+
+export type Colors = { [K in keyof typeof C]: string };
+export const DARK_COLORS: Colors = {
+  canvas: "#101214", surface: "#1C2023", ink: "#F1F4F6", muted: "#A7B2BA",
+  line: "#343B41", green: "#72D4AE", greenSoft: "#203D32",
+  blue: "#91BFF1", blueSoft: "#243346", orange: "#E9BD78", orangeSoft: "#3A3022",
+  error: "#F39B9B", errorSoft: "#3D252A", greenSolid: "#19745C", onGreen: "#FFFFFF",
+  greenPressed: "#125B48", backdrop: "#00000099", shadow: "#000000",
+  softBorder: "#365348", skeleton: "#343B41", inputCanvas: "#101214", paperBackdrop: "rgba(0,0,0,0.65)",
+  paper: "#252A2D", paperInk: "#EBEEEF", paperMuted: "#ACB5BA",
+  paperRule: "#42494D", paperFooterRule: "#42494D", paperBorder: "#495155",
+  paperArtBorder: "#495155", paperArtRule: "#42494D", paperAccent: "#72D4AE",
+};
 
 export const UI = {
   gutter: 24,

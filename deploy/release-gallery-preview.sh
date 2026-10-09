@@ -5,6 +5,24 @@ file_count=8
 dockerfile=deploy/Dockerfile.cloud-preview-gallery
 manifest_file=gallery-patch.json
 case "${2:-gallery}" in
+  appearance)
+    revision=appearance-20261008-r1
+    base_tag=preview-20261008-letter-paper-preview-r4
+    base_id=sha256:416818d2c77b7ecd7f99490e1aaa810257928c84bde61f67393c07b10b749daa
+    next_tag=preview-20261008-appearance-r1
+    file_count=33
+    dockerfile=deploy/Dockerfile.cloud-mobile-patch
+    manifest_file=e2ee-image-patch.json
+    ;;
+  paper-preview)
+    revision=letter-paper-preview-20261008-r4
+    base_tag=preview-20261008-letter-paper-preview-r3
+    base_id=sha256:9b978c765e35e062034fc386e6a26c84fd74e58d86967d03b6f2bc16f7d0074d
+    next_tag=preview-20261008-letter-paper-preview-r4
+    file_count=6
+    dockerfile=deploy/Dockerfile.cloud-mobile-patch
+    manifest_file=e2ee-image-patch.json
+    ;;
   envelope-geometry)
     revision=letter-envelope-geometry-20261008
     base_tag=preview-20261008-letter-paper-front-r1
@@ -121,7 +139,7 @@ for (const source of manifest.sources.filter(s=>s.file.startsWith("apps/mobile/"
   if (actual !== source.sha256) throw Error("source_mismatch:" + source.file);
 }
 console.log("GALLERY_SOURCE_PASS");'
-if [ "${2:-gallery}" != settle ] && [ "${2:-gallery}" != ritual ] && [ "${2:-gallery}" != paper ] && [ "${2:-gallery}" != paper-center ] && [ "${2:-gallery}" != seal-hold ] && [ "${2:-gallery}" != continuous-paper ] && [ "${2:-gallery}" != paper-front ] && [ "${2:-gallery}" != envelope-geometry ]; then
+if [ "${2:-gallery}" != appearance ] && [ "${2:-gallery}" != settle ] && [ "${2:-gallery}" != ritual ] && [ "${2:-gallery}" != paper ] && [ "${2:-gallery}" != paper-center ] && [ "${2:-gallery}" != seal-hold ] && [ "${2:-gallery}" != continuous-paper ] && [ "${2:-gallery}" != paper-front ] && [ "${2:-gallery}" != envelope-geometry ] && [ "${2:-gallery}" != paper-preview ]; then
   docker run --rm --init --network none --read-only --memory 1280m --pids-limit 192 --cpus 0.75 \
   --tmpfs /tmp:uid=1000,gid=1000,mode=1777,size=536870912 \
   --tmpfs /workspace/apps/mobile/.expo:uid=1000,gid=1000,mode=0700,size=67108864 \
@@ -151,7 +169,7 @@ trap failed_release EXIT
 trap 'exit 1' HUP INT TERM
 sed -i "s/^PREVIEW_TAG=$base_tag\$/PREVIEW_TAG=$next_tag/" preview.env
 docker compose --env-file preview.env -f docker-compose.cloud-preview.yml up -d --no-deps --wait --wait-timeout 180 preview
-if [ "${2:-gallery}" = motion ] || [ "${2:-gallery}" = settle ] || [ "${2:-gallery}" = ritual ] || [ "${2:-gallery}" = paper ] || [ "${2:-gallery}" = paper-center ] || [ "${2:-gallery}" = seal-hold ] || [ "${2:-gallery}" = continuous-paper ] || [ "${2:-gallery}" = paper-front ] || [ "${2:-gallery}" = envelope-geometry ]; then
+if [ "${2:-gallery}" = appearance ] || [ "${2:-gallery}" = motion ] || [ "${2:-gallery}" = settle ] || [ "${2:-gallery}" = ritual ] || [ "${2:-gallery}" = paper ] || [ "${2:-gallery}" = paper-center ] || [ "${2:-gallery}" = seal-hold ] || [ "${2:-gallery}" = continuous-paper ] || [ "${2:-gallery}" = paper-front ] || [ "${2:-gallery}" = envelope-geometry ] || [ "${2:-gallery}" = paper-preview ]; then
   docker exec -i -e "CHECK_RITUAL=${2:-gallery}" yishu-cloud-preview-preview-1 node --input-type=module > "$directory/bundle-check.log" <<'JS'
 import assert from 'node:assert/strict';
 const response = await fetch('http://127.0.0.1:8081', {
@@ -170,7 +188,7 @@ assert.equal(asset.status, 200);
 const bundle = (await asset.text()).replace(/\\u([0-9a-f]{4})/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
 for (const symbol of ['image-preview-neighbor-', 'PINCH_DISMISS_ZOOM', 'renderPage', 'image-preview-current'])
   assert.ok(bundle.includes(symbol), 'missing:' + symbol);
-if (['ritual', 'paper', 'paper-center', 'seal-hold', 'continuous-paper', 'paper-front', 'envelope-geometry'].includes(process.env.CHECK_RITUAL)) {
+if (['ritual', 'paper', 'paper-center', 'seal-hold', 'continuous-paper', 'paper-front', 'envelope-geometry', 'paper-preview'].includes(process.env.CHECK_RITUAL)) {
   for (const symbol of ['轻点骑缝章', 'openReadableLetter', '封好这封信', '关闭信封', '不能给自己寄信'])
     assert.ok(bundle.includes(symbol), 'missing:' + symbol);
 }
@@ -180,7 +198,7 @@ if (process.env.CHECK_RITUAL === 'paper' || process.env.CHECK_RITUAL === 'paper-
 }
 if (process.env.CHECK_RITUAL === 'paper-center') assert.ok(bundle.includes('paper-reader-top-space'), 'missing:centered-paper');
 if (process.env.CHECK_RITUAL === 'seal-hold') assert.ok(bundle.includes('sealedHold'), 'missing:sealed-hold');
-if (['continuous-paper', 'paper-front', 'envelope-geometry'].includes(process.env.CHECK_RITUAL)) {
+if (['continuous-paper', 'paper-front', 'envelope-geometry', 'paper-preview'].includes(process.env.CHECK_RITUAL)) {
   for (const symbol of ['continuous-reading-paper', 'reading-paper-content', 'opening-envelope-frame', 'entranceFrame', 'sealedHold'])
     assert.ok(bundle.includes(symbol), 'missing:' + symbol);
 }
@@ -188,7 +206,19 @@ if (process.env.CHECK_RITUAL === 'envelope-geometry') {
   for (const symbol of ['envelope-outline', 'envelope-flap-art', 'sending-envelope-flap', 'opening-envelope-flap', 'sealLeft', 'flapSeam'])
     assert.ok(bundle.includes(symbol), 'missing:' + symbol);
 }
-console.log(JSON.stringify({status:process.env.CHECK_RITUAL === 'continuous-paper' ? 'CONTINUOUS_PAPER_BUNDLE_PASS' : process.env.CHECK_RITUAL === 'seal-hold' ? 'LETTER_SEAL_HOLD_BUNDLE_PASS' : ['paper', 'paper-center'].includes(process.env.CHECK_RITUAL) ? 'LETTER_PAPER_BUNDLE_PASS' : process.env.CHECK_RITUAL === 'ritual' ? 'LETTER_RITUAL_BUNDLE_PASS' : 'GALLERY_MOTION_BUNDLE_PASS', sdk:manifest.extra.expoClient.sdkVersion}));
+if (process.env.CHECK_RITUAL === 'paper-preview') {
+  for (const symbol of ['letter-paper-preview-content', 'letter-paper-preview-fade', 'paper-reader-clip', 'paper-reader-fade'])
+    assert.ok(bundle.includes(symbol), 'missing:' + symbol);
+  assert.ok(!bundle.includes('envelope-flap-art'), 'unexpected:unverified-envelope-patch');
+}
+if (process.env.CHECK_RITUAL === 'appearance') {
+  assert.equal(manifest.extra.expoClient.userInterfaceStyle, 'automatic');
+  for (const symbol of ['界面设置', '浅色模式', '深色模式', '跟随系统', 'yishu.appearance', 'yishuSetMapTheme', 'paper-reader-clip', 'paperInk', 'paperArtRule', '#252A2D', '#EBEEEF'])
+    assert.ok(bundle.includes(symbol), 'missing:' + symbol);
+  assert.ok(!bundle.includes('envelope-flap-art'), 'unexpected:unverified-envelope-patch');
+  console.log('APPEARANCE_BUNDLE_PASS');
+}
+console.log(JSON.stringify({status:process.env.CHECK_RITUAL === 'paper-preview' ? 'PAPER_PREVIEW_BUNDLE_PASS' : process.env.CHECK_RITUAL === 'continuous-paper' ? 'CONTINUOUS_PAPER_BUNDLE_PASS' : process.env.CHECK_RITUAL === 'seal-hold' ? 'LETTER_SEAL_HOLD_BUNDLE_PASS' : ['paper', 'paper-center'].includes(process.env.CHECK_RITUAL) ? 'LETTER_PAPER_BUNDLE_PASS' : process.env.CHECK_RITUAL === 'ritual' ? 'LETTER_RITUAL_BUNDLE_PASS' : 'GALLERY_MOTION_BUNDLE_PASS', sdk:manifest.extra.expoClient.sdkVersion}));
 JS
 fi
 docker inspect yishu-cloud-api-1 yishu-cloud-worker-1 yishu-cloud-postgres-1 yishu-cloud-redis-1 yishu-cloud-caddy-1 yishu-cloud-maps-map-tiles-1 \

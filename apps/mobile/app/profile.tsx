@@ -17,7 +17,8 @@ import type { AuthUser } from "../src/auth/authService";
 import { RegionSelector } from "../src/regions/RegionSelector";
 import { ActionButton, FormInput, KeyboardFrame, ScreenHeader } from "../src/ui/controls";
 import { problemMessage } from "../src/ui/presentation";
-import { C, UI } from "../src/ui/theme";
+import { type Colors, UI } from "../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../src/ui/ThemeProvider";
 import { refetchVisibleScreens } from "../src/refresh/usePolling";
 import type { UploadImageInput } from "../src/api/letterApi";
 import { PrivateAvatar } from "../src/media/PrivateImage";
@@ -26,6 +27,9 @@ import { prepareAvatar, type CropImage } from "../src/media/avatarCrop";
 import { AvatarCropper } from "../src/media/AvatarCropper";
 
 export default function ProfileScreen() {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const { section } = useLocalSearchParams<{ section?: string }>();
   const editingRegion = section === "region";
   const [original, setOriginal] = useState<AuthUser | null>(null);
@@ -228,7 +232,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
   flex: { flex: 1 },
   page: {

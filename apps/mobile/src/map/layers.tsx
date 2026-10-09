@@ -23,7 +23,8 @@ import {
   toDisplayPolyline as toPolylinePoints,
   toDisplayPoint as toViewBoxPoint,
 } from "./displayProjection";
-import { MAP_COLORS, MAP_RADIUS, MAP_STROKE, REMAINING_DASH } from "./theme";
+import { MAP_RADIUS, MAP_STROKE, REMAINING_DASH } from "./theme";
+import { useMapColors } from "./useMapColors";
 
 /**
  * 中国外轮廓（静态本地资产，示意性几何）。
@@ -31,6 +32,7 @@ import { MAP_COLORS, MAP_RADIUS, MAP_STROKE, REMAINING_DASH } from "./theme";
  * 资产已经按 EPSG:3857 投影并等比拟合到 viewBox；无需重复缩放，描边直接使用 viewBox 单位。
  */
 export function ChinaOutlineLayer() {
+  const MAP_COLORS = useMapColors();
   return (
     <G>
       <Path
@@ -54,6 +56,7 @@ export function ChinaOutlineLayer() {
  * 来源、许可与「非法律边界认定」说明见 `data/maps/README.md`；运行时完全离线。
  */
 export function ProvinceBoundaryLayer() {
+  const MAP_COLORS = useMapColors();
   return (
     <G>
       {CHINA_GEOGRAPHIC_SHAPES.map((shape) => (
@@ -72,6 +75,7 @@ export function ProvinceBoundaryLayer() {
 
 /** 已走路线：实线（只由用户可见事实确认的节点组成）。 */
 export function CompletedRouteLayer({ points }: { points: readonly MapPoint[] }) {
+  const MAP_COLORS = useMapColors();
   if (points.length < 2) return null;
   return (
     <Polyline
@@ -88,6 +92,7 @@ export function CompletedRouteLayer({ points }: { points: readonly MapPoint[] })
 
 /** 未走路线：虚线（来自冻结的路线规划几何）。 */
 export function RemainingRouteLayer({ points }: { points: readonly MapPoint[] }) {
+  const MAP_COLORS = useMapColors();
   if (points.length < 2) return null;
   return (
     <Polyline
@@ -108,6 +113,7 @@ export function RemainingRouteLayer({ points }: { points: readonly MapPoint[] })
  * 失联 / 终态 / 无时间锚点时由上层传 `null` → 不渲染（只保留最后确报位置）。
  */
 export function ApproximatePositionLayer({ position }: { position: MapPoint | null }) {
+  const MAP_COLORS = useMapColors();
   if (position === null) return null;
   const { x, y } = toViewBoxPoint(position);
   return (
@@ -133,6 +139,7 @@ export function ApproximatePositionLayer({ position }: { position: MapPoint | nu
 
 /** 最后确报位置（失联 / 终态时保持不变）。 */
 export function LastKnownPositionLayer({ position }: { position: MapPoint | null }) {
+  const MAP_COLORS = useMapColors();
   if (position === null) return null;
   const { x, y } = toViewBoxPoint(position);
   return (
@@ -153,6 +160,7 @@ export function LastKnownPositionLayer({ position }: { position: MapPoint | null
  * 不渲染文字标签（避免小屏重叠），事实文案由地图下方列表展示。
  */
 export function FactNodeLayer({ facts }: { facts: readonly MapFactView[] }) {
+  const MAP_COLORS = useMapColors();
   return (
     <G id="fact-nodes">
       {facts.map((fact, index) => {

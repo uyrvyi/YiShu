@@ -12,9 +12,10 @@ import { Earth, RefreshCw, ScanLine } from "lucide-react-native";
 import WebView from "react-native-webview";
 import type { RouteMapViewParsed } from "@yishu/shared";
 import { RouteMap } from "./RouteMap";
-import { buildLocalMapHtml, mapUpdateScript } from "./localMapHtml";
+import { buildLocalMapHtml, mapThemeScript, mapUpdateScript } from "./localMapHtml";
 import { mapDetailScript, mapDetailsForViewport, parseMapDetailRequest } from "./mapDetails";
-import { C, UI } from "../ui/theme";
+import { type Colors, UI } from "../ui/theme";
+import { useAppTheme, useThemedStyles } from "../ui/ThemeProvider";
 
 interface InteractiveRouteMapProps {
   view: RouteMapViewParsed;
@@ -27,6 +28,10 @@ export function InteractiveRouteMap({
   progress,
   onInteractionChange,
 }: InteractiveRouteMapProps) {
+  const { colors: C } = useAppTheme();
+  const { scheme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const [progressHeight, setProgressHeight] = useState(64);
@@ -90,6 +95,10 @@ export function InteractiveRouteMap({
   useEffect(() => {
     if (documentReady.current) webview.current?.injectJavaScript(mapUpdateScript(view, topInset));
   }, [view, topInset, ready]);
+
+  useEffect(() => {
+    if (documentReady.current) webview.current?.injectJavaScript(mapThemeScript(scheme));
+  }, [scheme, ready]);
 
   useEffect(() => {
     const release = () => {
@@ -194,6 +203,7 @@ export function InteractiveRouteMap({
             }
             if (message === "document-ready") {
               documentReady.current = true;
+              webview.current?.injectJavaScript(mapThemeScript(scheme));
               webview.current?.injectJavaScript(mapUpdateScript(view, topInset));
             }
             if (message === "ready") setReady(true);
@@ -250,7 +260,7 @@ export function InteractiveRouteMap({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   container: { width: "100%", aspectRatio: 5 / 4, overflow: "hidden", borderRadius: UI.radius },
   progress: {
     position: "absolute",

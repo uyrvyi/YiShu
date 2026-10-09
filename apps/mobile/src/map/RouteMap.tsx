@@ -24,7 +24,9 @@ import {
 } from "./layers";
 import { MAP_VIEWBOX_STRING } from "./geometry";
 import { toDisplayPoint as toViewBoxPoint } from "./displayProjection";
-import { MAP_COLORS, MAP_RADIUS } from "./theme";
+import { MAP_RADIUS } from "./theme";
+import { useMapColors } from "./useMapColors";
+import { useAppTheme } from "../ui/ThemeProvider";
 
 interface RouteMapProps {
   /** `GET /letters/:trackingNo/map` 的用户可见响应（已经 schema strip-parse）。 */
@@ -32,11 +34,13 @@ interface RouteMapProps {
 }
 
 export function RouteMap({ view }: RouteMapProps) {
+  const MAP_COLORS = useMapColors();
+  const { colors } = useAppTheme();
   const origin = view.origin === null ? null : toViewBoxPoint(view.origin);
   const destination = view.destination === null ? null : toViewBoxPoint(view.destination);
 
   return (
-    <View style={styles.container} accessibilityLabel="信件旅程地图">
+    <View style={[styles.container, { borderColor: colors.line }]} accessibilityLabel="信件旅程地图">
       <Svg
         width="100%"
         height="100%"

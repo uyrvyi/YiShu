@@ -25,6 +25,23 @@ export const MAP_COLORS = {
   destination: C.blue,
 } as const;
 
+export const DARK_MAP_COLORS = {
+  water: "#15252D", paper: "#232A2D", outline: "#617782", province: "#46555E",
+  completed: "#72D4AE", remaining: "#A0B0BA", approximate: "#E9BD78", lastKnown: "#A7B2BA",
+  fact: "#72D4AE", factHalo: "#232A2D", origin: "#72D4AE", destination: "#91BFF1",
+};
+export const WEB_MAP_PALETTES = {
+  light: { ...MAP_COLORS, land: "#FAFCFD", river: "#CEE5EE", coast: "#A4CBDC",
+    completed: "#177B65", remaining: "#95A5AF", approximate: "#D18237", origin: "#177B65", destination: "#357AB4", lastKnown: "#177B65",
+    road: "#DFE0DD", majorRoad: "#D2D4D1", boundary: "#C0CDD2", provinceBoundary: "#B4C3C9",
+    city: ["#F6F9FA", "#F0F5F4", "#F4F6F9"], district: ["#F0F6F4", "#F2F5FA", "#F7F8F9"],
+    label: "#71818A", districtLabel: "#89959B", provinceLabel: "#84939C", text: "#202629", panel: "#FFFFFFE6", station: "#687E88" },
+  dark: { ...DARK_MAP_COLORS, land: "#232A2D", river: "#294752", coast: "#4D7887",
+    road: "#4E5555", majorRoad: "#757C77", boundary: "#60717B", provinceBoundary: "#778C98",
+    city: ["#242F30", "#25302B", "#29303A"], district: ["#25342E", "#29343F", "#303436"],
+    label: "#C1CDD3", districtLabel: "#B1BDC4", provinceLabel: "#D2DCE2", text: "#F1F4F6", panel: "#1C2023EB", station: "#ACBDC5" },
+};
+
 /**
  * 描边宽度（**实际渲染宽度**，即 viewBox 单位；viewBox 固定 0 0 1000 800，不随设备变化）。
  *

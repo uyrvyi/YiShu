@@ -6,11 +6,14 @@ import { KeyRound, ShieldCheck, RotateCw } from "lucide-react-native";
 import { encryptionClient } from "../src/api";
 import { ActionButton, FormInput, KeyboardFrame, ScreenHeader } from "../src/ui/controls";
 import { problemMessage } from "../src/ui/presentation";
-import { C, UI } from "../src/ui/theme";
+import { type Colors, UI } from "../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../src/ui/ThemeProvider";
 import { revealKeyboardInput } from "../src/ui/keyboardVisibility";
 
 type Status = Awaited<ReturnType<typeof encryptionClient.status>>;
 export default function EncryptionScreen() {
+  const styles = useThemedStyles(createStyles);
+
   const params = useLocalSearchParams<{ uid?: string }>();
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
@@ -241,7 +244,7 @@ export default function EncryptionScreen() {
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
   flex: { flex: 1 },
   header: { paddingHorizontal: 20 },

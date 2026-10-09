@@ -588,6 +588,17 @@ describe("timeline integration", () => {
     expect(typesOf(timeline)).toContain("COURIER_MISSING");
     const json = JSON.stringify(timeline).toLowerCase();
     expect(json).not.toMatch(/迷路|lost_path|lostpath|原因|cause/);
+    expect(timeline.filter((fact) => fact.type === "ARRIVED_STATION" && fact.happenedAt === canonical!.occurredAtSim.toISOString())).toHaveLength(0);
+    // Keep legacy materialized records for audit, but exclude obsolete sources for both participants.
+    await prisma.timelineEvent.create({ data: {
+      letterId, sourceKey: `leg:${firstLeg!.sequence}:arrived`, sequence: 99,
+      type: "ARRIVED_STATION", title: "已到达", description: "旧版到站动态",
+      province: "", city: "", happenedAt: canonical!.occurredAtSim, visibleAt: canonical!.occurredAtSim, importance: 0,
+    } });
+    for (const token of [alice.accessToken, bob.accessToken]) {
+      expect(await timelineOf(trackingNo, token)).toEqual(timeline);
+    }
+    expect(await prisma.timelineEvent.count({ where: { letterId, sourceKey: `leg:${firstLeg!.sequence}:arrived` } })).toBe(1);
     // 一个 logical missing transition 只产生一条失联事实（绑定 canonical，而非 LOST_PATH）
     const rows = await prisma.timelineEvent.findMany({
       where: { letterId, type: "COURIER_MISSING" },

@@ -21,11 +21,15 @@ import { formatFactTime } from "../../src/map/presentation";
 import { DETAIL_POLL_MS } from "../../src/refresh/poller";
 import { usePolling } from "../../src/refresh/usePolling";
 import { ActionButton, Notice, ScreenHeader } from "../../src/ui/controls";
-import { bodyTextFor, isTerminal, problemMessage, statusCopy } from "../../src/ui/presentation";
-import { C, UI } from "../../src/ui/theme";
+import { bodyTextFor, isTerminal, problemMessage, statusCopy, TRANSPORT_LABELS } from "../../src/ui/presentation";
+import { type Colors, UI } from "../../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../../src/ui/ThemeProvider";
 import { LetterPaper, PaperReader, type PaperFrame } from "../../src/letters/LetterPaper";
 
 export default function LetterDetailScreen() {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const { trackingNo } = useLocalSearchParams<{ trackingNo: string }>();
   const [busy, setBusy] = useState(false);
   const [reader, setReader] = useState<{ letter: LetterView; session: number } | null>(null);
@@ -53,6 +57,7 @@ export default function LetterDetailScreen() {
   const latest = data?.timeline.at(-1);
   const recipientView = letter?.readState !== undefined;
   const bodyText = letter ? bodyTextFor(letter) : null;
+  const paperExpanded = [reader, paperReader].some((active) => active?.session === session && active.letter.trackingNo === trackingNo);
 
   async function act(operation: () => Promise<void>, after?: () => void) {
     if (busy) return;
@@ -151,7 +156,7 @@ export default function LetterDetailScreen() {
               ) : null}
               {bodyText !== null && !letter.decryptionError ? (
                 <View ref={paper} collapsable={false} onLayout={measurePaper}>
-                  <LetterPaper letter={letter} onPress={() => {
+                  <LetterPaper letter={letter} concealed={paperExpanded} onPress={() => {
                     measurePaper();
                     setClosePaper(false);
                     setPaperReader({ letter, session });
@@ -185,6 +190,10 @@ export default function LetterDetailScreen() {
               <Text accessibilityRole="header" style={styles.heading}>
                 寄收信息
               </Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>寄送方式</Text>
+                <Text style={styles.infoValue}>{TRANSPORT_LABELS[letter.initialTransport]}</Text>
+              </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>寄件人</Text>
                 <Text style={styles.infoValue}>{letter.sender.nickname}</Text>
@@ -247,7 +256,7 @@ export default function LetterDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.surface },
   page: {
     width: "100%",
@@ -281,7 +290,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: "#D9EAE1",
+    borderColor: C.softBorder,
   },
   section: {
     paddingTop: 32,

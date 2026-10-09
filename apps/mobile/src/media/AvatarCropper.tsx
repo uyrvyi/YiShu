@@ -15,7 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Check, Minus, Plus, RotateCcw } from "lucide-react-native";
 import { ActionButton, ScreenHeader } from "../ui/controls";
-import { C, UI } from "../ui/theme";
+import { type Colors, UI } from "../ui/theme";
+import { useAppTheme, useThemedStyles } from "../ui/ThemeProvider";
 import { problemMessage } from "../ui/presentation";
 import type { UploadImageInput } from "../api/letterApi";
 import {
@@ -49,6 +50,9 @@ export function AvatarCropper({
   onCancel: () => void;
   onConfirm: (input: UploadImageInput) => Promise<void>;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const window = useWindowDimensions();
   const diameter = Math.max(100, Math.min(360, window.width - 48, window.height * 0.48));
   const [position, setPosition] = useState<CropPosition>(INITIAL_CROP);
@@ -224,7 +228,7 @@ export function AvatarCropper({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
   header: { paddingHorizontal: UI.gutter },
   stage: { flex: 1, alignItems: "center", justifyContent: "center" },

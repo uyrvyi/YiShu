@@ -4,7 +4,8 @@ import { router } from "expo-router";
 import { PackageSearch, Plus, UserRound } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassSurface } from "./GlassSurface";
-import { C, UI } from "./theme";
+import { type Colors, UI } from "./theme";
+import { useAppTheme, useThemedStyles } from "./ThemeProvider";
 import { dragOffset, navGeometry, tabAtOffset, type NavTab } from "./navDrag";
 
 export function useBottomNavContentInset() {
@@ -12,6 +13,9 @@ export function useBottomNavContentInset() {
 }
 
 export function BottomNav({ active }: { active: "letters" | "me" }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const { bottom } = useSafeAreaInsets();
   const [width, setWidth] = useState(0);
   const [held, setHeld] = useState(false);
@@ -151,7 +155,7 @@ export function BottomNav({ active }: { active: "letters" | "me" }) {
               }}
               onPress={() => router.push("/letters/new")}
             >
-              <Plus size={26} color={C.surface} strokeWidth={2} />
+              <Plus size={26} color={C.onGreen} strokeWidth={2} />
             </Pressable>
           </View>
           {tab(items[1])}
@@ -161,13 +165,13 @@ export function BottomNav({ active }: { active: "letters" | "me" }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   floating: { position: "absolute", left: 20, right: 20, alignItems: "center" },
   shadow: {
     width: "100%",
     maxWidth: 420,
     borderRadius: 36,
-    shadowColor: "#202629",
+    shadowColor: C.shadow,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 18,
@@ -198,12 +202,12 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: C.green,
+    backgroundColor: C.greenSolid,
     alignItems: "center",
     justifyContent: "center",
   },
-  pressed: { backgroundColor: "rgba(25,116,92,0.16)" },
-  composePressed: { backgroundColor: "#125B48", transform: [{ scale: 0.95 }] },
+  pressed: { backgroundColor: C.greenSoft },
+  composePressed: { backgroundColor: C.greenPressed, transform: [{ scale: 0.95 }] },
   label: { color: C.muted, fontSize: 11, fontWeight: "500" },
   activeLabel: { color: C.green },
 });

@@ -21,14 +21,17 @@ import {
   MapPin,
   UserRound,
   ShieldCheck,
+  SunMoon,
 } from "lucide-react-native";
 import { getApi, logoutSession } from "../src/api";
 import { AuthExpiredError } from "../src/api/authenticatedFetch";
 import { usePolling } from "../src/refresh/usePolling";
 import { BottomNav, useBottomNavContentInset } from "../src/ui/BottomNav";
 import { Notice } from "../src/ui/controls";
-import { C, UI } from "../src/ui/theme";
+import { type Colors, UI } from "../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../src/ui/ThemeProvider";
 import { getGlassDiagnostics } from "../src/ui/GlassSurface";
+import { APPEARANCE_LABELS } from "../src/ui/appearanceStore";
 import { PrivateAvatar } from "../src/media/PrivateImage";
 import {
   getPushStatus,
@@ -38,6 +41,10 @@ import {
 } from "../src/push/status";
 
 export default function MeScreen() {
+  const { preference } = useAppTheme();
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const bottomInset = useBottomNavContentInset();
   const load = useCallback(async () => {
     try {
@@ -175,6 +182,15 @@ export default function MeScreen() {
           设置
         </Text>
         <View style={styles.group} testID="preferences-settings-group">
+          <Pressable style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            accessibilityRole="button" accessibilityLabel="界面设置"
+            onPress={() => router.push("/appearance")}>
+            <SunMoon size={19} color={C.muted} />
+            <Text style={styles.rowLabel}>界面设置</Text>
+            <Text style={styles.rowValue}>{APPEARANCE_LABELS[preference]}</Text>
+            <ChevronRight size={17} color={C.muted} />
+          </Pressable>
+          <View style={styles.separator} />
           <Pressable
             style={styles.row}
             accessibilityRole="button"
@@ -264,7 +280,7 @@ export default function MeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
   content: { width: "100%", maxWidth: 680, alignSelf: "center", paddingBottom: 32 },
   title: {

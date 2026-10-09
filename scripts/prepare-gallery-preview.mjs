@@ -11,12 +11,19 @@ const sealHold = process.argv.includes("--seal-hold");
 const continuousPaper = process.argv.includes("--continuous-paper");
 const paperFront = process.argv.includes("--paper-front");
 const envelopeGeometry = process.argv.includes("--envelope-geometry");
+const paperPreview = process.argv.includes("--paper-preview");
 const settle = process.argv.includes("--settle");
-const motion = envelopeGeometry || paperFront || continuousPaper || sealHold || paperCenter || paper || ritual || settle || process.argv.includes("--motion");
-const revision = envelopeGeometry ? "letter-envelope-geometry-20261008" : paperFront ? "letter-paper-front-20261008" : continuousPaper ? "letter-continuous-paper-20261008" : sealHold ? "letter-seal-hold-20261007" : paperCenter ? "letter-paper-center-20261007" : paper ? "letter-paper-20261007" : ritual ? "letter-ritual-20261007" : settle ? "gallery-settle-20261007" : motion ? "gallery-motion-20261006" : preload ? "gallery-preload-20261005" : "gallery-20261005";
+const motion = paperPreview || envelopeGeometry || paperFront || continuousPaper || sealHold || paperCenter || paper || ritual || settle || process.argv.includes("--motion");
+const revision = paperPreview ? "letter-paper-preview-20261008-r4" : envelopeGeometry ? "letter-envelope-geometry-20261008" : paperFront ? "letter-paper-front-20261008" : continuousPaper ? "letter-continuous-paper-20261008" : sealHold ? "letter-seal-hold-20261007" : paperCenter ? "letter-paper-center-20261007" : paper ? "letter-paper-20261007" : ritual ? "letter-ritual-20261007" : settle ? "gallery-settle-20261007" : motion ? "gallery-motion-20261006" : preload ? "gallery-preload-20261005" : "gallery-20261005";
 const target = join(root, `.local/cloud-preview/${revision}/context`);
 const files = [
-  ...(envelopeGeometry ? [
+  ...(paperPreview ? [
+    "apps/mobile/src/letters/LetterPaper.tsx",
+    "apps/mobile/app/letters/[trackingNo].tsx",
+    "apps/mobile/app/letters/index.tsx",
+    "deploy/Dockerfile.cloud-mobile-patch",
+    "deploy/release-gallery-preview.sh",
+  ] : envelopeGeometry ? [
     "apps/mobile/src/letters/LetterRitual.tsx",
     "apps/mobile/src/letters/envelopeGeometry.ts",
     "deploy/Dockerfile.cloud-mobile-patch",
@@ -85,7 +92,9 @@ const sources = files.map((file) => {
   return { file, sha256: createHash("sha256").update(bytes).digest("hex") };
 });
 const manifest = {
-  baseImage: envelopeGeometry
+  baseImage: paperPreview
+    ? "yishu-cloud-preview:preview-20261008-letter-paper-preview-r3"
+    : envelopeGeometry
     ? "yishu-cloud-preview:preview-20261008-letter-paper-front-r1"
     : paperFront
     ? "yishu-cloud-preview:preview-20261008-letter-continuous-paper-r1"
@@ -106,7 +115,9 @@ const manifest = {
     : preload
     ? "yishu-cloud-preview:preview-20261005-gallery"
     : "yishu-cloud-preview:preview-20261005-upload-feedback",
-  baseImageId: envelopeGeometry
+  baseImageId: paperPreview
+    ? "sha256:9b978c765e35e062034fc386e6a26c84fd74e58d86967d03b6f2bc16f7d0074d"
+    : envelopeGeometry
     ? "sha256:19537f3e6602a6471cea75df8279f52ad6d1cdc7def69dda96f68e27a0be3b42"
     : paperFront
     ? "sha256:2eff6aee4e76508b0f11b812cbd660b341d9f4a811de646cab077e466905ad0f"

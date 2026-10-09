@@ -10,7 +10,8 @@ import {
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { BlurView } from "expo-blur";
 import Constants from "expo-constants";
-import { C } from "./theme";
+import { type Colors } from "./theme";
+import { useAppTheme, useThemedStyles } from "./ThemeProvider";
 
 export function glassMaterial(platform: string, available: boolean, reduceTransparency: boolean) {
   if (reduceTransparency) return "opaque";
@@ -43,6 +44,10 @@ export function GlassSurface({
   style: StyleProp<ViewStyle>;
   appearance?: "glass" | "clear" | "frosted";
 }) {
+  const { colors: C } = useAppTheme();
+  const { scheme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   // Start opaque until the system accessibility preference has been read.
   const [reduceTransparency, setReduceTransparency] = useState(true);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
@@ -88,13 +93,13 @@ export function GlassSurface({
           key={`${size.width}:${size.height}`}
           pointerEvents="none"
           glassEffectStyle={appearance === "clear" ? "clear" : "regular"}
-          colorScheme="light"
+          colorScheme={scheme}
           style={[layerStyle, { width: size.width, height: size.height }]}
         />
       ) : material !== "opaque" ? (
         <BlurView
           pointerEvents="none"
-          tint="systemThinMaterialLight"
+          tint={scheme === "dark" ? "systemThinMaterialDark" : "systemThinMaterialLight"}
           intensity={appearance === "frosted" ? 80 : 55}
           style={[layerStyle, { overflow: "hidden" }]}
         />
@@ -104,6 +109,6 @@ export function GlassSurface({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   layer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
 });

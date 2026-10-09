@@ -159,6 +159,12 @@ export function projectTimelineFacts(input: TimelineProjectionInput): TimelineFa
 
   const sortedLegs = [...legs].sort((a, b) => a.sequence - b.sequence);
   const completedLegs = sortedLegs.filter((leg) => leg.status === "COMPLETED");
+  // Completing a simulation leg is not an arrival confirmation when that same boundary records missing contact.
+  const missingBoundaries = new Set(
+    worldEvents
+      .filter((event) => event.eventType === "COURIER_MISSING" && event.transportLegSequence !== null)
+      .map((event) => `${event.transportLegSequence}:${event.nodeId}:${event.occurredAtSim.getTime()}`)
+  );
   const lastCompleted = completedLegs[completedLegs.length - 1] ?? null;
   const currentNodeId = lastCompleted?.toNodeId ?? journey.originNodeId;
 
@@ -262,9 +268,10 @@ export function projectTimelineFacts(input: TimelineProjectionInput): TimelineFa
     );
   }
 
-  // 已到达某站（COMPLETED leg 永久保留；reroute 不删除已确认事实）
+  // 已到达某站：只确认没有同段、同时失联的完成点，不从隐藏原因推断事实。
   for (const leg of completedLegs) {
     if (leg.completedAtSim === null) continue;
+    if (missingBoundaries.has(`${leg.sequence}:${leg.toNodeId}:${leg.completedAtSim.getTime()}`)) continue;
     const name = stationFact(leg.toNodeId, graphVersion)?.name ?? "驿站";
     const at = leg.completedAtSim.getTime();
     push(
@@ -508,7 +515,7 @@ export function toTimelineEventView(event: TimelineEvent): TimelineEventView {
  * - 每次都基于**完整 canonical fact set** 计算，因此分多次 GET 与最终一次 GET 结果一致。
  * - 缺失行用 createMany(skipDuplicates) 插入；已存在行的 sequence 若与 canonical 不一致则同步，
  *   （只同步排序键，不改用户可见内容 type/title/description/happenedAt/visibleAt/location）。
- * - 只返回 `visibleAt <= nowMs` 的事件：未到可见时刻的行服务端不返回。
+ * - 只返回 canonical 来源且 `visibleAt <= nowMs` 的事件；旧版冲突动态保留存储但不再展示。
  *
  * @param nowMs SimulationClock 当前模拟时刻（禁止 Date.now() 直接决定可见性）
  */
@@ -579,7 +586,7 @@ export async function materializeVisibleTimeline(
   }
 
   return prisma.timelineEvent.findMany({
-    where: { letterId, visibleAt: { lte: new Date(nowMs) } },
+    where: { letterId, sourceKey: { in: facts.map((fact) => fact.sourceKey) }, visibleAt: { lte: new Date(nowMs) } },
     orderBy: [{ happenedAt: "asc" }, { sequence: "asc" }, { sourceKey: "asc" }],
   });
 }

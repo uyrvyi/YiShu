@@ -27,13 +27,17 @@ import { HOME_POLL_MS } from "../../src/refresh/poller";
 import { usePolling } from "../../src/refresh/usePolling";
 import { BottomNav, useBottomNavContentInset } from "../../src/ui/BottomNav";
 import { KeyboardFrame, Notice } from "../../src/ui/controls";
-import { isTerminal, statusCopy, statusTone, TRANSPORT_LABELS } from "../../src/ui/presentation";
-import { C, UI } from "../../src/ui/theme";
+import { isTerminal, statusCopy, statusTone } from "../../src/ui/presentation";
+import { type Colors, UI } from "../../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../../src/ui/ThemeProvider";
 
 type Filter = "all" | "sent" | "received";
 type Row = { letter: LetterView; direction: "sent" | "received" };
 
 export default function LettersScreen() {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const bottomInset = useBottomNavContentInset();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -233,7 +237,6 @@ export default function LettersScreen() {
                 </View>
                 <View style={styles.rowBottom}>
                   <Text style={styles.meta} numberOfLines={1}>
-                    {TRANSPORT_LABELS[item.letter.currentTransport]} ·{" "}
                     {formatFactTime(item.letter.createdAt)}
                   </Text>
                   <ChevronRight size={17} color={C.muted} />
@@ -248,7 +251,7 @@ export default function LettersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.canvas },
   flex: { flex: 1 },
   list: {
@@ -290,7 +293,7 @@ const styles = StyleSheet.create({
   clearSearch: { width: 32, height: 44, alignItems: "center", justifyContent: "center" },
   filters: {
     flexDirection: "row",
-    backgroundColor: "#E9EDF0",
+    backgroundColor: C.skeleton,
     borderRadius: UI.radius,
     padding: 4,
     gap: 4,

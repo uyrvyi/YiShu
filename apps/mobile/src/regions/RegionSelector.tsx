@@ -12,7 +12,8 @@ import {
 import { Check, ChevronDown, LocateFixed, X } from "lucide-react-native";
 import { isRegionServiceUnavailable, REGION_SERVICE_UNAVAILABLE_MESSAGE } from "@yishu/shared";
 import { FormInput, KeyboardFrame } from "../ui/controls";
-import { C, UI } from "../ui/theme";
+import { type Colors, UI } from "../ui/theme";
+import { useAppTheme, useThemedStyles } from "../ui/ThemeProvider";
 import {
   changeRegion,
   citiesFor,
@@ -37,6 +38,9 @@ export function RegionSelector({
   autoLocate?: boolean;
   disabled?: boolean;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const [open, setOpen] = useState<keyof Region | null>(null);
   const [query, setQuery] = useState("");
   const [locating, setLocating] = useState(false);
@@ -209,7 +213,7 @@ export function RegionSelector({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   fields: {
     borderRadius: UI.controlRadius,
     borderWidth: 1,
@@ -232,7 +236,7 @@ const styles = StyleSheet.create({
   locationText: { color: C.green, fontSize: 13 },
   notice: { fontSize: 12, color: C.muted, flex: 1, lineHeight: 18 },
   unavailable: { fontSize: 12, color: C.muted, flexShrink: 1, lineHeight: 18 },
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#20262970" },
+  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: C.backdrop },
   sheet: {
     maxHeight: "78%",
     minHeight: "55%",

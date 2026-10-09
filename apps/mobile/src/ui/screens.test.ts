@@ -3,6 +3,7 @@ import { isValidElement, type ReactNode } from "react";
 import type { LayoutChangeEvent } from "react-native";
 import type { LetterView } from "../api/letterApi";
 import type { RouteMapViewParsed } from "@yishu/shared";
+import { formatFactTime } from "../map/presentation";
 
 // Match the repository's native-host substitution tests; these check structure, not device layout.
 const harness = vi.hoisted(() => ({
@@ -34,7 +35,19 @@ const harness = vi.hoisted(() => ({
   encryptionEnsure: vi.fn(),
   encryptionBackup: vi.fn(),
   animate: vi.fn(),
+  scheme: "light" as "light" | "dark",
+  preference: "system" as "light" | "dark" | "system",
+  selectAppearance: vi.fn(),
 }));
+
+vi.mock("./ThemeProvider", async () => {
+  const { C, DARK_COLORS } = await import("./theme");
+  return {
+    useAppTheme: () => ({ colors: harness.scheme === "dark" ? DARK_COLORS : C, scheme: harness.scheme,
+      preference: harness.preference, saving: false, select: harness.selectAppearance }),
+    useThemedStyles: (factory: (colors: typeof DARK_COLORS) => unknown) => factory(harness.scheme === "dark" ? DARK_COLORS : C),
+  };
+});
 
 vi.mock("react", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react")>()),
@@ -168,6 +181,10 @@ vi.mock("lucide-react-native", () => ({
   LocateFixed: "LocateFixed",
   Layers: "Layers",
   ShieldCheck: "ShieldCheck",
+  Sun: "Sun",
+  Moon: "Moon",
+  Smartphone: "Smartphone",
+  SunMoon: "SunMoon",
   KeyRound: "KeyRound",
   Mail: "Mail",
   MailOpen: "MailOpen",
@@ -233,6 +250,7 @@ import HomeScreen from "../../app/index";
 import MeScreen from "../../app/me";
 import EncryptionScreen from "../../app/encryption";
 import ProfileScreen from "../../app/profile";
+import AppearanceScreen from "../../app/appearance";
 import { AvatarCropper } from "../media/AvatarCropper";
 import { ImagePreview } from "../media/ImagePreview";
 import { PrivateImages } from "../media/PrivateImage";
@@ -317,6 +335,8 @@ const map: RouteMapViewParsed = {
 };
 
 beforeEach(() => {
+  harness.scheme = "light";
+  harness.preference = "system";
   harness.state.clear();
   harness.refs = [];
   harness.persistentRefs = false;
@@ -329,9 +349,35 @@ beforeEach(() => {
   harness.optimizeImage.mockImplementation(async (input) => input);
   harness.uploadImage.mockResolvedValue({ id: "staged-image" });
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("移动端页面结构与交互", () => {
+  it("appearance settings expose three radios and a current-value entry", () => {
+    vi.stubGlobal("__DEV__", false);
+    const me = elements(MeScreen());
+    press(button(me, "界面设置"));
+    expect(harness.navigate).toHaveBeenCalledWith("/appearance");
+    expect(text(me)).toContain("跟随系统");
+    rerender();
+    let tree = elements(AppearanceScreen());
+    const options = tree.filter((node) => node.props.accessibilityRole === "radio");
+    expect(options).toHaveLength(3);
+    expect(options.map((node) => node.props.accessibilityState)).toEqual([
+      { checked: false, disabled: false }, { checked: false, disabled: false }, { checked: true, disabled: false },
+    ]);
+    press(options[1]); expect(harness.selectAppearance).toHaveBeenCalledWith("dark");
+    harness.preference = "dark"; harness.scheme = "dark"; rerender(); tree = elements(AppearanceScreen());
+    expect(tree.find((node) => node.props.accessibilityLabel === "深色模式")?.props.accessibilityState).toEqual({ checked: true, disabled: false });
+  });
+  it("theme changes retain the composer draft and recolor its controls", () => {
+    let tree = elements(NewLetterScreen());
+    const input = tree.find((node) => node.props.accessibilityLabel === "信件正文")!;
+    (input.props.onChangeText as (value: string) => void)("仍在写的草稿");
+    harness.scheme = "dark"; rerender(); tree = elements(NewLetterScreen());
+    expect(tree.find((node) => node.props.accessibilityLabel === "信件正文")?.props.value).toBe("仍在写的草稿");
+    const label = tree.find((node) => node.type === "Text" && node.props.children === "正文")!;
+    expect(label.props.style).toMatchObject({ color: "#F1F4F6" });
+  });
   it("加密设置区分安全码和用户编号，初始化不要求手动开启", () => {
     harness.state.set(0, { uid: "12345678", enabled: false, available: false, identity: null });
     const tree = elements(EncryptionScreen());
@@ -1296,6 +1342,15 @@ describe("移动端页面结构与交互", () => {
     expect(text(row).join("")).not.toContain("黄浦区");
     expect(text(row).join("")).not.toContain("浦东新区");
   });
+  it.each(["sent", "received"])("%s 首页卡片不显示寄送方式，保留时间与详情入口", (direction) => {
+    const list = elements(LettersScreen()).find((node) => node.type === "FlatList");
+    const render = list!.props.renderItem as (props: unknown) => ReactNode;
+    const row = elements(render({ item: { letter, direction } }));
+    expect(text(row)).toContain(formatFactTime(letter.createdAt));
+    expect(text(row).join("")).not.toMatch(/寄送方式|驿马|托人捎信|加急驿递|飞鸽传书/);
+    press(button(row, `${direction === "sent" ? "收件人" : "寄件人"}，运输中`));
+    expect(harness.navigate).toHaveBeenCalledWith("/letters/YS-TEST");
+  });
   it("信件首页只有最新动态入口、正文和寄收信息，不重复展示地图或计划", () => {
     harness.polls = [{ letter, timeline: facts }];
     const tree = elements(LetterDetailScreen());
@@ -1869,6 +1924,19 @@ describe("共用控件", () => {
     expect(Alert.alert).toHaveBeenCalledWith("不能给自己寄信", "请选择其他收件人。");
     expect(harness.state.get(3)).toBeNull();
     expect(harness.createLetter).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["HAND_CARRY", "托人捎信"],
+    ["HORSE_RELAY", "驿马"],
+    ["EXPRESS_RELAY", "加急驿递"],
+    ["PIGEON", "飞鸽传书"],
+  ] as const)("寄收信息显示原始寄送方式 %s，不影响未拆阅内容门禁", (initialTransport, label) => {
+    harness.polls = [{ letter: { ...letter, initialTransport, currentTransport: "PIGEON", readState: "UNOPENED" }, timeline: facts }];
+    const tree = elements(LetterDetailScreen());
+    const row = tree.find((node) => node.type === "View" && text(elements(node.props.children as ReactNode))[0] === "寄送方式");
+    expect(text(elements(row?.props.children as ReactNode))).toEqual(["寄送方式", label]);
+    expect(text(tree)).not.toContain(letter.content);
   });
 
   it("拆开按钮只进入仪式，点击骑缝章才调用拆阅接口", async () => {

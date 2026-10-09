@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("../ui/ThemeProvider", async () => {
+  const { C, DARK_COLORS } = await import("../ui/theme");
+  return { useAppTheme: () => ({ colors: h.dark ? DARK_COLORS : C, scheme: h.dark ? "dark" : "light" }),
+    useThemedStyles: (factory: (colors: typeof DARK_COLORS) => unknown) => factory(h.dark ? DARK_COLORS : C) };
+});
 import { isValidElement, type ReactNode } from "react";
 import type { LetterView } from "../api/letterApi";
 
 const h = vi.hoisted(() => ({
   cursor: 0, slots: [] as any[], pending: [] as Array<() => void>,
   session: 1, app: "active", reduce: false, width: 408, id: 0,
+  dark: false,
   changeApp: undefined as undefined | ((state: string) => void),
   alert: vi.fn(),
   animation: vi.fn(),
@@ -58,7 +64,7 @@ vi.mock("react-native", () => ({
   },
 }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView", SafeAreaProvider: "SafeAreaProvider", useSafeAreaInsets: () => ({ top: 59, bottom: 34 }) }));
-vi.mock("react-native-svg", () => ({ default: "Svg", Circle: "Circle", Path: "Path", Rect: "Rect", Line: "Line", Defs: "Defs", ClipPath: "ClipPath", G: "G", Pattern: "Pattern", Text: "SvgText" }));
+vi.mock("react-native-svg", () => ({ default: "Svg", Circle: "Circle", Path: "Path", Rect: "Rect", Line: "Line", Defs: "Defs", ClipPath: "ClipPath", G: "G", LinearGradient: "LinearGradient", Stop: "Stop", Pattern: "Pattern", Text: "SvgText" }));
 vi.mock("lucide-react-native", () => ({ X: "X" }));
 vi.mock("../api", () => ({ getSessionVersion: () => h.session, subscribeSession: vi.fn() }));
 vi.mock("../media/PrivateImage", () => ({ PrivateImages: "PrivateImages" }));
@@ -249,6 +255,109 @@ describe("寄信与拆信仪式", () => {
 });
 
 describe("信纸阅读浮层", () => {
+  it("paper theme changes preview, rules and fade without losing measured height", async () => {
+    const { LetterPaper } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
+    const { C, DARK_COLORS } = await import("../ui/theme");
+    const view = () => LetterPaper({ letter: opened, onPress: vi.fn() });
+    try {
+      let tree = render(view);
+      tree.find((node) => node.props.testID === "letter-paper-preview-content").props.onLayout({ nativeEvent: { layout: { height: 1200 } } });
+      tree.find((node) => node.type === "Text" && node.props.children === opened.content).props.onLayout({ nativeEvent: { layout: { width: 300, height: 960 } } });
+      for (const dark of [false, true, false]) {
+        h.dark = dark; tree = render(view);
+        const colors = dark ? DARK_COLORS : C;
+        expect(tree.find((node) => node.props.testID === "letter-paper").props.style.backgroundColor).toBe(colors.paper);
+        expect(tree.find((node) => node.props.testID === "letter-paper-preview-content").props.style.borderColor).toBe(colors.paperBorder);
+        expect(tree.find((node) => node.type === "Text" && node.props.children === opened.content).props.style.color).toBe(colors.paperInk);
+        expect(tree.filter((node) => node.type === "Text").some((node) => node.props.style?.color === colors.paperMuted)).toBe(true);
+        expect(tree.find((node) => node.type === "Line").props.stroke).toBe(colors.paperRule);
+        expect(tree.filter((node) => node.type === "Stop").map((node) => node.props.stopColor)).toEqual([colors.paper, colors.paper]);
+        expect(tree.find((node) => node.type === "PrivateImages").props.images).toEqual(opened.images);
+      }
+    } finally { h.dark = false; }
+  });
+  it("dark paper reader uses matching paper and text without changing images", async () => {
+    const { PaperReader } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
+    const { DARK_COLORS } = await import("../ui/theme");
+    h.dark = true;
+    try {
+      const tree = render(() => PaperReader({ letter: opened, getTarget: () => undefined, onClose: vi.fn() }));
+      expect(tree.find((node) => node.props.testID === "paper-reader-clip").props.style.backgroundColor).toBe(DARK_COLORS.paper);
+      expect(tree.find((node) => node.props.testID === "reading-paper-content").props.style.backgroundColor).toBe(DARK_COLORS.paper);
+      expect(tree.find((node) => node.type === "Text" && node.props.children === opened.content).props.style.color).toBe(DARK_COLORS.paperInk);
+      expect(tree.find((node) => node.type === "PrivateImages").props.images).toEqual(opened.images);
+    } finally { h.dark = false; }
+  });
+  it("dark sending paper keeps the vintage envelope unchanged", async () => {
+    const { DARK_COLORS } = await import("../ui/theme");
+    h.dark = true;
+    try {
+      const tree = render(() => SendLetterRitual({ ready: true, onComplete: vi.fn() }));
+      expect(tree.find((node) => node.type === "Rect" && node.props.width === "298").props).toMatchObject({ fill: DARK_COLORS.paper, stroke: DARK_COLORS.paperArtBorder });
+      expect(tree.find((node) => node.type === "SvgText" && node.props.children === "驿书").props.fill).toBe(DARK_COLORS.paperAccent);
+      expect(tree.find((node) => node.props.testID === "envelope-back-art")).toBeTruthy();
+    } finally { h.dark = false; }
+  });
+  it.each([180, 320, 1200])("%ipx 内容自适应且最多预览320点，整张信纸统一展开", async (measuredHeight) => {
+    const { LetterPaper } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
+    const expand = vi.fn();
+    const view = () => LetterPaper({ letter: opened, onPress: expand });
+    let tree = render(view);
+    tree.find((node) => node.props.testID === "letter-paper-preview-content").props.onLayout({ nativeEvent: { layout: { height: measuredHeight } } });
+    tree = render(view);
+    const preview = tree.find((node) => node.props.testID === "letter-paper");
+    expect(preview.props.style).toMatchObject({ maxHeight: 320, overflow: "hidden" });
+    expect(preview.props.style.height).toBeUndefined();
+    expect(tree.some((node) => node.props.testID === "letter-paper-preview-fade")).toBe(measuredHeight > 320);
+    const content = tree.find((node) => node.props.testID === "letter-paper-preview-content");
+    expect(content.props.pointerEvents).toBe("none");
+    expect(content.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(tree.some((node) => node.type === "ScrollView")).toBe(false);
+    expect(tree.some((node) => node.props.children === "驿书")).toBe(false);
+    expect(tree.find((node) => node.type === "PrivateImages").props.images).toEqual(opened.images);
+    preview.props.onPress(); expect(expand).toHaveBeenCalledTimes(1);
+  });
+  it("展开时隐藏底层预览但保留裁切定位尺寸", async () => {
+    const { LetterPaper } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
+    const tree = render(() => LetterPaper({ letter: opened, onPress: vi.fn(), concealed: true }));
+    const preview = tree.find((node) => node.props.testID === "letter-paper");
+    expect(preview.props.style).toMatchObject({ maxHeight: 320, opacity: 0 });
+    expect(preview.props.pointerEvents).toBe("none");
+    expect(preview.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(tree.some((node) => node.props.testID === "letter-paper-preview-content")).toBe(true);
+  });
+  it("长信纸等比放大并展开裁切窗，滚动后仍缩回预览而不纵向压扁", async () => {
+    const { PaperReader } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
+    const done = vi.fn();
+    const destination = { x: 24, y: 200, width: 360, height: 320 };
+    const view = () => PaperReader({ letter: opened, getTarget: () => destination, onClose: done });
+    let tree = render(view); await settle(); tree = render(view);
+    expect(h.animation).not.toHaveBeenCalled();
+    tree.find((node) => node.props.testID === "reading-paper-content").props.onLayout({ nativeEvent: { layout: { height: 1200 } } });
+    tree = render(view);
+    const scale = 360 / 376;
+    const surface = tree.find((node) => node.props.testID === "continuous-reading-paper");
+    expect(surface.props.style.transformOrigin).toBe("50% 0%");
+    expect(tree.some((node) => node.props.children === "驿书")).toBe(false);
+    expect(surface.props.style.transform).toHaveLength(3);
+    expect(surface.props.style.transform[2].scale.config.outputRange).toEqual([scale, scale, 1]);
+    expect(tree.find((node) => node.props.testID === "paper-reader-clip").props.style.height.config.outputRange).toEqual([320 / scale, 320 / scale, 1200]);
+    expect(tree.find((node) => node.props.testID === "reading-paper-content").props.style).toMatchObject({ position: "absolute", top: 0, left: 0, right: 0 });
+    expect(tree.find((node) => node.type === "ScrollView").props.scrollEnabled).toBe(false);
+    vi.advanceTimersByTime(380); tree = render(view);
+    const scroll = tree.find((node) => node.type === "ScrollView");
+    expect(scroll.props.scrollEnabled).toBe(true);
+    scroll.props.onScroll({ nativeEvent: { contentOffset: { y: 400 } } });
+    const tap = tree.find((node) => node.type === "Pressable" && nodes(node.props.children).some((child) => child.props.children === "私密正文"));
+    tap.props.onPress(); tree = render(view);
+    const layout = tree.find((node) => node.props.testID === "paper-reader-layout");
+    expect(layout.props.style.transform).toHaveLength(3);
+    expect(layout.props.style.transform[2].scale.config.outputRange).toEqual([1, scale]);
+    expect(layout.props.style.transform[1].translateY.config.outputRange).toEqual([0, 200 - (75 - 400)]);
+    expect(tree.find((node) => node.props.testID === "paper-reader-clip").props.style.height.config.outputRange).toEqual([1200, 320 / scale]);
+    expect(tree.find((node) => node.type === "PrivateImages").props.images).toEqual(opened.images);
+    vi.advanceTimersByTime(360); expect(done).toHaveBeenCalledTimes(1);
+  });
   it("短信纸在安全区内居中，长信纸从顶部整张滚动且不额外撑高", async () => {
     const { PaperReader } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
     const view = () => PaperReader({ letter: opened, getTarget: () => undefined, onClose: vi.fn() });
@@ -271,6 +380,8 @@ describe("信纸阅读浮层", () => {
     const destination = { x: 24, y: 280, width: 360, height: 300 };
     const view = () => PaperReader({ letter: opened, getTarget: () => destination, onClose: done });
     let tree = render(view); await settle(); tree = render(view);
+    tree.find((node) => node.props.testID === "reading-paper-content").props.onLayout({ nativeEvent: { layout: { height: 300 } } });
+    render(view); vi.advanceTimersByTime(380); tree = render(view);
     const scroll = tree.find((node) => node.type === "ScrollView");
     const sheet = tree.find((node) => node.props.testID === "reading-paper-content");
     expect(sheet.props.style.height).toBeUndefined();
@@ -278,19 +389,24 @@ describe("信纸阅读浮层", () => {
     expect(tree.filter((node) => node.type === "ScrollView")).toHaveLength(1);
     scroll.props.onTouchStart({ nativeEvent: { pageX: 100, pageY: 100 } });
     scroll.props.onTouchMove({ nativeEvent: { pageX: 100, pageY: 130 } });
+    scroll.props.onTouchEnd({ nativeEvent: { pageX: 5, touches: [] } });
     const textTap = tree.find((node) => node.type === "Pressable" && nodes(node.props.children).some((child) => child.props.children === "私密正文"));
     textTap.props.onPress(); render(view); vi.advanceTimersByTime(500);
     expect(done).not.toHaveBeenCalled();
     expect(tree.find((node) => node.type === "PrivateImages").props.images).toEqual(opened.images);
-    scroll.props.onTouchStart({ nativeEvent: { pageX: 100, pageY: 100 } });
-    textTap.props.onPress(); textTap.props.onPress(); tree = render(view);
+    scroll.props.onTouchStart({ nativeEvent: { pageX: 5, pageY: 100 } });
+    scroll.props.onTouchEnd({ nativeEvent: { pageX: 5, touches: [{}] } });
+    render(view); expect(done).not.toHaveBeenCalled();
+    scroll.props.onTouchEnd({ nativeEvent: { pageX: 5, touches: [] } });
+    textTap.props.onPress(); tree = render(view);
     expect(h.animation).toHaveBeenCalledWith(expect.objectContaining({ duration: 360, toValue: 1 }));
     vi.advanceTimersByTime(359); expect(done).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1); expect(done).toHaveBeenCalledTimes(1);
   });
   it("未拆阅内容不能进入信纸组件或阅读浮层", async () => {
     const { LetterPaper, PaperReader } = await vi.importActual<typeof import("./LetterPaper")>("./LetterPaper");
-    expect(LetterPaper({ letter: unopened, onPress: vi.fn() })).toBeNull();
+    expect(render(() => LetterPaper({ letter: unopened, onPress: vi.fn() }))).toEqual([]);
+    unmount(); h.cursor = 0; h.slots = []; h.pending = [];
     expect(render(() => PaperReader({ letter: unopened, getTarget: () => undefined, onClose: vi.fn() }))).toEqual([]);
   });
   it("同一张真实信纸从实测信封抽出，保持可见并连续展开，动画中不能滚动", async () => {

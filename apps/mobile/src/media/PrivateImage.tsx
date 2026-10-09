@@ -5,7 +5,8 @@ import { ImagePreview } from "./ImagePreview";
 import { createPrivateImageCache, type PrivatePixels } from "./privateImageCache";
 import { getApi, getSessionVersion, subscribeSession } from "../api";
 import type { LetterImage } from "../api/letterApi";
-import { C, UI } from "../ui/theme";
+import { type Colors, UI } from "../ui/theme";
+import { useAppTheme, useThemedStyles } from "../ui/ThemeProvider";
 
 function ProtectedPixels({
   id,
@@ -66,6 +67,9 @@ function ImagePixels({
   fullscreen?: boolean;
   onRetry: () => void;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const dimensions = aspectRatio ? { aspectRatio } : { flex: 1 };
   return (
     <View
@@ -92,6 +96,8 @@ function ImagePixels({
 }
 
 export function PrivateImages({ images }: { images: LetterImage[] }) {
+  const styles = useThemedStyles(createStyles);
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const index = images.findIndex((item) => item.id === activeId);
   const activeImage = images[index];
@@ -170,7 +176,7 @@ export function PrivateAvatar({ url }: { url: string }) {
   return id ? <ProtectedPixels id={id} preview aspectRatio={1} /> : null;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   frame: { borderRadius: UI.radius, overflow: "hidden", marginTop: 12 },
   pixels: {
     width: "100%",

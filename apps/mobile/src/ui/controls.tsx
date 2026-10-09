@@ -13,7 +13,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, CircleAlert, Info, type LucideIcon } from "lucide-react-native";
-import { C, UI } from "./theme";
+import { type Colors, UI } from "./theme";
+import { useAppTheme, useThemedStyles } from "./ThemeProvider";
 
 export function KeyboardFrame({
   children,
@@ -22,6 +23,8 @@ export function KeyboardFrame({
   nativeInsets = false,
   ...props
 }: KeyboardAvoidingViewProps & { nativeInsets?: boolean }) {
+  const styles = useThemedStyles(createStyles);
+
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView
@@ -44,6 +47,9 @@ export function FormInput({
   editable,
   ...props
 }: TextInputProps & { ref?: Ref<TextInput> }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
@@ -81,6 +87,9 @@ export function ScreenHeader({
   onBack: () => void;
   trailing?: ReactNode;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.header}>
       <Pressable
@@ -112,6 +121,9 @@ export function ActionButton({
   disabled?: boolean;
   quiet?: boolean;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -126,7 +138,7 @@ export function ActionButton({
         pressed && styles.pressed,
       ]}
     >
-      {Icon ? <Icon size={18} color={quiet ? C.green : C.surface} /> : null}
+      {Icon ? <Icon size={18} color={quiet ? C.green : C.onGreen} /> : null}
       <Text style={[styles.actionText, quiet && styles.quietText]}>{title}</Text>
     </Pressable>
   );
@@ -139,6 +151,9 @@ export function Notice({
   tone?: "error" | "info";
   children: ReactNode;
 }) {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View
       accessibilityRole="alert"
@@ -155,7 +170,7 @@ export function Notice({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   flex: { flex: 1 },
   input: {
     minHeight: UI.controlHeight,
@@ -181,7 +196,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: UI.controlRadius,
     borderCurve: "continuous",
-    backgroundColor: C.green,
+    backgroundColor: C.greenSolid,
     shadowColor: C.green,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
@@ -193,7 +208,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionText: {
-    color: C.surface,
+    color: C.onGreen,
     fontWeight: "600",
     fontSize: 15,
     lineHeight: 22,

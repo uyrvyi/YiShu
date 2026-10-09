@@ -1,7 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildLocalMapHtml, mapUpdateScript } from "./localMapHtml";
+import { buildLocalMapHtml, mapThemeScript, mapUpdateScript } from "./localMapHtml";
+import { WEB_MAP_PALETTES } from "./theme";
 import type { RouteMapViewParsed } from "@yishu/shared";
 describe("offline map document", () => {
+  it.each([undefined, { baseUrl: "https://example.com/maps/national-v2" }])("theme updates recolor existing layers without camera operations", (options) => {
+    const html = buildLocalMapHtml(options);
+    const start = html.indexOf("window.yishuSetMapTheme=function(mode)");
+    const end = html.indexOf("window.yishuMapOverview();notify('document-ready')", start);
+    const window = { yishuSetMapTheme: (_value: string) => {}, yishuUpdateMap: vi.fn() };
+    const base = { setStyle: vi.fn() };
+    const css = { setProperty: vi.fn() };
+    const group = { eachLayer: vi.fn((apply) => apply({ setStyle: vi.fn() })) };
+    const grid = { redraw: vi.fn() }; const showOverviewLand = vi.fn();
+    const recolor = new Function("window", "document", "palettes", "palette", "base", "cities", "districts", "waters", "cityStyle", "districtStyle", "waterStyle", "grid", "showOverviewLand", "lastView", "inset", html.slice(start, end));
+    const view = { segments: [] };
+    recolor(window, { documentElement: { style: css } }, WEB_MAP_PALETTES, WEB_MAP_PALETTES.light,
+      base, group, group, group, {}, {}, {}, grid, showOverviewLand, view, 82);
+    window.yishuSetMapTheme("dark");
+    expect(base.setStyle).toHaveBeenCalledWith({ fillColor: WEB_MAP_PALETTES.dark.land });
+    expect(css.setProperty).toHaveBeenCalledWith("--water", WEB_MAP_PALETTES.dark.water);
+    expect(window.yishuUpdateMap).toHaveBeenCalledWith(view, 82);
+    expect(grid.redraw).toHaveBeenCalledTimes(options ? 1 : 0);
+    expect(mapThemeScript("dark")).toBe('window.yishuSetMapTheme("dark");true;');
+    expect(html.slice(start, end)).not.toMatch(/fitBounds|setView|panTo|yishuMapFit|location\./);
+  });
   it.each([
     [undefined, 13, 10],
     [{ baseUrl: "https://8.136.121.71/maps/national-20261003-v2" }, 15, 12],
@@ -57,7 +79,7 @@ describe("offline map document", () => {
     expect(html).toContain("Leaflet 1.9.4");
     expect(html).toContain("crs:L.CRS.EPSG3857");
     expect(html).toContain("var base=L.geoJSON(");
-    expect(html).toContain("style:{stroke:false,fillColor:'#fafcfd',fillOpacity:1}");
+    expect(html).toContain("style:{stroke:false,fillColor:palette.land,fillOpacity:1}");
     expect(html).not.toContain("province-borders");
     expect(html).not.toContain("L.svgOverlay(");
     expect(html).toContain("connect-src 'none'");

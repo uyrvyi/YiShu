@@ -54,7 +54,8 @@ import {
   ScreenHeader,
 } from "../../src/ui/controls";
 import { problemMessage, TRANSPORT_LABELS } from "../../src/ui/presentation";
-import { C, UI } from "../../src/ui/theme";
+import { type Colors, UI } from "../../src/ui/theme";
+import { useAppTheme, useThemedStyles } from "../../src/ui/ThemeProvider";
 import { formatEstimatedDuration, TRANSPORT_DESCRIPTIONS } from "../../src/ui/transport";
 import { SendLetterRitual } from "../../src/letters/LetterRitual";
 
@@ -72,6 +73,9 @@ interface DraftUpload {
 type PreparedUpload = { job: DraftUpload } | { failure: unknown };
 
 export default function NewLetterScreen() {
+  const { colors: C } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+
   const pageScroll = useRef<ScrollView>(null);
   const bodyFocused = useRef(false);
   const bodyTop = useRef(0);
@@ -510,9 +514,9 @@ export default function NewLetterScreen() {
               disabled={searching || draftLocked}
             >
               {searching ? (
-                <ActivityIndicator color={C.surface} />
+                <ActivityIndicator color={C.onGreen} />
               ) : (
-                <Search color={C.surface} size={21} />
+                <Search color={C.onGreen} size={21} />
               )}
             </Pressable>
           </View>
@@ -637,7 +641,7 @@ export default function NewLetterScreen() {
                       onPress={() => confirmRemoveImage(image.id)}
                       hitSlop={8}
                     >
-                      <X size={17} color={C.surface} />
+                      <X size={17} color={C.onGreen} />
                     </Pressable>
                   ) : null}
                 </View>
@@ -665,7 +669,7 @@ export default function NewLetterScreen() {
                   {job.phase === "failed" && !draftLocked ? (
                     <>
                       <View style={styles.retryImage} pointerEvents="none">
-                        <RotateCw size={16} color={C.surface} />
+                        <RotateCw size={16} color={C.onGreen} />
                       </View>
                       <Pressable
                         style={styles.removeImage}
@@ -675,7 +679,7 @@ export default function NewLetterScreen() {
                         onPress={() => confirmRemoveImage(job.id)}
                         hitSlop={8}
                       >
-                        <X size={17} color={C.surface} />
+                        <X size={17} color={C.onGreen} />
                       </Pressable>
                     </>
                   ) : null}
@@ -862,7 +866,7 @@ export default function NewLetterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.surface },
   scroll: { flex: 1 },
   page: {
@@ -879,7 +883,7 @@ const styles = StyleSheet.create({
     width: UI.controlHeight,
     minHeight: UI.controlHeight,
     borderRadius: UI.radius,
-    backgroundColor: C.green,
+    backgroundColor: C.greenSolid,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -909,7 +913,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     lineHeight: 28,
-    backgroundColor: "#FAFBFC",
+    backgroundColor: C.inputCanvas,
   },
   counter: { textAlign: "right", color: C.muted, fontSize: 12, marginTop: 6 },
   overLimit: { color: C.error },
@@ -986,7 +990,7 @@ const styles = StyleSheet.create({
   secondary: { marginTop: 10 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "#20262980",
+    backgroundColor: C.backdrop,
     alignItems: "center",
     justifyContent: "center",
     padding: 20,

@@ -6,6 +6,11 @@ import osmNotice from "./detailData/osm-notice.json";
 import { LEAFLET_JS, LEAFLET_CSS } from "./vendor/leaflet";
 import { VECTOR_GRID_JS, VECTOR_GRID_NOTICES } from "./vendor/vectorGrid";
 import { staticTileConfig, staticTileScript, type StaticTileOptions } from "./vectorTiles";
+import { WEB_MAP_PALETTES } from "./theme";
+
+export function mapThemeScript(scheme: "light" | "dark"): string {
+  return `window.yishuSetMapTheme(${JSON.stringify(scheme)});true;`;
+}
 
 export function mapUpdateScript(view: RouteMapViewParsed, topInset: number): string {
   return `window.yishuUpdateMap(${JSON.stringify(geographicMapPayload(view)).replace(/</g, "\\u003c")},${Math.max(18, topInset)});true;`;
@@ -28,25 +33,33 @@ export function buildLocalMapHtml(options?: StaticTileOptions): string {
   };
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src ${tiles ? tiles.origin : "'none'"};"><style>${LEAFLET_CSS}
 .national-view .leaflet-tooltip{display:none}
+:root{--water:#eaf1f4;--land:#fafcfd;--panel:#ffffffe6;--text:#202629;--label:#71818a;--province-label:#84939c;--district-label:#89959b;--line:#c0cdd2}
+.place-label{color:var(--label)!important;text-shadow:0 1px 2px var(--land),1px 0 2px var(--land),-1px 0 2px var(--land)!important}.place-label.province{color:var(--province-label)!important}.place-label.district{color:var(--district-label)!important}
+.leaflet-tooltip,.leaflet-control-attribution,.detail-unavailable{background:var(--panel)!important;color:var(--text)!important}.leaflet-control-attribution a{color:var(--text)}.leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--line)!important}.pin{border-color:var(--land)!important}
+html,body,#map,.leaflet-container{background:var(--water)!important}#map.static-tiles{background:var(--map-background,var(--water))!important}
 html,body{overflow:hidden;overscroll-behavior:none}#map{touch-action:none;overscroll-behavior:none}
 .place-label{white-space:nowrap;color:#71818a;font-size:12px;line-height:20px;text-align:center;text-shadow:0 1px 2px white,1px 0 2px white,-1px 0 2px white;pointer-events:none}.place-label.province{color:#84939c;font-weight:600}.place-label.district{font-size:11px;color:#89959b}.detail-unavailable{position:absolute;bottom:25px;left:12px;z-index:800;font-size:11px;color:#657d88;background:#ffffffe6;padding:3px 6px;border-radius:6px}
 html,body,#map{height:100%;width:100%;margin:0;background:#eaf1f4}body{font-family:Arial,sans-serif;letter-spacing:0}.leaflet-container{background:#eaf1f4}.leaflet-control-zoom{border:0!important;box-shadow:0 2px 10px #0002!important;border-radius:12px!important;overflow:hidden}.leaflet-control-attribution{font-size:9px;background:#ffffffe6}.pin{display:block;width:12px;height:12px;border:3px solid white;border-radius:50%;box-shadow:0 1px 5px #0004;box-sizing:border-box}.leaflet-tooltip{font-size:11px;line-height:16px;border:0;box-shadow:none;background:#ffffffe6;padding:3px 6px;border-radius:6px}.leaflet-tooltip:before{display:none}</style></head><body><div id="map"></div><script type="application/json" id="map-license-notices">${JSON.stringify(notices).replace(/</g, "\\u003c")}</script><script>${LEAFLET_JS.replace(/<\/script/gi, "<\\/script")}</script>${tiles ? `<script>${VECTOR_GRID_JS.replace(/<\/script/gi, "<\\/script")}</script>` : ""}<script>
 (function(){
 var notify=function(v){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(v)};
 try{
+var palettes=${JSON.stringify(WEB_MAP_PALETTES)},palette=palettes.light,lastView=null;
 var routeFitMaxZoom=${maxZoom - 3};
 var map=L.map('map',{crs:L.CRS.EPSG3857,minZoom:2,maxZoom:${maxZoom},zoomControl:false,attributionControl:true,zoomSnap:0.1,bounceAtZoomLimits:false});
 map.getContainer().addEventListener('touchmove',function(event){if(event.cancelable)event.preventDefault()},{passive:false});
 L.control.zoom({position:'bottomright',zoomInTitle:'放大',zoomOutTitle:'缩小'}).addTo(map);
 map.attributionControl.setPrefix(false);${tiles ? "" : "map.attributionControl.addAttribution('运输示意图 · geoBoundaries · GaryBikini · © OpenStreetMap contributors');"}
 map.createPane('geographic-base');map.getPane('geographic-base').style.zIndex='200';
-var base=L.geoJSON(${JSON.stringify(CHINA_GEOGRAPHIC_GEOJSON)},{pane:'geographic-base',interactive:false,smoothFactor:0,style:{stroke:false,fillColor:'#fafcfd',fillOpacity:1}}).addTo(map);
+var base=L.geoJSON(${JSON.stringify(CHINA_GEOGRAPHIC_GEOJSON)},{pane:'geographic-base',interactive:false,smoothFactor:0,style:{stroke:false,fillColor:palette.land,fillOpacity:1}}).addTo(map);
 var layer=L.layerGroup().addTo(map),points=[],inset=18,first=true;
 ['city-boundaries','district-boundaries','physical-water','place-labels'].forEach(function(name,i){map.createPane(name);map.getPane(name).style.zIndex=String(210+i*10);map.getPane(name).style.pointerEvents='none'});
 ${tiles ? "map.createPane('national-tiles');map.getPane('national-tiles').style.zIndex='210';map.getPane('national-tiles').style.pointerEvents='none';" : ""}
 var cities=L.layerGroup().addTo(map),districts=L.layerGroup().addTo(map),waters=L.layerGroup().addTo(map),places=L.layerGroup().addTo(map),detailCandidates=[],detailTimer=null,labelTimer=null,requestId=0;
 var unavailable=document.createElement('div');unavailable.className='detail-unavailable';unavailable.hidden=true;unavailable.textContent='区域细节暂不可用';map.getContainer().appendChild(unavailable);
 window.yishuMapDetailsUnavailable=function(){unavailable.hidden=false};
+var cityStyle=function(f){return {color:palette.boundary,weight:0.8,fillColor:palette.city[Number(f.properties.code)%3],fillOpacity:0.75}};
+var districtStyle=function(f){return {color:palette.boundary,weight:0.9,fillColor:palette.district[Number(f.properties.code)%3],fillOpacity:0.7,dashArray:'3 3'}};
+var waterStyle=function(){return {stroke:false,fillColor:palette.river,fillOpacity:0.9}};
 var labelMeasure=document.createElement('canvas').getContext('2d');
 var overlap=function(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y};
 var drawPlaceLabels=function(){
@@ -65,9 +78,9 @@ var requestDetails=function(){${tiles ? "scheduleLabels();return;" : ""}clearTim
 if(r.zoom<6){cities.clearLayers();districts.clearLayers();waters.clearLayers();detailCandidates=[];scheduleLabels();return}
 if(window.yishuDetailBridge)window.yishuDetailBridge(r);else notify('detail-request:'+JSON.stringify(r));},100)};
 window.yishuMapDetails=function(payload){${tiles ? "return;" : ""}if(payload.id!==requestId)return;unavailable.hidden=true;cities.clearLayers();districts.clearLayers();waters.clearLayers();detailCandidates=[];
-(payload.cities||[]).forEach(function(f,i){L.geoJSON(f,{pane:'city-boundaries',interactive:false,smoothFactor:0.5,style:{color:'#c6d2d6',weight:0.8,fillColor:['#f6f9fa','#f0f5f4','#f4f6f9'][Number(f.properties.code)%3],fillOpacity:0.75}}).addTo(cities);detailCandidates.push(f.properties)});
-(payload.districts||[]).forEach(function(f){L.geoJSON(f,{pane:'district-boundaries',interactive:false,smoothFactor:f.properties.source==='OSM'?0:0.5,style:{color:'#c6d2d7',weight:0.9,fillColor:['#f0f6f4','#f2f5fa','#f7f8f9'][Number(f.properties.code)%3],fillOpacity:0.7,dashArray:'3 3'}}).addTo(districts);detailCandidates.push(f.properties)});
-(payload.waters||[]).forEach(function(f){if(f.properties.source!=='OSM'||(f.geometry.type!=='Polygon'&&f.geometry.type!=='MultiPolygon'))return;L.geoJSON(f,{pane:'physical-water',interactive:false,smoothFactor:0,style:{stroke:false,fillColor:'#cee5ee',fillOpacity:0.9}}).addTo(waters)});
+(payload.cities||[]).forEach(function(f,i){L.geoJSON(f,{pane:'city-boundaries',interactive:false,smoothFactor:0.5,style:cityStyle}).addTo(cities);detailCandidates.push(f.properties)});
+(payload.districts||[]).forEach(function(f){L.geoJSON(f,{pane:'district-boundaries',interactive:false,smoothFactor:f.properties.source==='OSM'?0:0.5,style:districtStyle}).addTo(districts);detailCandidates.push(f.properties)});
+(payload.waters||[]).forEach(function(f){if(f.properties.source!=='OSM'||(f.geometry.type!=='Polygon'&&f.geometry.type!=='MultiPolygon'))return;L.geoJSON(f,{pane:'physical-water',interactive:false,smoothFactor:0,style:waterStyle}).addTo(waters)});
 scheduleLabels();
 };
 ${tiles ? staticTileScript(tiles.baseUrl) : ""}
@@ -80,14 +93,24 @@ var pin=function(p,color,label,direction){if(!p)return;addPoint(p);var el=docume
 window.yishuMapOverview=function(){map.invalidateSize();map.fitBounds(base.getBounds(),{padding:[24,24],animate:false});};
 window.yishuMapFit=function(){map.invalidateSize();if(points.length){var bounds=L.latLngBounds(points);map.fitBounds(bounds,{paddingTopLeft:[72,inset+44],paddingBottomRight:[80,70],maxZoom:routeFitMaxZoom,animate:false});}else window.yishuMapOverview();};
 window.yishuUpdateMap=function(view,topInset){
-layer.clearLayers();points=[];inset=topInset||18;
-(view.segments||[]).forEach(function(segment){line([segment.from,segment.to],segment.state==='COMPLETED'?'#177b65':'#95a5af',segment.state==='COMPLETED'?null:'7 7',segment.kind)});
-(view.stations||[]).forEach(function(p){pin(p,'#687e88',p.name+'驿站')});
-pin(view.origin,'#177b65',view.origin&&view.origin.name,'bottom');pin(view.destination,'#357ab4',view.destination&&view.destination.name,'top');
-pin(view.approximatePosition,'#d18237','运输推算位置');if(!view.approximatePosition&&!view.destination)pin(view.lastKnownPosition,'#177b65');
+lastView=view;layer.clearLayers();points=[];inset=topInset||18;
+(view.segments||[]).forEach(function(segment){line([segment.from,segment.to],segment.state==='COMPLETED'?palette.completed:palette.remaining,segment.state==='COMPLETED'?null:'7 7',segment.kind)});
+(view.stations||[]).forEach(function(p){pin(p,palette.station,p.name+'驿站')});
+pin(view.origin,palette.origin,view.origin&&view.origin.name,'bottom');pin(view.destination,palette.destination,view.destination&&view.destination.name,'top');
+pin(view.approximatePosition,palette.approximate,'运输推算位置');if(!view.approximatePosition&&!view.destination)pin(view.lastKnownPosition,palette.lastKnown);
 (view.facts||[]).forEach(addPoint);
 if(first){window.yishuMapFit();first=false}notify('ready');
 scheduleLabels();
+};
+window.yishuSetMapTheme=function(mode){
+palette=mode==='dark'?palettes.dark:palettes.light;
+var root=document.documentElement.style;
+['water','land','panel','text','label','line'].forEach(function(key){root.setProperty('--'+key,palette[key]||palette.boundary)});
+root.setProperty('--province-label',palette.provinceLabel);root.setProperty('--district-label',palette.districtLabel);
+base.setStyle({fillColor:palette.land});
+cities.eachLayer(function(g){g.setStyle(cityStyle)});districts.eachLayer(function(g){g.setStyle(districtStyle)});waters.eachLayer(function(g){g.setStyle(waterStyle)});
+${tiles ? "grid.redraw();showOverviewLand();" : ""}
+if(lastView)window.yishuUpdateMap(lastView,inset);
 };
 window.yishuMapOverview();notify('document-ready');
 }catch(e){notify('error:render')}

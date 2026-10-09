@@ -10,7 +10,13 @@ const hooks = vi.hoisted(() => ({
   effectCursor: 0,
   effects: new Map<number, { deps: readonly unknown[]; cleanup?: () => void }>(),
   appStateListeners: new Set<(state: string) => void>(),
+  scheme: "light" as "light" | "dark",
 }));
+vi.mock("../ui/ThemeProvider", async () => {
+  const { C, DARK_COLORS } = await import("../ui/theme");
+  return { useAppTheme: () => ({ colors: hooks.scheme === "dark" ? DARK_COLORS : C, scheme: hooks.scheme }),
+    useThemedStyles: (factory: (colors: typeof DARK_COLORS) => unknown) => factory(hooks.scheme === "dark" ? DARK_COLORS : C) };
+});
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useState: (initial: unknown) => {
@@ -105,6 +111,7 @@ function message(tree: Element[], data: string) {
   });
 }
 beforeEach(() => {
+  hooks.scheme = "light";
   hooks.state.clear();
   hooks.refs.clear();
   hooks.effects.clear();
@@ -117,6 +124,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("bundled interactive transport map", () => {
+  it("recolors without replacing the document, changing key or restarting map interaction", async () => {
+    const changed = vi.fn();
+    const tree = await render(view, changed);
+    const injectJavaScript = vi.fn(); hooks.refs.get(0)!.current = { injectJavaScript };
+    message(tree, "document-ready"); message(tree, "ready"); await render(view, changed);
+    (tree.find((node) => node.props.onTouchStart)?.props.onTouchStart as () => void)();
+    injectJavaScript.mockClear(); hooks.scheme = "dark";
+    const dark = await render(view, changed);
+    const source = (nodes: Element[]) => nodes.find((node) => node.type === "WebView")!;
+    expect(source(dark).props.source).toEqual(source(tree).props.source);
+    expect(injectJavaScript).toHaveBeenCalledWith('window.yishuSetMapTheme("dark");true;');
+    expect(injectJavaScript.mock.calls.flat().join(" ")).not.toContain("yishuMapFit");
+    expect(changed.mock.calls).toEqual([[true]]);
+    expect(text(dark)).not.toContain("地图绘制中");
+  });
   it("loads public background detail through the native bridge without replacing the document", async () => {
     const tree = await render();
     const injectJavaScript = vi.fn();

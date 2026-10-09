@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+vi.mock("../ui/ThemeProvider", async () => {
+  const { C } = await import("../ui/theme");
+  return { useAppTheme: () => ({ colors: C, scheme: "light" }) };
+});
 import type { ReactNode } from "react";
 import { MAP_FACT_LIMIT, type RouteMapViewParsed } from "@yishu/shared";
 

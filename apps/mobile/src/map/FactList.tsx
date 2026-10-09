@@ -8,8 +8,17 @@
 import { Text, View } from "react-native";
 import type { RouteMapViewParsed } from "@yishu/shared";
 import { factRowsFor } from "./presentation";
+import { useAppTheme } from "../ui/ThemeProvider";
 
 export function FactList({ view }: { view: RouteMapViewParsed }) {
+  const { colors } = useAppTheme();
+  const styles = {
+    factsBox: { ...baseStyles.factsBox, borderColor: colors.line, backgroundColor: colors.surface },
+    factsTitle: { ...baseStyles.factsTitle, color: colors.ink },
+    factRow: baseStyles.factRow,
+    factTitle: { ...baseStyles.factTitle, color: colors.ink },
+    factMeta: { ...baseStyles.factMeta, color: colors.muted },
+  };
   const rows = factRowsFor(view);
 
   return (
@@ -30,7 +39,7 @@ export function FactList({ view }: { view: RouteMapViewParsed }) {
   );
 }
 
-const styles = {
+const baseStyles = {
   factsBox: {
     marginTop: 16,
     borderWidth: 1,
